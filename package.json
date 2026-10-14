@@ -8,6 +8,10 @@
     "node": ">=20"
   },
   "scripts": {
+    "start": "node --env-file=.env start.mjs --painel",
+    "rodada": "node --env-file=.env start.mjs",
+    "dry": "node --env-file=.env start.mjs --dry",
+    "planilha": "node escrever-planilha.mjs --tudo",
     "fixture": "node scripts/gerar-fixture.mjs",
     "importar": "node scripts/importar-planilha.mjs",
     "proof": "node run-proof.mjs",
