@@ -12,3 +12,7 @@ resultado.txt
 
 node_modules/
 .DS_Store
+
+# saída dos testes locais
+tela-shopee.*
+tela-adspower.png
