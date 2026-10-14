@@ -22,9 +22,24 @@ createServer((req, res) => {
     res.end('{"ok":true}');
     let m; try { m = JSON.parse(bruto); } catch { return; }
 
+    // O coletor nunca pode cair: ele é o único ponto por onde a coleta
+    // passa, e um processo morto vira "nenhum pedido novo" silencioso.
+    try { tratar(m); } catch (e) { console.error(`\x1b[31m[erro ao tratar payload]\x1b[0m ${e.message}`); }
+  });
+}).listen(PORTA, "127.0.0.1", () =>
+  console.log(`coletor ouvindo em http://127.0.0.1:${PORTA}  —  aguardando coletas\n`));
+
+function tratar(m) {
+
     const hora = new Date().toLocaleTimeString("pt-BR");
+    if (m.tipo === "ping") return; // checagem de sanidade da rodada
     if (m.tipo === "coleta") {
-      console.log(`\x1b[35m[${hora}] COLETA\x1b[0m ${m.pagina}  (${m.duracaoMs} ms)`);
+      const conta = m.conta ?? "sem-conta";
+      console.log(`\x1b[35m[${hora}] COLETA\x1b[0m conta ${conta} · ${(m.pedidos ?? []).length} pedido(s) · ${m.duracaoMs} ms`);
+      mkdirSync("captura/coletas", { recursive: true });
+      // arquivo por conta: é o sinal que a fila espera para saber que
+      // aquela conta terminou
+      writeFileSync(`captura/coletas/conta-${conta}.json`, JSON.stringify(m, null, 2));
       writeFileSync("captura/coleta.json", JSON.stringify(m, null, 2));
 
       console.log("\n  \x1b[1mLISTAS\x1b[0m");
@@ -83,9 +98,9 @@ createServer((req, res) => {
       return;
     }
 
-    const rota = String(m.url ?? "").split("?")[0];
+    const rota = String(m.url ?? "(sem url)").split("?")[0];
     const arq = `captura/ext-${String(++n).padStart(2, "0")}.json`;
-    writeFileSync(arq, JSON.stringify(m.corpo, null, 2));
+    writeFileSync(arq, JSON.stringify(m.corpo ?? m, null, 2));
     console.log(`\x1b[32m[${hora}] API\x1b[0m ${rota}`);
     console.log(`   -> ${arq}`);
 
@@ -99,6 +114,4 @@ createServer((req, res) => {
       return [`${p} = ${JSON.stringify(o).slice(0, 60)}`];
     };
     console.log(forma(m.corpo).slice(0, 25).map((l) => "   " + l).join("\n"));
-  });
-}).listen(PORTA, "127.0.0.1", () =>
-  console.log(`coletor ouvindo em http://127.0.0.1:${PORTA}  —  abra a tela de compras no perfil\n`));
+}

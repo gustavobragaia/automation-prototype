@@ -1,90 +1,86 @@
-// Rodada automática, sem CDP e sem interação humana.
+// Rodada completa: varre as contas, coleta, grava o estado e escreve a planilha.
 //
-//   1. abre o perfil pela Local API, injetando a extensão via --load-extension
-//   2. abre a aba de compras pelo endpoint HTTP do DevTools (não anexa sessão)
-//   3. a extensão coleta sozinha e manda para o coletor
-//   4. fecha o perfil, sem deslogar
+//   node --env-file=.env rodada.mjs                 # usa contas.json
+//   node --env-file=.env rodada.mjs 2 7 196         # contas específicas
 //
-//   node --env-file=.env rodada.mjs [serial]
+// Pré-requisito: o coletor precisa estar rodando (node coletor.mjs).
 
-import { resolve } from "node:path";
-import { fecharPerfil, statusPerfil } from "./src/adspower.mjs";
-
-const BASE = process.env.ADSPOWER_BASE ?? "http://local.adspower.net:50325";
-const KEY = process.env.ADSPOWER_API_KEY ?? "";
-const EXT = resolve("extensao");
-const serial = Number(process.argv[2] ?? 2);
+import { readFileSync, existsSync } from "node:fs";
+import { rodarFila } from "./src/fila.mjs";
+import { extrairPedido } from "./src/shopee.mjs";
+import { carregar, salvar, registrar } from "./src/estado.mjs";
+import { listarPerfisOuNull } from "./src/adspower.mjs";
+import { parseConta } from "./src/tracking.mjs";
 
 const ok = (m) => console.log(`  \x1b[32m✓\x1b[0m ${m}`);
+const aten = (m) => console.log(`  \x1b[33m!\x1b[0m ${m}`);
+const falha = (m) => console.log(`  \x1b[31m✗\x1b[0m ${m}`);
 const info = (m) => console.log(`    ${m}`);
 const sec = (t) => console.log(`\n\x1b[1m${t}\x1b[0m`);
-const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const api = async (caminho, params = {}) => {
-  const u = new URL(caminho, BASE);
-  for (const [k, v] of Object.entries(params)) if (v != null) u.searchParams.set(k, v);
-  const r = await fetch(u, { headers: { Authorization: `Bearer ${KEY}` }, signal: AbortSignal.timeout(90_000) });
-  const j = await r.json();
-  if (j.code !== 0) throw new Error(`${j.msg} (code ${j.code})`);
-  return j.data;
-};
+// ── de onde vêm as contas ────────────────────────────────────────────
+async function descobrirContas() {
+  const args = process.argv.slice(2);
+  if (args.length) return args.map((a) => ({ serial: Number(a), conta: Number(a) }));
 
-try {
-  sec("1. Abrir perfil com a extensão injetada");
-  if ((await statusPerfil({ serial })) === "Active") {
-    await fecharPerfil({ serial });
-    await dormir(3000);
-    info("perfil estava aberto; reiniciado para injetar a extensão");
-  }
-  const d = await api("/api/v1/browser/start", {
-    serial_number: serial, open_tabs: 0, ip_tab: 0, cdp_mask: 1,
-    launch_args: JSON.stringify([`--load-extension=${EXT}`]),
-  });
-  const porta = d.debug_port;
-  ok(`perfil aberto · porta ${porta}`);
-  await dormir(5000);
-
-  // O service worker MV3 fica dormente até o primeiro evento, então a
-  // ausência dele não prova nada. Tenta por alguns segundos só para
-  // informar; a verificação que vale é o dado chegar no coletor.
-  let idExt = null;
-  for (let i = 0; i < 8 && !idExt; i++) {
-    const alvos = await (await fetch(`http://127.0.0.1:${porta}/json/list`)).json();
-    idExt = alvos.find((t) => t.type === "service_worker" && /\/background\.js$/.test(t.url ?? ""))?.url?.split("/")[2];
-    if (!idExt) await dormir(2000);
-  }
-  idExt ? ok(`extensão ativa: ${idExt}`) : info("service worker dormente (normal no MV3) — seguindo");
-
-  sec("2. Abrir a tela de compras (sem anexar CDP)");
-  for (const tipo of [7]) {
-    const url = encodeURIComponent(`https://shopee.com.br/user/purchase?type=${tipo}`);
-    await fetch(`http://127.0.0.1:${porta}/json/new?${url}`, { method: "PUT" });
-    ok(`aba aberta em type=${tipo}`);
+  if (existsSync("contas.json")) {
+    const c = JSON.parse(readFileSync("contas.json", "utf8"));
+    info(`${c.length} contas lidas de contas.json`);
+    return c;
   }
 
-  sec("3. Aguardando a extensão coletar");
-  const { statSync, existsSync } = await import("node:fs");
-  const arq = "captura/coleta.json";
-  const antes = existsSync(arq) ? statSync(arq).mtimeMs : 0;
-
-  let chegou = false;
-  for (let i = 0; i < 30; i++) {
-    await dormir(2000);
-    if (existsSync(arq) && statSync(arq).mtimeMs > antes) { chegou = true; break; }
-    if (i % 5 === 4) info(`aguardando... ${(i + 1) * 2}s`);
-  }
-
-  const abas = await (await fetch(`http://127.0.0.1:${porta}/json/list`)).json();
-  for (const t of abas.filter((x) => x.type === "page"))
-    info(`${JSON.stringify(t.title)}  ${t.url.slice(0, 70)}`);
-
-  if (chegou) ok("coleta recebida pelo coletor local");
-  else {
-    console.log("  \x1b[31m✗ nada chegou ao coletor\x1b[0m");
-    info("causas possíveis: coletor desligado, extensão não injetada, ou a página não carregou");
-  }
-} finally {
-  sec("4. Encerrar");
-  try { await fecharPerfil({ serial }); ok("perfil fechado, sem deslogar"); } catch {}
-  console.log("\n  Veja o resultado no terminal do coletor.");
+  // no plano pago do cliente, o próprio AdsPower lista os 700 perfis
+  const lista = await listarPerfisOuNull(1, 500);
+  if (!lista) throw new Error("sem contas.json e user/list indisponível (plano free) — passe os seriais como argumento");
+  return lista.list
+    .map((p) => ({ userId: p.user_id, conta: parseConta(p.name).numeros[0] }))
+    .filter((c) => c.conta != null);
 }
+
+const contas = await descobrirContas();
+sec(`Rodada · ${contas.length} conta(s)`);
+
+// checagem de sanidade: coletor no ar? sem ele a rodada seria vazia e
+// pareceria "nenhum pedido novo"
+try {
+  await fetch("http://127.0.0.1:3000/captura", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: "ping" }),
+    signal: AbortSignal.timeout(3000),
+  });
+  ok("coletor respondendo em 127.0.0.1:3000");
+} catch {
+  falha("coletor não está rodando — abra outro terminal e rode: node coletor.mjs");
+  process.exit(1);
+}
+
+const t0 = Date.now();
+const resultados = await rodarFila(contas, {
+  concorrencia: Number(process.env.CONCORRENCIA ?? 3),
+  aoLog: (m) => info(m),
+});
+
+sec("Consolidando");
+const estado = carregar();
+let novos = 0, despachados = 0;
+
+for (const r of resultados.filter((x) => x.ok)) {
+  const pacote = JSON.parse(readFileSync(r.arq, "utf8"));
+  for (const p of pacote.pedidos ?? []) {
+    if (!p.bruto) continue;
+    const pedido = extrairPedido(p.bruto, { orderId: p.orderId });
+    const antes = estado[pedido.orderId];
+    registrar(estado, r.conta, pedido);
+    if (!antes) novos++;
+    if (pedido.despachado) despachados++;
+  }
+}
+salvar(estado);
+
+const falhas = resultados.filter((x) => !x.ok);
+ok(`${resultados.length - falhas.length}/${contas.length} contas coletadas em ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+ok(`${Object.keys(estado).length} pedidos no estado · ${novos} novo(s) · ${despachados} já despachado(s)`);
+if (falhas.length) {
+  aten(`${falhas.length} conta(s) falharam — vão para a próxima rodada:`);
+  for (const f of falhas) info(`conta ${f.conta}: ${f.erro}`);
+}
+console.log("\n  Para gerar a planilha:  node escrever-planilha.mjs\n");

@@ -8,9 +8,10 @@ const txt = (v) => (typeof v === "string" ? v.trim() : "");
 // 100.000 fecham de forma coerente:
 //   /10000  -> item 35,80 · antes 70,00 · total 43,10 (frete 7,30)
 //   /100000 -> item  3,58 · antes  7,00 · total  4,31 (frete 0,73)
-// Só o valor realmente pago resolve. Errar aqui corrompe o casamento por
-// valor em silêncio, então fica explícito e configurável.
-export const DIVISOR_VALOR = Number(process.env.SHOPEE_DIVISOR_VALOR ?? 10000);
+// Confirmado com o pedido de teste: foram pagos R$ 4,31, logo o divisor
+// é 100.000. Errar aqui corrompe o casamento por valor em silêncio, então
+// fica explícito e configurável.
+export const DIVISOR_VALOR = Number(process.env.SHOPEE_DIVISOR_VALOR ?? 100000);
 export const paraReais = (n) => (typeof n === "number" ? n / DIVISOR_VALOR : null);
 
 // "Rua Dona Regina, S/N, Piracicaba, São Paulo, 13424165"

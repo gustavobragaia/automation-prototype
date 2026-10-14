@@ -84,7 +84,7 @@
       pedidos.push({
         // fase de descoberta: manda o corpo cru do primeiro detalhe que deu OK,
         // para mapear onde moram destinatário, endereço e rastreio
-        bruto: pedidos.length === 0 ? respostas.find((r) => r.ok)?.corpo ?? null : null,
+        bruto: respostas.find((r) => r.ok)?.corpo ?? null,
         orderId: id,
         codigos,
         simulado,
@@ -94,8 +94,13 @@
       await new Promise((r) => setTimeout(r, 400)); // ritmo humano entre pedidos
     }
 
+    // A conta vem marcada no fragmento da URL (#conta=196) na hora de abrir
+    // a aba. Sem isso o coletor não sabe de qual perfil veio cada pedido.
+    const conta = new URLSearchParams(location.hash.slice(1)).get("conta");
+
     publicar({
       tipo: "coleta",
+      conta,
       pagina: location.href,
       duracaoMs: Date.now() - inicio,
       listas,
