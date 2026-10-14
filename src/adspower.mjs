@@ -38,12 +38,24 @@ const idParams = (ref) => {
   return a.serial != null ? { serial_number: a.serial } : { user_id: a.userId };
 };
 
-export async function abrirPerfil(ref, { headless = 0 } = {}) {
-  // cdp_mask=1 é o padrão e mascara a detecção de automação. Explícito de propósito.
-  const d = await chamar("/api/v1/browser/start", {
-    ...idParams(ref), open_tabs: 0, ip_tab: 0, headless, cdp_mask: 1,
-  });
-  return { ws: d.ws.puppeteer, debugPort: d.debug_port };
+// O AdsPower baixa/atualiza o kernel do Chrome sozinho e, enquanto isso,
+// recusa abrir o perfil. É transitório: espera e tenta de novo.
+const TRANSITORIO = /is updating|waiting for download|downloading|please wait/i;
+
+export async function abrirPerfil(ref, { headless = 0, tentativas = 20, espera = 15_000, aoEsperar } = {}) {
+  for (let i = 1; ; i++) {
+    try {
+      // cdp_mask=1 mascara a detecção de automação. Explícito de propósito.
+      const d = await chamar("/api/v1/browser/start", {
+        ...idParams(ref), open_tabs: 0, ip_tab: 0, headless, cdp_mask: 1,
+      });
+      return { ws: d.ws.puppeteer, debugPort: d.debug_port };
+    } catch (e) {
+      if (i >= tentativas || !TRANSITORIO.test(e.message)) throw e;
+      aoEsperar?.(e.message, i, tentativas);
+      await new Promise((r) => setTimeout(r, espera));
+    }
+  }
 }
 
 export const fecharPerfil = (ref) => chamar("/api/v1/browser/stop", idParams(ref));

@@ -54,7 +54,9 @@ try {
   // ─── 2. Abrir e conectar ────────────────────────────────────────────────
   sec("2. Abrir o perfil e conectar o Playwright");
   const t0 = Date.now();
-  const sessao = await abrirPerfil(alvo);
+  const sessao = await abrirPerfil(alvo, {
+    aoEsperar: (msg, i, n) => aviso(`${msg} — aguardando (${i}/${n})`),
+  });
   perfilAberto = alvo;
   ok(`perfil aberto em ${Date.now() - t0} ms`);
   info(`ws: ${sessao.ws}`);
