@@ -23,6 +23,59 @@ createServer((req, res) => {
     let m; try { m = JSON.parse(bruto); } catch { return; }
 
     const hora = new Date().toLocaleTimeString("pt-BR");
+    if (m.tipo === "coleta") {
+      console.log(`\x1b[35m[${hora}] COLETA\x1b[0m ${m.pagina}  (${m.duracaoMs} ms)`);
+      writeFileSync("captura/coleta.json", JSON.stringify(m, null, 2));
+
+      console.log("\n  \x1b[1mLISTAS\x1b[0m");
+      for (const l of m.listas ?? []) {
+        const marca = l.ok ? "\x1b[32m OK \x1b[0m" : l.erro ? "\x1b[31mERR \x1b[0m" : `\x1b[33m${String(l.status).padStart(4)}\x1b[0m`;
+        console.log(`  ${marca} tipo=${l.tipo} ${l.caminho.split("?")[0]}`);
+        if (l.ok) console.log(`         ${JSON.stringify(l.corpo).length} bytes · chaves: ${Object.keys(l.corpo).slice(0, 8).join(", ")}`);
+      }
+
+      console.log(`\n  \x1b[1mPEDIDOS\x1b[0m (${(m.pedidos ?? []).length})`);
+      for (const p of m.pedidos ?? []) {
+        const tag = p.simulado ? "\x1b[33m[SIMULADO]\x1b[0m" : "\x1b[32m[REAL]\x1b[0m";
+        console.log(`   ${tag} order_id=${p.orderId}  ->  ${p.codigos.join(", ") || "(sem código)"}`);
+        if (p.camposComRastreio?.length) console.log(`             campo: ${p.camposComRastreio.join(" | ")}`);
+        if (p.endpointsOk?.length) console.log(`             endpoints OK: ${p.endpointsOk.join(" ")}`);
+      }
+      writeFileSync("captura/coleta-tela.txt", m.texto ?? "");
+      console.log();
+      return;
+    }
+
+    if (m.tipo === "sonda") {
+      console.log(`\x1b[35m[${hora}] SONDA\x1b[0m ${m.pagina}`);
+      writeFileSync("captura/sonda.json", JSON.stringify(m, null, 2));
+
+      const rastreios = (txt) => [...new Set((txt.match(/BR\d{12}[A-Z0-9]|SPX[A-Z]*\d{6,}|[A-Z]{2}\d{9}BR/g) || []))];
+
+      const mostrar = (titulo, itens) => {
+        console.log(`\n  \x1b[1m${titulo}\x1b[0m`);
+        for (const a of itens) {
+          const marca = a.ok ? "\x1b[32m OK \x1b[0m" : a.erro ? "\x1b[31mERR \x1b[0m" : `\x1b[33m${String(a.status).padStart(4)}\x1b[0m`;
+          console.log(`  ${marca} ${a.caminho}`);
+          if (!a.ok || !a.corpo) continue;
+          const txt = JSON.stringify(a.corpo);
+          console.log(`         ${txt.length} bytes · chaves: ${Object.keys(a.corpo).slice(0, 10).join(", ")}`);
+          const tr = rastreios(txt);
+          if (tr.length) console.log(`         \x1b[32mRASTREIO: ${tr.join(", ")}\x1b[0m`);
+        }
+      };
+
+      mostrar("LISTAS", m.listas ?? []);
+      console.log(`\n  \x1b[1mIDS ENCONTRADOS\x1b[0m (${(m.ids ?? []).length})`);
+      console.log("   " + (m.ids ?? []).slice(0, 20).join("  ") || "   (nenhum)");
+      console.log(`   order_id usado no detalhe: ${m.orderIdUsado ?? "(nenhum)"}`);
+      mostrar("DETALHE", m.detalhes ?? []);
+
+      writeFileSync("captura/sonda-tela.txt", m.texto ?? "");
+      console.log(`\n  tela: ${(m.texto ?? "").length} chars -> captura/sonda-tela.txt\n`);
+      return;
+    }
+
     if (m.tipo === "tela") {
       console.log(`\x1b[36m[${hora}] tela\x1b[0m ${m.texto.length} chars`);
       writeFileSync("captura/extensao-tela.txt", m.texto);
