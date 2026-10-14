@@ -16,3 +16,6 @@ node_modules/
 # saída dos testes locais
 tela-shopee.*
 tela-adspower.png
+
+# capturas contêm dados de conta
+captura/
