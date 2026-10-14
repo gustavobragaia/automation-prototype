@@ -1,7 +1,42 @@
 // Escrita do rastreio na Shopify via Admin GraphQL.
 // Suporta vários códigos no mesmo fulfillment (2% dos pedidos da base real).
 
-const VERSAO = "2026-04";
+const VERSAO = process.env.SHOPIFY_API_VERSAO ?? "2026-04";
+
+// A Shopify aposentou os apps personalizados legados em 01/01/2026: não
+// existe mais token estático na tela. Apps do Dev Dashboard trocam
+// client_id + client_secret por um token que vale 24h, então o robô
+// renova sozinho e guarda em memória até perto do vencimento.
+let tokenCache = { valor: null, expiraEm: 0 };
+
+export async function obterToken({ loja, clientId, clientSecret, token } = {}) {
+  if (token) return token;                       // token fixo, se houver
+  if (tokenCache.valor && Date.now() < tokenCache.expiraEm) return tokenCache.valor;
+
+  loja ??= process.env.SHOPIFY_LOJA;
+  clientId ??= process.env.SHOPIFY_CLIENT_ID;
+  clientSecret ??= process.env.SHOPIFY_CLIENT_SECRET;
+  if (!loja || !clientId || !clientSecret)
+    throw new Error("faltam SHOPIFY_LOJA, SHOPIFY_CLIENT_ID e SHOPIFY_CLIENT_SECRET no .env");
+
+  const r = await fetch(`https://${loja}/admin/oauth/access_token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      grant_type: "client_credentials",
+      client_id: clientId,
+      client_secret: clientSecret,
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token)
+    throw new Error(`troca de token falhou (HTTP ${r.status}): ${JSON.stringify(j).slice(0, 200)}`);
+
+  const segundos = Number(j.expires_in ?? 86400);
+  tokenCache = { valor: j.access_token, expiraEm: Date.now() + (segundos - 300) * 1000 };
+  return tokenCache.valor;
+}
 
 const MUTATION = `
 mutation criarFulfillment($f: FulfillmentV2Input!) {
@@ -39,7 +74,8 @@ const inferir = (c) => (/^SPX/i.test(c) ? "shopee-xpress" : "correios");
 
 export async function enviar(entrada, { loja, token, dryRun = false } = {}) {
   if (dryRun) return { dryRun: true, enviaria: { query: "fulfillmentCreateV2", variables: { f: entrada } } };
-  if (!loja || !token) throw new Error("faltam credenciais da Shopify");
+  loja ??= process.env.SHOPIFY_LOJA;
+  token = await obterToken({ loja, token });
 
   const r = await fetch(`https://${loja}/admin/api/${VERSAO}/graphql.json`, {
     method: "POST",
@@ -53,4 +89,59 @@ export async function enviar(entrada, { loja, token, dryRun = false } = {}) {
   const erros = json?.data?.fulfillmentCreateV2?.userErrors ?? [];
   if (erros.length) throw new Error(`Shopify: ${erros.map((e) => e.message).join("; ")}`);
   return json.data.fulfillmentCreateV2.fulfillment;
+}
+
+
+const QUERY_ABERTOS = `
+query pedidosAbertos($cursor: String) {
+  orders(first: 50, after: $cursor, query: "fulfillment_status:unfulfilled AND status:open") {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      id name createdAt
+      totalPriceSet { shopMoney { amount } }
+      shippingAddress { name address1 city province zip }
+      lineItems(first: 5) { nodes { title quantity } }
+      fulfillmentOrders(first: 5) { nodes { id status } }
+    }
+  }
+}`;
+
+/** Pedidos da Shopify ainda sem rastreio — o lado "aberto" do casamento. */
+export async function pedidosAbertos({ loja, token } = {}) {
+  loja ??= process.env.SHOPIFY_LOJA;
+  token = await obterToken({ loja, token });
+
+  const saida = [];
+  let cursor = null;
+  do {
+    const r = await fetch(`https://${loja}/admin/api/${VERSAO}/graphql.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
+      body: JSON.stringify({ query: QUERY_ABERTOS, variables: { cursor } }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const j = await r.json();
+    if (j.errors) throw new Error(`Shopify: ${JSON.stringify(j.errors).slice(0, 300)}`);
+    const p = j.data.orders;
+    for (const o of p.nodes) {
+      saida.push({
+        pedido: o.name,
+        id: o.id,
+        criadoEm: o.createdAt,
+        // o nome que importa é o do ENDEREÇO DE ENTREGA, não o do cliente:
+        // é esse que aparece na Shopee
+        nome: o.shippingAddress?.name ?? "",
+        cep: (o.shippingAddress?.zip ?? "").replace(/\D/g, ""),
+        endereco: [o.shippingAddress?.address1, o.shippingAddress?.city, o.shippingAddress?.province].filter(Boolean).join(", "),
+        valor: Number(o.totalPriceSet?.shopMoney?.amount ?? 0),
+        produto: o.lineItems?.nodes?.[0]?.title ?? null,
+        unidades: o.lineItems?.nodes?.reduce((s, i) => s + (i.quantity ?? 0), 0) ?? null,
+        fulfillmentOrderId: o.fulfillmentOrders?.nodes?.find((f) => f.status === "OPEN")?.id
+          ?? o.fulfillmentOrders?.nodes?.[0]?.id ?? null,
+      });
+    }
+    cursor = p.pageInfo.hasNextPage ? p.pageInfo.endCursor : null;
+  } while (cursor);
+
+  return saida;
 }
