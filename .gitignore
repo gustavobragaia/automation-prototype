@@ -23,3 +23,7 @@ captura/
 # saída e estado locais
 saida/
 estado/
+
+# vídeo: fonte versionada, arquivos pesados não
+video/*.mp4
+video/painel.png

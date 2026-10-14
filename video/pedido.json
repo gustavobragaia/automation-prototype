@@ -1,0 +1,16 @@
+{
+  "conta": "2",
+  "orderId": "245683099198904",
+  "nome": "Gustavo Bragaia",
+  "cep": "13424165",
+  "endereco": "Rua Dona Regina, S/N, Piracicaba, São Paulo, 13424165",
+  "valor": 4.31,
+  "produto": "10 Pares De Cílios Tira Russa DD Curl Postiços Fofos E Finos Pacote",
+  "loja": "kiligmata.br",
+  "transportadora": "Expresso padrão",
+  "codigos": [],
+  "despachado": false,
+  "vistoEm": "2026-10-14T14:15:52.402Z",
+  "primeiroVistoEm": "2026-10-14T14:15:52.403Z",
+  "enviadoShopify": false
+}

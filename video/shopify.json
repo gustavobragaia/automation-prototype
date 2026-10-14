@@ -1,0 +1,16 @@
+{
+  "name": "#1001",
+  "displayFulfillmentStatus": "FULFILLED",
+  "fulfillments": [
+    {
+      "status": "SUCCESS",
+      "createdAt": "2026-10-14T14:07:33Z",
+      "trackingInfo": [
+        {
+          "number": "BR269999999999S",
+          "company": "Correios"
+        }
+      ]
+    }
+  ]
+}

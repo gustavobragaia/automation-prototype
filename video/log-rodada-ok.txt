@@ -1,0 +1,7 @@
+  11:11:18 coletor em 127.0.0.1:3000
+  11:11:18 rodada iniciada · 1 conta(s)
+  11:11:25 conta 2: perfil aberto (porta 59326)
+  11:11:41 conta 2: 1 pedido(s) em 3741 ms
+  11:11:44 conta 2: coletada
+  11:11:45 consultando pedidos abertos na Shopify
+  11:11:46 fim · 1/1 contas · 1 pedido · 27s
