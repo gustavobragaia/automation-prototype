@@ -1,0 +1,14 @@
+# Dados pessoais de clientes finais — NUNCA versionar
+data/pedidos.json
+data/*.xlsx
+data/*.csv
+resultado.txt
+*.log
+
+# Credenciais
+.env
+.env.*
+!.env.example
+
+node_modules/
+.DS_Store

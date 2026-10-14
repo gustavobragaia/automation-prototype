@@ -1,0 +1,15 @@
+{
+  "name": "shopee-tracking-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Automação de rastreios Shopee -> Shopify via AdsPower",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "fixture": "node scripts/gerar-fixture.mjs",
+    "importar": "node scripts/importar-planilha.mjs",
+    "proof": "node run-proof.mjs",
+    "e2e": "node run-e2e.mjs",
+    "test": "node scripts/gerar-fixture.mjs && node run-e2e.mjs"
+  }
+}
