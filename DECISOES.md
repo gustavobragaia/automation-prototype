@@ -102,25 +102,81 @@ O operador decide a hora. O app nunca interrompe trabalho por conta própria.
 
 ---
 
-## 4. De onde vem o mapeamento pedido → conta (2026-10-15)
+## 4. De onde vem o mapeamento pedido → conta (2026-10-15, corrigido)
 
-A planilha **não** é a ponte entre Shopee e Shopify: a ponte é o endereço de
-entrega (nome + CEP), medido em 97,6% de identificação única contra os 19.975
-pedidos reais. A planilha só **estreita a busca**, dizendo em qual das 700
-contas procurar.
+**Correção de uma premissa minha.** Eu havia dito que a planilha era só um
+acelerador e que dava para inverter a fila partindo da Shopify. O cliente
+corrigiu, e ele tem razão:
 
-Por isso não existem duas versões do produto, e sim uma fonte com três níveis:
+> "você não tem como saber pela Shopify em qual conta da Shopee foi pago
+> aquele pedido. Precisa da planilha."
+
+O casamento por nome + CEP (97,6% de identificação única em 19.975 pedidos)
+prova **identidade** depois que a conta está aberta. Ele não diz **qual** conta
+abrir. Essa informação nasce de uma decisão humana — a funcionária escolhe em
+qual conta pagar — e hoje só existe na planilha.
+
+### O processo de hoje
 
 ```
-1. banco      — mapeamento que o robô aprendeu sozinho    (preferido)
-2. planilha   — enquanto o banco não cobre                 (apoio)
-3. varredura  — quando nenhum dos dois sabe                (último recurso)
+pedido entra na Shopify
+  ↓  (manhã seguinte)
+exporta pedidos do dia anterior → prompt de IA → planilha do dia
+  ↓
+funcionária paga na Shopee e anota na planilha de controle:
+  pedido · cliente · produto · qtd · valor · [rastreio vazio] · CONTA
+  ↓
+outra pessoa vê onde o rastreio para, abre aquela conta, copia o rastreio
+  ↓
+copia da planilha para a Shopify
 ```
 
-Toda vez que o robô encontra um pedido numa conta, grava a associação. A
-cobertura do banco cresce sozinha; quando chegar perto de 100%, a planilha deixa
-de ser lida e passa a ser **só saída** — o robô preenche a coluna da conta em
-vez de consultá-la.
+### v1 — a planilha é entrada, e isso está certo
+
+O robô lê a coluna da conta, abre só os perfis daquele dia e preenche o
+rastreio na Shopify. Elimina as etapas 4 e 5 (copiar rastreio, colar na
+Shopify) sem pedir mudança nenhuma de hábito.
+
+### v2 — o app substitui a planilha no momento em que o dado nasce
+
+A funcionária já registra o mapeamento; a questão é **onde**. Se ela registra
+no app em vez da planilha, o dado nasce no banco:
+
+```
+app puxa os pedidos do dia anterior da Shopify   (mata o export + prompt de IA)
+  ↓
+ela trabalha pela lista do app; a cada pedido pago, escolhe a conta
+  ↓
+app já sabe pedido ↔ conta, abre os perfis e preenche o rastreio sozinho
+```
+
+Mesmo esforço para ela — provavelmente menos, porque a lista vem pronta — e
+ninguém mais abre planilha. A planilha continua sendo gerada, como **saída**,
+para quem quiser conferir pelo Drive.
+
+**Não são dois produtos.** É a mesma resolução em três níveis; a v2 acontece
+quando o nível 1 passa a cobrir tudo:
+
+```
+1. banco      — registrado no app pela funcionária, ou aprendido numa coleta
+2. planilha   — enquanto o banco não cobre
+3. varredura  — último recurso, e cara: 700 contas
+```
 
 Uma tela mostra a cobertura ("78% do mapeamento vem do banco") para a troca ser
-uma decisão com número, não um palpite.
+decisão com número, não palpite.
+
+---
+
+## 5. Plataformas e ambientes (2026-10-15)
+
+**Windows é o alvo principal** — é onde o cliente opera. **macOS também é
+suportado**, porque o desenvolvimento acontece no Mac e o AdsPower tem cliente
+para as duas plataformas; o mesmo código Node roda nos dois.
+
+Distribuir no macOS exige conta Apple Developer (US$ 99/ano) e notarização,
+senão o Gatekeeper bloqueia. Para uso só do desenvolvedor isso pode esperar.
+
+**Beta na máquina do desenvolvedor, estável na do cliente.** Nenhuma versão
+chega ao cliente sem ter rodado antes numa máquina real com AdsPower e contas
+de verdade.
