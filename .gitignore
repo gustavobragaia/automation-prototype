@@ -27,3 +27,9 @@ estado/
 # vídeo: fonte versionada, arquivos pesados não
 video/*.mp4
 video/painel.png
+
+# artefatos do solver de captcha (fora da main, mas ficam no disco;
+# extensao-captcha/script.js guarda a chave em texto puro)
+extensao-captcha/
+shopee-captcha-solver/
+shopee.md

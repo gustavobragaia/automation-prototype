@@ -1,0 +1,66 @@
+<!doctype html><meta charset="utf-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:14px/1.5 -apple-system,"Helvetica Neue",Arial,sans-serif;background:#f1f1f1;color:#303030;width:1360px}
+.top{background:#1a1a1a;color:#e3e3e3;display:flex;align-items:center;gap:16px;padding:10px 20px;font-size:13px}
+.top .s{width:22px;height:22px;background:#95bf47;border-radius:5px}
+.top .busca{flex:1;background:#303030;border:1px solid #444;border-radius:7px;padding:6px 12px;color:#9b9b9b;max-width:640px;margin:0 auto}
+.body{display:flex}
+.nav{width:206px;padding:14px 10px;font-size:13.5px;color:#4a4a4a}
+.nav div{padding:7px 10px;border-radius:7px;display:flex;justify-content:space-between}
+.nav div.on{background:#e3e3e3;font-weight:600}
+.cont{flex:1;padding:22px 28px}
+.hd{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.hd h1{font-size:19px;font-weight:650}
+.pill{font-size:12px;padding:3px 9px;border-radius:9px;display:inline-flex;align-items:center;gap:5px}
+.pago{background:#e0f0ff;color:#00527c}
+.nproc{background:#ffeec2;color:#6b4e00}
+.proc{background:#cdfee1;color:#0c5132}
+.sub{font-size:12.5px;color:#6a6a6a;margin-bottom:18px}
+.grid{display:flex;gap:18px}
+.col{flex:1}
+.cardx{background:#fff;border:1px solid #e3e3e3;border-radius:10px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 0 rgba(0,0,0,.03)}
+.cardx h2{font-size:14.5px;font-weight:650;margin-bottom:12px;display:flex;align-items:center;gap:9px}
+.lin{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid #f1f1f1}
+.th{width:40px;height:40px;background:#f1f1f1;border-radius:7px}
+.rastbox{background:#f7f7f7;border:1px solid #e3e3e3;border-radius:8px;padding:12px 14px;margin-top:6px}
+.rk{font-size:12px;color:#6a6a6a}
+.rv{font:600 16px ui-monospace,Menlo,monospace;letter-spacing:.4px;margin-top:2px}
+.rv a{color:#005bd3;text-decoration:none}
+.vazio{color:#8a8a8a;font-size:13px;padding:8px 0}
+.lado{width:300px}
+.k{font-size:12.5px;color:#6a6a6a}
+.v{font-size:13.5px}
+.mb{margin-bottom:12px}
+.btn{background:#303030;color:#fff;font-size:13px;padding:7px 14px;border-radius:8px;display:inline-block}
+</style>
+<div class="top"><div class="s"></div><div class="busca">Pesquisar</div><div>Teste Loja</div></div>
+<div class="body">
+  <div class="nav">
+    <div class="on">Pedidos <span>1</span></div><div>Produtos</div><div>Clientes</div>
+    <div>Conteúdo</div><div>Análises</div><div>Marketing</div><div>Descontos</div>
+  </div>
+  <div class="cont">
+    <div class="hd"><h1>#1001</h1><span class="pill pago">● Pago</span><span class="pill STATUSCLS">● STATUSTXT</span></div>
+    <div class="sub">14 de outubro de 2026 às 10:00 · Rascunhos de pedido</div>
+    <div class="grid">
+      <div class="col">
+        <div class="cardx">
+          <h2>STATUSTXT</h2>
+          <div class="lin"><div class="th"></div><div style="flex:1">Item teste<div class="k">SKU —</div></div><div>R$ 4,31 × 1</div><div style="width:70px;text-align:right">R$ 4,31</div></div>
+          RASTREIO
+        </div>
+        <div class="cardx"><h2>Pago</h2>
+          <div style="display:flex;justify-content:space-between;padding:4px 0"><span class="k">Subtotal</span><span>R$ 4,31</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:650"><span>Total</span><span>R$ 4,31</span></div>
+        </div>
+      </div>
+      <div class="lado">
+        <div class="cardx"><h2>Cliente</h2><div class="v mb" style="color:#005bd3">Ayumu Hirano</div>
+          <div class="k mb">Endereço de entrega</div>
+          <div class="v">Gustavo Bragaia<br>Rua Dona Regina, 121<br>Paulicéia<br>13424-165 Piracicaba SP<br>Brasil</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
