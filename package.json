@@ -16,10 +16,13 @@
     "importar": "node scripts/importar-planilha.mjs",
     "proof": "node run-proof.mjs",
     "e2e": "node run-e2e.mjs",
-    "test": "node scripts/gerar-fixture.mjs && node run-e2e.mjs"
+    "test": "node scripts/gerar-fixture.mjs && node run-e2e.mjs && node scripts/testar-armazenamento.mjs",
+    "contrato": "node scripts/testar-armazenamento.mjs"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
     "playwright-core": "^1.64.0"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.4.1"
   }
 }

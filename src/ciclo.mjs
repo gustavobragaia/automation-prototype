@@ -5,44 +5,14 @@ import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { rodarFila } from "./fila.mjs";
 import { extrairPedido } from "./shopee.mjs";
-import { carregar, salvar, registrar, db } from "./estado.mjs";
+import { carregar, salvar, registrar, historico, registrarRodada } from "./estado.mjs";
 import { listarPerfisOuNull } from "./adspower.mjs";
 import { parseConta } from "./tracking.mjs";
 import { normNome } from "./match.mjs";
 import { pedidosAbertos, montarEntrada, transportadoraDe, enviar } from "./shopify.mjs";
 import { alarmar, avaliarRodada } from "./alarme.mjs";
 
-// Rodadas agora vivem no banco; o painel lê daqui.
-export function historico(limite = 200) {
-  return db().prepare(`
-    SELECT inicio, duracao_ms, contas, coletadas, pedidos_vistos, novos,
-           escritos, revisao, falhas, planilha
-      FROM rodadas ORDER BY id DESC LIMIT ?`).all(limite).map((r) => ({
-    inicio: r.inicio,
-    duracaoMs: r.duracao_ms,
-    contas: r.contas,
-    coletadas: r.coletadas,
-    pedidosVistos: r.pedidos_vistos,
-    novos: r.novos,
-    escritos: r.escritos,
-    revisao: r.revisao,
-    falhas: JSON.parse(r.falhas || "[]"),
-    planilha: r.planilha,
-  }));
-}
-
-function registrarRodada(r) {
-  db().prepare(`
-    INSERT INTO rodadas (inicio, duracao_ms, contas, coletadas, pedidos_vistos,
-                         novos, escritos, revisao, falhas, planilha)
-    VALUES (@inicio, @duracao_ms, @contas, @coletadas, @pedidos_vistos,
-            @novos, @escritos, @revisao, @falhas, @planilha)`).run({
-    inicio: r.inicio, duracao_ms: r.duracaoMs, contas: r.contas,
-    coletadas: r.coletadas, pedidos_vistos: r.pedidosVistos, novos: r.novos,
-    escritos: r.escritos, revisao: r.revisao,
-    falhas: JSON.stringify(r.falhas ?? []), planilha: r.planilha ?? null,
-  });
-}
+export { historico };
 
 export async function descobrirContas(args = []) {
   if (args.length) return args.map((a) => ({ serial: Number(a), conta: Number(a) }));

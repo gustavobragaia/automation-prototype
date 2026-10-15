@@ -4,7 +4,6 @@
 // migração falhar, o app recusa iniciar e aponta o backup — subir com schema
 // pela metade é pior que não subir.
 
-import Database from "better-sqlite3";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
@@ -55,9 +54,18 @@ function podar(DIR_BACKUPS) {
  * Abre o banco e aplica o que faltar.
  * @throws se a migração falhar — o chamador deve recusar iniciar.
  */
+// Carregado sob demanda: o módulo é nativo, e a fase 1 roda sem ele.
+let Database = null;
+export function carregarDriver() {
+  if (!Database) Database = require("better-sqlite3");
+  return Database;
+}
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
 export function abrir({ aoLog = ok, caminho = CAMINHO } = {}) {
   mkdirSync(dirname(caminho), { recursive: true });
-  const db = new Database(caminho);
+  const db = new (carregarDriver())(caminho);
   db.pragma("journal_mode = WAL");   // leitura do painel não trava a escrita da fila
   db.pragma("foreign_keys = ON");
 
