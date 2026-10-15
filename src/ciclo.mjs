@@ -1,31 +1,47 @@
 // Uma rodada completa: coleta -> consolida -> casa -> escreve -> planilha.
 // É o que o agendador dispara e o que o painel mostra.
 
-import { readFileSync, existsSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { rodarFila } from "./fila.mjs";
 import { extrairPedido } from "./shopee.mjs";
-import { carregar, salvar, registrar } from "./estado.mjs";
+import { carregar, salvar, registrar, db } from "./estado.mjs";
 import { listarPerfisOuNull } from "./adspower.mjs";
 import { parseConta } from "./tracking.mjs";
 import { normNome } from "./match.mjs";
 import { pedidosAbertos, montarEntrada, transportadoraDe, enviar } from "./shopify.mjs";
 import { alarmar, avaliarRodada } from "./alarme.mjs";
 
-const ARQ_RODADAS = "estado/rodadas.json";
-
-export function historico() {
-  if (!existsSync(ARQ_RODADAS)) return [];
-  try { return JSON.parse(readFileSync(ARQ_RODADAS, "utf8")); } catch { return []; }
+// Rodadas agora vivem no banco; o painel lê daqui.
+export function historico(limite = 200) {
+  return db().prepare(`
+    SELECT inicio, duracao_ms, contas, coletadas, pedidos_vistos, novos,
+           escritos, revisao, falhas, planilha
+      FROM rodadas ORDER BY id DESC LIMIT ?`).all(limite).map((r) => ({
+    inicio: r.inicio,
+    duracaoMs: r.duracao_ms,
+    contas: r.contas,
+    coletadas: r.coletadas,
+    pedidosVistos: r.pedidos_vistos,
+    novos: r.novos,
+    escritos: r.escritos,
+    revisao: r.revisao,
+    falhas: JSON.parse(r.falhas || "[]"),
+    planilha: r.planilha,
+  }));
 }
 
 function registrarRodada(r) {
-  const h = historico();
-  h.unshift(r);
-  mkdirSync("estado", { recursive: true });
-  const tmp = `${ARQ_RODADAS}.tmp`;
-  writeFileSync(tmp, JSON.stringify(h.slice(0, 200), null, 2));
-  renameSync(tmp, ARQ_RODADAS);
+  db().prepare(`
+    INSERT INTO rodadas (inicio, duracao_ms, contas, coletadas, pedidos_vistos,
+                         novos, escritos, revisao, falhas, planilha)
+    VALUES (@inicio, @duracao_ms, @contas, @coletadas, @pedidos_vistos,
+            @novos, @escritos, @revisao, @falhas, @planilha)`).run({
+    inicio: r.inicio, duracao_ms: r.duracaoMs, contas: r.contas,
+    coletadas: r.coletadas, pedidos_vistos: r.pedidosVistos, novos: r.novos,
+    escritos: r.escritos, revisao: r.revisao,
+    falhas: JSON.stringify(r.falhas ?? []), planilha: r.planilha ?? null,
+  });
 }
 
 export async function descobrirContas(args = []) {
