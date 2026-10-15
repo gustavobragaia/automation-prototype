@@ -34,7 +34,7 @@ async function umaRodada() {
   if (emAndamento) { log("rodada já em andamento, ignorando"); return; }
   emAndamento = true;
   try {
-    const contas = await descobrirContas(seriais);
+    const contas = await descobrirContas(seriais, { aoLog: log });
     const r = await rodarCiclo({ contas, escrever, simular, aoLog: log });
     log(`\x1b[1mfim\x1b[0m · ${r.coletadas}/${r.contas} contas · ${r.pedidosVistos} pedidos · ${r.escritos} escritos · ${r.revisao} em revisão`);
     return r;

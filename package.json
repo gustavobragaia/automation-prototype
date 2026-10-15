@@ -20,6 +20,7 @@
     "contrato": "node scripts/testar-armazenamento.mjs"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "playwright-core": "^1.64.0"
   },
   "optionalDependencies": {

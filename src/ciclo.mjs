@@ -8,17 +8,39 @@ import { extrairPedido } from "./shopee.mjs";
 import { carregar, salvar, registrar, historico, registrarRodada } from "./estado.mjs";
 import { listarPerfisOuNull } from "./adspower.mjs";
 import { parseConta } from "./tracking.mjs";
+import { lerPendentes } from "./planilha.mjs";
+import { anotarMapeamento } from "./estado.mjs";
 import { normNome } from "./match.mjs";
 import { pedidosAbertos, montarEntrada, transportadoraDe, enviar } from "./shopify.mjs";
 import { alarmar, avaliarRodada } from "./alarme.mjs";
 
 export { historico };
 
-export async function descobrirContas(args = []) {
+/**
+ * De onde sai a lista de contas a abrir, em ordem de preferência
+ * (DECISOES.md §4): planilha → contas.json → todos os perfis do AdsPower.
+ */
+export async function descobrirContas(args = [], { aoLog = () => {} } = {}) {
   if (args.length) return args.map((a) => ({ serial: Number(a), conta: Number(a) }));
+
+  const planilha = process.env.PLANILHA;
+  if (planilha && existsSync(planilha)) {
+    const r = await lerPendentes(planilha, { aba: process.env.PLANILHA_ABA });
+    aoLog(`planilha "${r.aba}": ${r.total} linhas · ${r.pendentes.length} sem rastreio · ${r.contas.length} contas a abrir`);
+    if (r.ignorados.length) aoLog(`${r.ignorados.length} linha(s) sem conta reconhecível — vão para revisão, não para a fila`);
+
+    // O mapeamento pedido→conta nasce aqui. Guardá-lo é o que permite, lá na
+    // frente, o banco cobrir o que hoje só a planilha sabe.
+    for (const p of r.pendentes) if (p.pedido) anotarMapeamento(p.pedido, p.conta, "planilha");
+
+    return r.contas.map((c) => ({ conta: c.conta, pedidosEsperados: c.pedidos.length }));
+  }
+
   if (existsSync("contas.json")) return JSON.parse(readFileSync("contas.json", "utf8"));
+
   const lista = await listarPerfisOuNull(1, 500);
-  if (!lista) throw new Error("sem contas.json e user/list indisponível — passe os seriais como argumento");
+  if (!lista) throw new Error("sem PLANILHA, sem contas.json e user/list indisponível — passe os seriais como argumento");
+  aoLog(`${lista.list.length} perfis do AdsPower (varredura completa — cara)`);
   return lista.list
     .map((p) => ({ userId: p.user_id, conta: parseConta(p.name).numeros[0] }))
     .filter((c) => c.conta != null);
