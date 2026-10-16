@@ -56,12 +56,18 @@
     const cred = await pedir("credencial");
     if (!cred?.email) return avisar("login-falhou", { motivo: cred?.erro ?? "coletor não devolveu credencial" });
 
+    const campoSenha = await esperar(SEL.senha);
+    if (!campoSenha) return avisar("login-falhou", { motivo: "campo de senha não apareceu" });
+
     preencher(campoUsuario, cred.email);
-    preencher(document.querySelector(SEL.senha), cred.senha);
+    preencher(campoSenha, cred.senha);
     avisar("login-iniciado", { email: cred.email });
 
+    const botao = await esperar(SEL.entrar);
+    if (!botao) return avisar("login-falhou", { motivo: "botão ENTRAR não apareceu" });
+
     const inicio = Math.floor(Date.now() / 1000);
-    (await esperar(SEL.entrar))?.click();
+    botao.click();
 
     // A partir daqui, três desfechos: entrou, pediu código, ou pediu
     // verificação de imagem.
@@ -93,5 +99,10 @@
     avisar("login-falhou", { motivo: "sem desfecho em 60s" });
   }
 
-  if (/\/buyer\/login/.test(location.pathname)) entrar();
+  if (/\/buyer\/login/.test(location.pathname)) {
+    // Sem isto, qualquer erro aqui dentro vira silêncio: o log mostrava
+    // "credencial entregue" e nada depois, sem dizer o que quebrou.
+    entrar().catch((e) =>
+      avisar("login-falhou", { motivo: `erro no login.js: ${e?.message ?? e}` }));
+  }
 })();
