@@ -18,6 +18,11 @@ const EXT = resolve("extensao");
 // prazo próprio, a fila fechava o perfil no meio e parecia que o login falhou.
 const ESPERA_LOGIN_MS = Number(process.env.ESPERA_LOGIN_MS ?? 180_000);
 
+// Verificação da Shopee não é contornada por software: alguém resolve na
+// janela. Fechar o perfil na hora tirava da pessoa a chance de fazer isso —
+// e é exatamente o fluxo que o produto promete.
+const ESPERA_HUMANO_MS = Number(process.env.ESPERA_HUMANO_MS ?? 300_000);
+
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const entre = (a, b) => a + Math.floor(Math.random() * (b - a));
 
