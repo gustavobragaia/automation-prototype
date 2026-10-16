@@ -6,7 +6,19 @@ importScripts("sessao.js");   // define self.COLETOR_TOKEN, gerado por rodada
 
 const COLETOR = "http://127.0.0.1:3000";
 
+// Só uma aba pode logar. O perfil restaura as abas da sessão anterior e
+// todas caem no /buyer/login, então sem trava eram 4 logins simultâneos —
+// e a Shopee responde a isso com verificação de imagem.
+let donoDoLogin = null;
+
 chrome.runtime.onMessage.addListener((msg, remetente, responder) => {
+  if (msg?.pedido === "travar-login") {
+    const aba = remetente.tab?.id ?? 0;
+    if (donoDoLogin === null) donoDoLogin = aba;
+    responder({ ok: donoDoLogin === aba });
+    return true;
+  }
+
   // Pedidos que esperam resposta (credencial, código de verificação).
   if (msg?.pedido) {
     const url = new URL(`${COLETOR}/${msg.pedido === "otp" ? "otp" : "credencial"}`);

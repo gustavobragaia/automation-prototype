@@ -46,6 +46,10 @@
     ["#NEW_CAPTCHA", "#captchaMask", "aside[aria-modal=true] canvas"].some((s) => document.querySelector(s));
 
   async function entrar() {
+    // Abas restauradas também caem aqui; só a primeira loga.
+    const trava = await pedir("travar-login");
+    if (!trava?.ok) return;
+
     const campoUsuario = await esperar(SEL.usuario);
     if (!campoUsuario) return avisar("login-falhou", { motivo: "campo de usuário não apareceu" });
 
@@ -89,8 +93,5 @@
     avisar("login-falhou", { motivo: "sem desfecho em 60s" });
   }
 
-  if (/\/buyer\/login/.test(location.pathname)) {
-    avisar("login-detectado");   // prova que o content script casou com a página
-    entrar();
-  }
+  if (/\/buyer\/login/.test(location.pathname)) entrar();
 })();

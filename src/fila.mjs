@@ -57,7 +57,19 @@ export async function processarConta({ serial, userId, conta }, { aoLog = () => 
 
   try {
     await dormir(entre(3000, 5000));
-    const url = `https://shopee.com.br/user/purchase?type=7#conta=${conta}`;
+
+    // O perfil restaura as abas da última sessão do operador. Elas também
+    // rodam nossos content scripts, o que virava logins simultâneos e
+    // coletas duplicadas. Fechar é pelo endpoint HTTP, sem sessão CDP.
+    try {
+      const abas = await (await fetch(`http://127.0.0.1:${porta}/json/list`)).json();
+      const antigas = abas.filter((t) => t.type === "page" && !/^(about:blank|chrome:)/.test(t.url ?? ""));
+      for (const t of antigas)
+        await fetch(`http://127.0.0.1:${porta}/json/close/${t.id}`).catch(() => {});
+      if (antigas.length) aoLog(`conta ${conta}: ${antigas.length} aba(s) restaurada(s) fechada(s)`);
+    } catch {}
+
+    const url = "https://shopee.com.br/user/purchase?type=7";
     await fetch(`http://127.0.0.1:${porta}/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
 
     const limite = Date.now() + timeoutMs;
