@@ -16,12 +16,17 @@ import { join, resolve } from "node:path";
 import { emailDaConta } from "./tracking.mjs";
 
 const BASE_EXT = resolve("extensao");
-const DIR_RODADA = resolve("extensao-rodada");
+const RAIZ_RODADA = resolve("extensao-rodada");
 let tokenAtual = null;
+let dirRodada = null;
 
 export function novoToken() {
   tokenAtual = randomBytes(24).toString("hex");
-  rmSync(DIR_RODADA, { recursive: true, force: true });
+  // O ID de uma extensão descompactada vem do CAMINHO. Reusar a mesma pasta
+  // fazia o Chrome reaproveitar o service worker em cache do perfil — com o
+  // token da rodada anterior, e a credencial era recusada como inválida.
+  rmSync(RAIZ_RODADA, { recursive: true, force: true });
+  dirRodada = join(RAIZ_RODADA, randomBytes(6).toString("hex"));
   return tokenAtual;
 }
 
@@ -35,8 +40,9 @@ export function novoToken() {
  * ao mesmo tempo e todas leriam o mesmo valor.
  */
 export function extensaoDaConta(conta) {
-  const destino = join(DIR_RODADA, `conta-${conta}`);
-  mkdirSync(DIR_RODADA, { recursive: true });
+  if (!dirRodada) throw new Error("novoToken() precisa rodar antes de extensaoDaConta()");
+  const destino = join(dirRodada, `conta-${conta}`);
+  mkdirSync(dirRodada, { recursive: true });
   rmSync(destino, { recursive: true, force: true });
   cpSync(BASE_EXT, destino, { recursive: true });
   writeFileSync(join(destino, "sessao.js"),
@@ -50,7 +56,8 @@ export const tokenValido = (t) => Boolean(tokenAtual) && t === tokenAtual;
 
 export function limparToken() {
   tokenAtual = null;
-  try { rmSync(DIR_RODADA, { recursive: true, force: true }); } catch {}
+  dirRodada = null;
+  try { rmSync(RAIZ_RODADA, { recursive: true, force: true }); } catch {}
 }
 
 /** A senha é única para todas as contas; o e-mail vem do padrão. */
