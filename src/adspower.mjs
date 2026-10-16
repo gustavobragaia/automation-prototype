@@ -48,7 +48,17 @@ const idParams = (ref) => {
 const TRANSITORIO =
   /is updating|waiting for download|downloading|please wait|is not ready|being installed|installing/i;
 
-export async function abrirPerfil(ref, { headless = 0, tentativas = 60, espera = 15_000, aoEsperar, launchArgs = null } = {}) {
+// 60 tentativas × 15s dava 15 minutos de espera muda quando o kernel não
+// estava em cache — tempo demais para descobrir que nada ia acontecer.
+// Com kernel já baixado o perfil abre em segundos; o teto só existe para
+// a primeira vez de cada versão.
+export async function abrirPerfil(ref, {
+  headless = 0,
+  tentativas = Number(process.env.ADSPOWER_TENTATIVAS ?? 16),   // ~4 min
+  espera = 15_000,
+  aoEsperar,
+  launchArgs = null,
+} = {}) {
   for (let i = 1; ; i++) {
     try {
       // cdp_mask=1 mascara a detecção de automação. Explícito de propósito.

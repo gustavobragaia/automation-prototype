@@ -95,6 +95,10 @@ export function prefixoDaConta(numero) {
   return Number(numero) >= FAIXA_PREFIXO ? "Brushopee" : "chompspee";
 }
 
-export function emailDaConta(numero, { digitos = 3 } = {}) {
-  return `${prefixoDaConta(numero)}${String(numero).padStart(digitos, "0")}@givmail.com`;
+// Sem zero à esquerda: a conta 76 é chompspee76, não chompspee076 — foi
+// conferido entrando na conta. O "007" que eu tinha assumido veio do nome
+// do perfil no AdsPower ("Shopee 076"), que é outra coisa.
+export function emailDaConta(numero, { digitos = Number(process.env.SHOPEE_DIGITOS ?? 0) } = {}) {
+  const n = digitos > 0 ? String(numero).padStart(digitos, "0") : String(Number(numero));
+  return `${prefixoDaConta(numero)}${n}@givmail.com`;
 }
