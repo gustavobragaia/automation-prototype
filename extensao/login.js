@@ -56,6 +56,23 @@
     }
   }
 
+  // A Shopee escreve o motivo na tela: senha errada, conta bloqueada,
+  // excesso de tentativas. Ignorar isso e esperar 60s dá "sem desfecho",
+  // que não ajuda ninguém a entender o que houve.
+  const ERROS = [
+    [/senha.*(inv[aá]lid|incorret)|incorrect password|wrong password/i, "senha inválida"],
+    [/usu[aá]rio.*n[aã]o.*(existe|encontrad)|account does not exist/i, "conta não existe"],
+    [/muitas tentativas|too many|tente novamente mais tarde/i, "excesso de tentativas"],
+    [/conta.*(bloquead|suspens)|account.*(locked|banned)/i, "conta bloqueada"],
+    [/c[oó]digo.*(inv[aá]lid|incorret)/i, "código de verificação inválido"],
+  ];
+
+  function erroNaTela() {
+    const texto = document.body?.innerText ?? "";
+    for (const [re, motivo] of ERROS) if (re.test(texto)) return motivo;
+    return null;
+  }
+
   const temVerificacaoDeImagem = () =>
     ["#NEW_CAPTCHA", "#captchaMask", "aside[aria-modal=true] canvas"].some((s) => document.querySelector(s));
 
@@ -102,6 +119,9 @@
 
       if (temVerificacaoDeImagem())
         return avisar("precisa-humano", { motivo: "Shopee pediu verificação de imagem" });
+
+      const erro = erroNaTela();
+      if (erro) return avisar("login-falhou", { motivo: `a Shopee respondeu: ${erro}` });
 
       if (!/\/buyer\/login/.test(location.pathname)) {
         avisar("login-ok", { duracaoMs: Date.now() - t0 });
