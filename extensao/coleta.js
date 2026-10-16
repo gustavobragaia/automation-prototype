@@ -4,7 +4,9 @@
 //   2. entra em cada pedido e procura o código de rastreio
 // Tudo com os cookies da própria sessão. Nada de CDP.
 (() => {
-  const SIMULAR = true; // injeta rastreio falso onde ainda não há — teste ponta a ponta
+  // Rastreio falso serviu para o vídeo de demonstração. Ligado por engano
+  // em produção, escreveria um código inventado num pedido real.
+  const SIMULAR = false;
 
   const publicar = (payload) => window.postMessage({ __coletorShopee: true, payload }, "*");
 
@@ -51,8 +53,14 @@
 
   async function rodar() {
     const inicio = Date.now();
+    // Códigos reais das abas, lidos do HTML da própria página:
+    //   6=Tudo  9=A Pagar  7=Preparando  8=A caminho
+    //   3=Finalizado  4=Cancelado  12=Reembolso
+    // "Tudo" primeiro porque supor a aba certa já nos custou duas rodadas:
+    // pedi 7 e vieram pedidos concluídos. Os outros dois ficam como reforço,
+    // e a deduplicação por order_id cuida da sobreposição.
     const listas = [];
-    for (const tipo of [7, 8])
+    for (const tipo of [6, 8, 7])
       for (const c of [
         `/api/v4/order/get_all_order_and_checkout_list?limit=20&offset=0&list_type=${tipo}`,
         `/api/v4/order/get_order_list?limit=20&offset=0&list_type=${tipo}`,
@@ -63,16 +71,18 @@
 
     const pedidos = [];
     for (const id of [...ids].slice(0, 25)) {
-      const candidatos = [
-        `/api/v4/order/get_order_detail?order_id=${id}`,
-        `/api/v4/order/get_order_detail?order_id=${id}&order_list_tab=7`,
-        `/api/v4/order/get_tracking_info?order_id=${id}`,
-        `/api/v4/logistics/tracking/get_tracking_info?order_id=${id}`,
-        `/api/v4/logistics/tracking_info/get?order_id=${id}`,
-        `/api/v4/order/get_logistics_info?order_id=${id}`,
-      ];
-      const respostas = [];
-      for (const c of candidatos) respostas.push(await pegar(c));
+      // Só o get_order_detail responde — os outros dois eram 2 chamadas
+      // desperdiçadas por pedido, e com 25 pedidos isso estourava o prazo
+      // da fila. Ficam como reserva, usados apenas se o primeiro falhar.
+      const respostas = [await pegar(`/api/v4/order/get_order_detail?order_id=${id}`)];
+      if (!respostas[0].ok)
+        for (const c of [
+          `/api/v4/order/get_order_detail?order_id=${id}&order_list_tab=7`,
+          `/api/v4/order/get_tracking_info?order_id=${id}`,
+        ]) {
+          respostas.push(await pegar(c));
+          if (respostas.at(-1).ok) break;
+        }
 
       const achados = respostas.filter((r) => r.ok).flatMap((r) => acharRastreio(r.corpo));
       let codigos = [...new Set(achados.flatMap((a) => a.codigos))];
@@ -91,7 +101,7 @@
         camposComRastreio: achados.map((a) => a.campo),
         endpointsOk: respostas.filter((r) => r.ok).map((r) => r.caminho.split("?")[0]),
       });
-      await new Promise((r) => setTimeout(r, 400)); // ritmo humano entre pedidos
+      await new Promise((r) => setTimeout(r, 250)); // ritmo humano entre pedidos
     }
 
     // A conta vem marcada no fragmento da URL (#conta=196) na hora de abrir

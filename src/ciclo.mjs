@@ -116,8 +116,17 @@ export async function rodarCiclo({ contas, escrever = true, simular = false, aoL
     aoLog(`Shopify indisponível: ${e.message}`);
   }
 
+  // Rastreio simulado nunca pode ser escrito: a extensão roda no navegador
+  // e pode voltar com a flag de teste ligada por engano.
+  const SIMULADO = /^BR269999999999/;
+
   for (const p of Object.values(estado)) {
     if (p.enviadoShopify) continue;
+    if (!simular && (p.codigos ?? []).some((c) => SIMULADO.test(c))) {
+      p.revisao = { motivo: "código parece simulado — recusado", em: new Date().toISOString() };
+      revisao.push({ orderId: p.orderId, nome: p.nome, motivo: p.revisao.motivo });
+      continue;
+    }
 
     let codigos = p.codigos ?? [];
     let simulado = false;

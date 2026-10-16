@@ -40,7 +40,12 @@ async function api(caminho, params = {}) {
  * ou lança se nada chegou — rodada silenciosamente vazia é o pior
  * resultado possível, pior que um erro barulhento.
  */
-export async function processarConta({ serial, userId, conta }, { aoLog = () => {}, timeoutMs = 70_000 } = {}) {
+// 70s era apertado: uma conta com 20 pedidos levou 62s. Qualquer conta um
+// pouco maior falhava por prazo, não por problema real.
+export async function processarConta({ serial, userId, conta }, {
+  aoLog = () => {},
+  timeoutMs = Number(process.env.TIMEOUT_CONTA_MS ?? 150_000),
+} = {}) {
   const ref = serial != null ? { serial } : { userId };
   const arq = `captura/coletas/conta-${conta}.json`;
   const antes = existsSync(arq) ? statSync(arq).mtimeMs : 0;
