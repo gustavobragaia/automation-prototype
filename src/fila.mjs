@@ -8,7 +8,7 @@
 import { resolve } from "node:path";
 import { existsSync, statSync } from "node:fs";
 import { abrirPerfil, fecharPerfil, statusPerfil } from "./adspower.mjs";
-import { novoToken, limparToken } from "./credenciais.mjs";
+import { novoToken, limparToken, extensaoDaConta } from "./credenciais.mjs";
 
 const BASE = process.env.ADSPOWER_BASE ?? "http://local.adspower.net:50325";
 const KEY = process.env.ADSPOWER_API_KEY ?? "";
@@ -45,7 +45,7 @@ export async function processarConta({ serial, userId, conta }, { aoLog = () => 
   // AdsPower baixando o kernel do Chrome do perfil. Numa máquina nova nenhum
   // kernel está em cache, e cada perfil pode pedir uma versão diferente.
   const d = await abrirPerfil(ref, {
-    launchArgs: [`--load-extension=${EXT}`],
+    launchArgs: [`--load-extension=${extensaoDaConta(conta)}`],
     aoEsperar: (msg, i, n) => aoLog(`conta ${conta}: ${msg} (tentativa ${i}/${n})`),
   });
   const porta = d.debugPort;

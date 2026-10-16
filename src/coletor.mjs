@@ -8,6 +8,7 @@ import { obterCodigo } from "./otp.mjs";
 
 export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
   mkdirSync("captura/coletas", { recursive: true });
+  mkdirSync("captura/eventos", { recursive: true });
 
   const servidor = createServer(async (req, res) => {
     const u = new URL(req.url, "http://127.0.0.1");
@@ -58,8 +59,19 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         if (m.tipo === "coleta") {
           const conta = m.conta ?? "sem-conta";
           writeFileSync(`captura/coletas/conta-${conta}.json`, JSON.stringify(m, null, 2));
-          aoLog(`conta ${conta}: ${(m.pedidos ?? []).length} pedido(s) em ${m.duracaoMs} ms`);
+          aoLog(`conta ${conta}: ${(m.pedidos ?? []).length} pedido(s) em ${m.duracaoMs} ms · ${String(m.pagina ?? "").slice(0, 55)}`);
+          return;
         }
+
+        // Todo o resto também é registrado. Mensagem de login caindo num ramo
+        // mudo foi o que nos deixou adivinhando a causa de uma rodada vazia:
+        // "extensão não injetada" e "Shopee bloqueando" davam o mesmo silêncio.
+        const conta = m.conta ?? "sem-conta";
+        const detalhe = [m.motivo, m.email, m.temToken === false ? "SEM TOKEN" : null]
+          .filter(Boolean).join(" · ");
+        aoLog(`conta ${conta}: ${m.tipo ?? "(sem tipo)"}${detalhe ? " — " + detalhe : ""}` +
+              (m.pagina ? ` · ${String(m.pagina).slice(0, 60)}` : ""));
+        writeFileSync(`captura/eventos/${Date.now()}-${m.tipo ?? "sem-tipo"}.json`, JSON.stringify(m, null, 2));
       } catch (e) {
         aoLog(`erro ao tratar payload: ${e.message}`);
       }

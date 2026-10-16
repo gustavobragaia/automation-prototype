@@ -10,7 +10,7 @@ chrome.runtime.onMessage.addListener((msg, remetente, responder) => {
   // Pedidos que esperam resposta (credencial, código de verificação).
   if (msg?.pedido) {
     const url = new URL(`${COLETOR}/${msg.pedido === "otp" ? "otp" : "credencial"}`);
-    url.searchParams.set("conta", msg.conta ?? "");
+    url.searchParams.set("conta", self.COLETOR_CONTA ?? "");
     url.searchParams.set("token", self.COLETOR_TOKEN ?? "");
     if (msg.desde) url.searchParams.set("desde", msg.desde);
 
@@ -25,6 +25,17 @@ chrome.runtime.onMessage.addListener((msg, remetente, responder) => {
   fetch(`${COLETOR}/captura`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...msg, aba: remetente.tab?.id, em: Date.now() }),
+    // A conta vem daqui, não da página: o fragmento da URL morre no
+    // redirect para o login, e era de lá que ela saía antes.
+    body: JSON.stringify({ ...msg, conta: self.COLETOR_CONTA ?? null, aba: remetente.tab?.id, em: Date.now() }),
   }).catch(() => {});
 });
+
+// Avisa que subiu. Sem isso, "extensão não injetada" e "Shopee bloqueando"
+// têm exatamente o mesmo sintoma: silêncio.
+fetch(`${COLETOR}/captura`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ tipo: "extensao-viva", conta: self.COLETOR_CONTA ?? null,
+                         temToken: Boolean(self.COLETOR_TOKEN), em: Date.now() }),
+}).catch(() => {});

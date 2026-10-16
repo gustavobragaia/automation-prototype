@@ -11,24 +11,46 @@
 //   3. o coletor recusa qualquer requisição com Origin de site.
 
 import { randomBytes } from "node:crypto";
-import { writeFileSync, rmSync } from "node:fs";
-import { resolve } from "node:path";
+import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { emailDaConta } from "./tracking.mjs";
 
-const ARQ_TOKEN = resolve("extensao/sessao.js");
+const BASE_EXT = resolve("extensao");
+const DIR_RODADA = resolve("extensao-rodada");
 let tokenAtual = null;
 
 export function novoToken() {
   tokenAtual = randomBytes(24).toString("hex");
-  writeFileSync(ARQ_TOKEN, `// gerado por rodada — não versionar\nself.COLETOR_TOKEN = ${JSON.stringify(tokenAtual)};\n`);
+  rmSync(DIR_RODADA, { recursive: true, force: true });
   return tokenAtual;
+}
+
+/**
+ * Uma cópia da extensão por conta. O fragmento da URL (#conta=231) não
+ * sobrevive ao redirect da Shopee para a tela de login — e era assim que a
+ * extensão descobria de quem era o perfil. Gravando a conta dentro da
+ * própria extensão, ela sabe quem é independente de para onde a página vá.
+ *
+ * Cópia por conta, e não arquivo compartilhado, porque a fila roda várias
+ * ao mesmo tempo e todas leriam o mesmo valor.
+ */
+export function extensaoDaConta(conta) {
+  const destino = join(DIR_RODADA, `conta-${conta}`);
+  mkdirSync(DIR_RODADA, { recursive: true });
+  rmSync(destino, { recursive: true, force: true });
+  cpSync(BASE_EXT, destino, { recursive: true });
+  writeFileSync(join(destino, "sessao.js"),
+    `// gerado por rodada — não versionar\n` +
+    `self.COLETOR_TOKEN = ${JSON.stringify(tokenAtual)};\n` +
+    `self.COLETOR_CONTA = ${JSON.stringify(String(conta))};\n`);
+  return destino;
 }
 
 export const tokenValido = (t) => Boolean(tokenAtual) && t === tokenAtual;
 
 export function limparToken() {
   tokenAtual = null;
-  try { writeFileSync(ARQ_TOKEN, "self.COLETOR_TOKEN = null;\n"); } catch {}
+  try { rmSync(DIR_RODADA, { recursive: true, force: true }); } catch {}
 }
 
 /** A senha é única para todas as contas; o e-mail vem do padrão. */

@@ -36,3 +36,5 @@ shopee.md
 
 # token da rodada, gerado em tempo de execução
 extensao/sessao.js
+extensao-rodada/
+extensao/sessao.js

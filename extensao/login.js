@@ -17,17 +17,11 @@
     codigo: 'input[name="otp"], input[maxlength="6"], input[inputmode="numeric"]',
   };
 
-  const conta = (() => {
-    const h = new URLSearchParams(location.hash.slice(1)).get("conta");
-    try { if (h) sessionStorage.setItem("coletorConta", h); return h ?? sessionStorage.getItem("coletorConta"); }
-    catch { return h; }
-  })();
-
   const pedir = (tipo, extra = {}) =>
-    new Promise((r) => chrome.runtime.sendMessage({ pedido: tipo, conta, ...extra }, r));
+    new Promise((r) => chrome.runtime.sendMessage({ pedido: tipo, ...extra }, r));
 
   const avisar = (tipo, extra = {}) =>
-    chrome.runtime.sendMessage({ tipo, conta, pagina: location.href, ...extra });
+    chrome.runtime.sendMessage({ tipo, pagina: location.href, ...extra });
 
   // Preenche de um jeito que o React enxergue: atribuir .value direto não
   // dispara o onChange, e o formulário continua achando que está vazio.
@@ -52,8 +46,6 @@
     ["#NEW_CAPTCHA", "#captchaMask", "aside[aria-modal=true] canvas"].some((s) => document.querySelector(s));
 
   async function entrar() {
-    if (!conta) return avisar("login-falhou", { motivo: "conta não identificada na URL" });
-
     const campoUsuario = await esperar(SEL.usuario);
     if (!campoUsuario) return avisar("login-falhou", { motivo: "campo de usuário não apareceu" });
 
@@ -91,5 +83,8 @@
     avisar("login-falhou", { motivo: "sem desfecho em 60s" });
   }
 
-  if (/\/buyer\/login/.test(location.pathname)) entrar();
+  if (/\/buyer\/login/.test(location.pathname)) {
+    avisar("login-detectado");   // prova que o content script casou com a página
+    entrar();
+  }
 })();
