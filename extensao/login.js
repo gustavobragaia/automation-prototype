@@ -42,6 +42,20 @@
     }, 300);
   });
 
+  // A Shopee abre um modal de idioma por cima do formulário na primeira
+  // visita. Os campos existem e são preenchíveis, mas o clique em ENTRAR
+  // não chega — o modal intercepta. Sem fechar, o login trava calado.
+  async function fecharModais() {
+    for (let i = 0; i < 10; i++) {
+      const idioma = [...document.querySelectorAll("button")]
+        .find((b) => /^portugu[eê]s/i.test((b.innerText || "").trim()));
+      if (!idioma) break;
+      idioma.click();
+      avisar("modal-idioma-fechado");
+      await new Promise((r) => setTimeout(r, 600));
+    }
+  }
+
   const temVerificacaoDeImagem = () =>
     ["#NEW_CAPTCHA", "#captchaMask", "aside[aria-modal=true] canvas"].some((s) => document.querySelector(s));
 
@@ -49,6 +63,8 @@
     // Abas restauradas também caem aqui; só a primeira loga.
     const trava = await pedir("travar-login");
     if (!trava?.ok) return;
+
+    await fecharModais();
 
     const campoUsuario = await esperar(SEL.usuario);
     if (!campoUsuario) return avisar("login-falhou", { motivo: "campo de usuário não apareceu" });
@@ -67,6 +83,15 @@
     if (!botao) return avisar("login-falhou", { motivo: "botão ENTRAR não apareceu" });
 
     const inicio = Math.floor(Date.now() / 1000);
+    await fecharModais();   // o modal pode reaparecer entre o preenchimento e o clique
+
+    // Se outro elemento estiver por cima, o clique vai para ele e o login
+    // nunca acontece — melhor descobrir agora que esperar 60s em silêncio.
+    const r = botao.getBoundingClientRect();
+    const porCima = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    if (porCima && !botao.contains(porCima) && porCima !== botao)
+      avisar("aviso", { motivo: `algo cobre o botão ENTRAR: ${porCima.tagName}.${(porCima.className || "").slice(0, 30)}` });
+
     botao.click();
 
     // A partir daqui, três desfechos: entrou, pediu código, ou pediu

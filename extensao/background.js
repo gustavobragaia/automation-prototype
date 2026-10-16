@@ -10,12 +10,30 @@ const COLETOR = "http://127.0.0.1:3000";
 // todas caem no /buyer/login, então sem trava eram 4 logins simultâneos —
 // e a Shopee responde a isso com verificação de imagem.
 let donoDoLogin = null;
+let travadoEm = 0;
+const TRAVA_VALE_MS = 45_000;   // dona que não concluiu em 45s perde a vez
+
+// A aba restaurada costuma chegar primeiro e pegar a trava; logo depois a
+// fila a fecha, e a trava ficava presa numa aba morta — nenhuma outra
+// conseguia logar.
+chrome.tabs?.onRemoved?.addListener((id) => {
+  if (id === donoDoLogin) { donoDoLogin = null; travadoEm = 0; }
+});
 
 chrome.runtime.onMessage.addListener((msg, remetente, responder) => {
   if (msg?.pedido === "travar-login") {
     const aba = remetente.tab?.id ?? 0;
-    if (donoDoLogin === null) donoDoLogin = aba;
-    responder({ ok: donoDoLogin === aba });
+    const expirou = donoDoLogin !== null && Date.now() - travadoEm > TRAVA_VALE_MS;
+    if (donoDoLogin === null || expirou) { donoDoLogin = aba; travadoEm = Date.now(); }
+    const meu = donoDoLogin === aba;
+    // Avisa dos dois lados: sem isto, trava negada era indistinguível de
+    // content script que nem rodou.
+    fetch(`${COLETOR}/captura`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: meu ? "login-assumido" : "login-cedido",
+                             conta: self.COLETOR_CONTA ?? null, aba, em: Date.now() }),
+    }).catch(() => {});
+    responder({ ok: meu });
     return true;
   }
 

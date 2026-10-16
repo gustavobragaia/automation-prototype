@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "description": "Lê os pedidos da própria tela da Shopee, faz login quando a sessão cai, e envia ao coletor local.",
   "permissions": [
-    "storage"
+    "storage",
+    "tabs"
   ],
   "host_permissions": [
     "https://shopee.com.br/*",
