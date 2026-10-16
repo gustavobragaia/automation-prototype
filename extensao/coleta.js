@@ -101,6 +101,7 @@
     publicar({
       tipo: "coleta",
       conta,
+      listasBrutas: listas.filter((l) => l.ok).map((l) => ({ caminho: l.caminho, corpo: l.corpo })),
       pagina: location.href,
       duracaoMs: Date.now() - inicio,
       listas,

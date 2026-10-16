@@ -9,6 +9,7 @@ import { carregar, salvar, registrar, historico, registrarRodada } from "./estad
 import { listarPerfisOuNull } from "./adspower.mjs";
 import { parseConta } from "./tracking.mjs";
 import { lerPendentes } from "./planilha.mjs";
+import { resolverContas } from "./perfis.mjs";
 import { anotarMapeamento } from "./estado.mjs";
 import { normNome } from "./match.mjs";
 import { pedidosAbertos, montarEntrada, transportadoraDe, enviar } from "./shopify.mjs";
@@ -33,7 +34,10 @@ export async function descobrirContas(args = [], { aoLog = () => {} } = {}) {
     // frente, o banco cobrir o que hoje só a planilha sabe.
     for (const p of r.pendentes) if (p.pedido) anotarMapeamento(p.pedido, p.conta, "planilha");
 
-    return r.contas.map((c) => ({ conta: c.conta, pedidosEsperados: c.pedidos.length }));
+    // A planilha dá o número da conta; a fila precisa do user_id do perfil.
+    const { resolvidas } = await resolverContas(
+      r.contas.map((c) => ({ conta: c.conta, pedidosEsperados: c.pedidos.length })), { aoLog });
+    return resolvidas;
   }
 
   if (existsSync("contas.json")) return JSON.parse(readFileSync("contas.json", "utf8"));

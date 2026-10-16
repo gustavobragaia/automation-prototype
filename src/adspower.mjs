@@ -38,16 +38,23 @@ const idParams = (ref) => {
   return a.serial != null ? { serial_number: a.serial } : { user_id: a.userId };
 };
 
-// O AdsPower baixa/atualiza o kernel do Chrome sozinho e, enquanto isso,
-// recusa abrir o perfil. É transitório: espera e tenta de novo.
-const TRANSITORIO = /is updating|waiting for download|downloading|please wait/i;
+// O AdsPower baixa/instala o kernel do Chrome do perfil e, enquanto isso,
+// recusa abrir. Observado em sequência numa máquina nova, com três mensagens
+// diferentes para o mesmo evento:
+//   "is not ready,please to download!"  →  "is updating, waiting for download."
+//   →  "is being installed"             →  abre
+// Tratar só parte delas faz a conta falhar no meio de um processo que ia
+// terminar bem. Cada perfil pode pedir uma versão diferente de kernel.
+const TRANSITORIO =
+  /is updating|waiting for download|downloading|please wait|is not ready|being installed|installing/i;
 
-export async function abrirPerfil(ref, { headless = 0, tentativas = 20, espera = 15_000, aoEsperar } = {}) {
+export async function abrirPerfil(ref, { headless = 0, tentativas = 60, espera = 15_000, aoEsperar, launchArgs = null } = {}) {
   for (let i = 1; ; i++) {
     try {
       // cdp_mask=1 mascara a detecção de automação. Explícito de propósito.
       const d = await chamar("/api/v1/browser/start", {
         ...idParams(ref), open_tabs: 0, ip_tab: 0, headless, cdp_mask: 1,
+        ...(launchArgs ? { launch_args: JSON.stringify(launchArgs) } : {}),
       });
       return { ws: d.ws.puppeteer, debugPort: d.debug_port };
     } catch (e) {

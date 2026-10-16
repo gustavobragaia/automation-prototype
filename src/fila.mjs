@@ -7,7 +7,7 @@
 
 import { resolve } from "node:path";
 import { existsSync, statSync } from "node:fs";
-import { fecharPerfil, statusPerfil } from "./adspower.mjs";
+import { abrirPerfil, fecharPerfil, statusPerfil } from "./adspower.mjs";
 
 const BASE = process.env.ADSPOWER_BASE ?? "http://local.adspower.net:50325";
 const KEY = process.env.ADSPOWER_API_KEY ?? "";
@@ -40,12 +40,14 @@ export async function processarConta({ serial, userId, conta }, { aoLog = () => 
     await dormir(2500);
   }
 
-  const d = await api("/api/v1/browser/start", {
-    ...(serial != null ? { serial_number: serial } : { user_id: userId }),
-    open_tabs: 0, ip_tab: 0, cdp_mask: 1,
-    launch_args: JSON.stringify([`--load-extension=${EXT}`]),
+  // Via abrirPerfil, não com cliente próprio: é lá que mora o retry para o
+  // AdsPower baixando o kernel do Chrome do perfil. Numa máquina nova nenhum
+  // kernel está em cache, e cada perfil pode pedir uma versão diferente.
+  const d = await abrirPerfil(ref, {
+    launchArgs: [`--load-extension=${EXT}`],
+    aoEsperar: (msg, i, n) => aoLog(`conta ${conta}: ${msg} (tentativa ${i}/${n})`),
   });
-  const porta = d.debug_port;
+  const porta = d.debugPort;
   aoLog(`conta ${conta}: perfil aberto (porta ${porta})`);
 
   try {
