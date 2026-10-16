@@ -124,10 +124,20 @@
     avisar("login-falhou", { motivo: "sem desfecho em 60s" });
   }
 
-  if (/\/buyer\/login/.test(location.pathname)) {
-    // Sem isto, qualquer erro aqui dentro vira silêncio: o log mostrava
+  // A Shopee troca /user/purchase por /buyer/login POR DENTRO da SPA, sem
+  // recarregar. Content script casado só com a URL de login nunca era
+  // injetado na aba que a fila abre — ela nasce em /user/purchase.
+  // Por isso este script roda em qualquer página da Shopee e observa a URL.
+  let jaTentou = false;
+  function talvezEntrar() {
+    if (jaTentou || !/\/buyer\/login/.test(location.pathname)) return;
+    jaTentou = true;
+    // Sem o catch, qualquer erro aqui dentro vira silêncio: o log mostrava
     // "credencial entregue" e nada depois, sem dizer o que quebrou.
     entrar().catch((e) =>
       avisar("login-falhou", { motivo: `erro no login.js: ${e?.message ?? e}` }));
   }
+
+  talvezEntrar();
+  setInterval(talvezEntrar, 1000);
 })();

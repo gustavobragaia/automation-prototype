@@ -38,7 +38,8 @@
     },
     {
       "matches": [
-        "https://shopee.com.br/buyer/login*"
+        "https://shopee.com.br/*",
+        "https://*.shopee.com.br/*"
       ],
       "js": [
         "login.js"
