@@ -68,8 +68,14 @@
       if (temVerificacaoDeImagem())
         return avisar("precisa-humano", { motivo: "Shopee pediu verificação de imagem" });
 
-      if (!/\/buyer\/login/.test(location.pathname))
-        return avisar("login-ok", { duracaoMs: Date.now() - t0 });
+      if (!/\/buyer\/login/.test(location.pathname)) {
+        avisar("login-ok", { duracaoMs: Date.now() - t0 });
+        // A Shopee devolve para onde a pessoa tentou ir, que pode ser
+        // qualquer página. A coleta acontece em Minhas Compras.
+        if (!/\/user\/purchase/.test(location.pathname))
+          location.href = "https://shopee.com.br/user/purchase?type=7";
+        return;
+      }
 
       const campoCodigo = document.querySelector(SEL.codigo);
       if (campoCodigo && !campoCodigo.value) {

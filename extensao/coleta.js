@@ -98,6 +98,16 @@
     // a aba. Sem isso o coletor não sabe de qual perfil veio cada pedido.
     const conta = new URLSearchParams(location.hash.slice(1)).get("conta");
 
+    // Sessão caída não é coleta vazia: é outra coisa. Reportar como coleta
+    // fazia a fila dar a conta por concluída no meio do login.
+    const naoAutenticado =
+      /\/buyer\/login/.test(location.pathname) ||
+      listas.some((l) => l.corpo?.error === 19 || /authenticate/i.test(l.corpo?.error_msg ?? ""));
+    if (naoAutenticado) {
+      publicar({ tipo: "nao-autenticado", pagina: location.href });
+      return;
+    }
+
     publicar({
       tipo: "coleta",
       conta,

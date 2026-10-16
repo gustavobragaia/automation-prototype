@@ -6,13 +6,17 @@
 // varrer contas em ritmo constante é o que chama atenção.
 
 import { resolve } from "node:path";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { abrirPerfil, fecharPerfil, statusPerfil } from "./adspower.mjs";
 import { novoToken, limparToken, extensaoDaConta } from "./credenciais.mjs";
 
 const BASE = process.env.ADSPOWER_BASE ?? "http://local.adspower.net:50325";
 const KEY = process.env.ADSPOWER_API_KEY ?? "";
 const EXT = resolve("extensao");
+
+// Login (formulário + código no e-mail) leva bem mais que uma coleta. Sem
+// prazo próprio, a fila fechava o perfil no meio e parecia que o login falhou.
+const ESPERA_LOGIN_MS = Number(process.env.ESPERA_LOGIN_MS ?? 180_000);
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const entre = (a, b) => a + Math.floor(Math.random() * (b - a));

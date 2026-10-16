@@ -9,6 +9,7 @@ import { obterCodigo } from "./otp.mjs";
 export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
   mkdirSync("captura/coletas", { recursive: true });
   mkdirSync("captura/eventos", { recursive: true });
+  mkdirSync("captura/login", { recursive: true });
 
   const servidor = createServer(async (req, res) => {
     const u = new URL(req.url, "http://127.0.0.1");
@@ -72,6 +73,12 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         aoLog(`conta ${conta}: ${m.tipo ?? "(sem tipo)"}${detalhe ? " — " + detalhe : ""}` +
               (m.pagina ? ` · ${String(m.pagina).slice(0, 60)}` : ""));
         writeFileSync(`captura/eventos/${Date.now()}-${m.tipo ?? "sem-tipo"}.json`, JSON.stringify(m, null, 2));
+
+        // A fila lê este arquivo para saber se vale esperar mais: login em
+        // andamento merece prazo; login falhado merece desistir na hora.
+        if (/^(login-|otp-|precisa-humano|nao-autenticado)/.test(m.tipo ?? ""))
+          writeFileSync(`captura/login/conta-${conta}.json`,
+            JSON.stringify({ tipo: m.tipo, motivo: m.motivo ?? null, em: Date.now() }, null, 2));
       } catch (e) {
         aoLog(`erro ao tratar payload: ${e.message}`);
       }
