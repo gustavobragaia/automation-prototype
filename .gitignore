@@ -33,3 +33,6 @@ video/painel.png
 extensao-captcha/
 shopee-captcha-solver/
 shopee.md
+
+# token da rodada, gerado em tempo de execução
+extensao/sessao.js

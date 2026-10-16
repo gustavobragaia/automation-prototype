@@ -2,12 +2,13 @@
   "manifest_version": 3,
   "name": "Coletor de Rastreios Shopee",
   "version": "0.1.0",
-  "description": "Lê os pedidos da própria tela da Shopee e envia para o coletor local.",
+  "description": "Lê os pedidos da própria tela da Shopee, faz login quando a sessão cai, e envia ao coletor local.",
   "permissions": [
     "storage"
   ],
   "host_permissions": [
     "https://shopee.com.br/*",
+    "https://*.shopee.com.br/*",
     "http://127.0.0.1/*"
   ],
   "background": {
@@ -32,6 +33,16 @@
         "ponte.js"
       ],
       "run_at": "document_start",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://shopee.com.br/buyer/login*"
+      ],
+      "js": [
+        "login.js"
+      ],
+      "run_at": "document_idle",
       "world": "ISOLATED"
     }
   ]

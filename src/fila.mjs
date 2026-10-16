@@ -8,6 +8,7 @@
 import { resolve } from "node:path";
 import { existsSync, statSync } from "node:fs";
 import { abrirPerfil, fecharPerfil, statusPerfil } from "./adspower.mjs";
+import { novoToken, limparToken } from "./credenciais.mjs";
 
 const BASE = process.env.ADSPOWER_BASE ?? "http://local.adspower.net:50325";
 const KEY = process.env.ADSPOWER_API_KEY ?? "";
@@ -71,6 +72,9 @@ export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pau
   const pendentes = [...contas];
   const resultados = [];
 
+  // Token novo a cada rodada: se vazar, vale só por esta execução.
+  novoToken();
+
   const trabalhador = async (n) => {
     while (pendentes.length) {
       const c = pendentes.shift();
@@ -86,6 +90,10 @@ export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pau
     }
   };
 
-  await Promise.all(Array.from({ length: Math.min(concorrencia, contas.length) }, (_, i) => trabalhador(i)));
+  try {
+    await Promise.all(Array.from({ length: Math.min(concorrencia, contas.length) }, (_, i) => trabalhador(i)));
+  } finally {
+    limparToken();   // fora da rodada, o coletor não entrega credencial nenhuma
+  }
   return resultados;
 }
