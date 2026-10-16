@@ -83,6 +83,18 @@ export function parseConta(raw) {
   };
 }
 
+// O prefixo muda com a faixa da conta, e isso custou duas tentativas de
+// login recusadas: as contas abaixo de 200 são anteriores e usam outro
+// prefixo. A senha sempre esteve certa; o endereço é que não.
+//
+//   conta  <  200  →  chompspee076@givmail.com
+//   conta >=  200  →  Brushopee506@givmail.com
+export const FAIXA_PREFIXO = Number(process.env.SHOPEE_FAIXA_PREFIXO ?? 200);
+
+export function prefixoDaConta(numero) {
+  return Number(numero) >= FAIXA_PREFIXO ? "Brushopee" : "chompspee";
+}
+
 export function emailDaConta(numero, { digitos = 3 } = {}) {
-  return `Brushopee${String(numero).padStart(digitos, "0")}@givmail.com`;
+  return `${prefixoDaConta(numero)}${String(numero).padStart(digitos, "0")}@givmail.com`;
 }

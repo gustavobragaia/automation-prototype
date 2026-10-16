@@ -11,7 +11,10 @@ const ok = (c, m) => console.log(c ? `  \x1b[32m✓\x1b[0m ${m}` : `  \x1b[31m�
 let tudo = true;
 const t = novoToken();
 
-tudo &= ok((await chamar(`conta=7&token=${t}`)).b.email === "Brushopee007@givmail.com", "com token válido, entrega a credencial");
+tudo &= ok((await chamar(`conta=7&token=${t}`)).b.email === "chompspee007@givmail.com",
+           "conta abaixo de 200 usa o prefixo chompspee");
+tudo &= ok((await chamar(`conta=506&token=${t}`)).b.email === "Brushopee506@givmail.com",
+           "conta a partir de 200 usa o prefixo Brushopee");
 tudo &= ok((await chamar("conta=7&token=errado")).s === 403, "token errado → 403");
 tudo &= ok((await chamar("conta=7")).s === 403, "sem token → 403");
 tudo &= ok((await chamar(`conta=7&token=${t}`, { Origin: "https://shopee.com.br" })).s === 403,
