@@ -48,7 +48,10 @@ export function extensaoDaConta(conta) {
   writeFileSync(join(destino, "sessao.js"),
     `// gerado por rodada — não versionar\n` +
     `self.COLETOR_TOKEN = ${JSON.stringify(tokenAtual)};\n` +
-    `self.COLETOR_CONTA = ${JSON.stringify(String(conta))};\n`);
+    `self.COLETOR_CONTA = ${JSON.stringify(String(conta))};\n` +
+    // Desligar o login permite varrer contas só para descobrir quais têm
+    // sessão viva, sem enviar credencial nenhuma.
+    `self.LOGIN_AUTOMATICO = ${process.env.LOGIN_AUTOMATICO === "0" ? "false" : "true"};\n`);
   return destino;
 }
 

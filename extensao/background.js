@@ -21,6 +21,11 @@ chrome.tabs?.onRemoved?.addListener((id) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, remetente, responder) => {
+  if (msg?.pedido === "login-ligado") {
+    responder({ ok: self.LOGIN_AUTOMATICO !== false });
+    return true;
+  }
+
   if (msg?.pedido === "travar-login") {
     const aba = remetente.tab?.id ?? 0;
     const expirou = donoDoLogin !== null && Date.now() - travadoEm > TRAVA_VALE_MS;

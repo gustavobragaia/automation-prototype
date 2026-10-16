@@ -23,6 +23,29 @@ const COLUNAS = {
   conta:    ["onde foi feito o pedido", "conta", "conta shopee"],
 };
 
+// A planilha tem dois formatos de data: ISO (até 22/09) e texto "dd/mm"
+// depois disso. Sem normalizar, filtrar por dia é impossível — e foi o que
+// deixou a leitura sem data nenhuma.
+export function normalizarData(v) {
+  if (!v) return null;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const br = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/.exec(String(v).trim());
+  if (br) {
+    let ano = br[3] ? Number(br[3]) : new Date().getFullYear();
+    if (ano < 100) ano += 2000;
+    return `${ano}-${String(Number(br[2])).padStart(2, "0")}-${String(Number(br[1])).padStart(2, "0")}`;
+  }
+  return null;
+}
+
+/** Data de corte N dias antes do pedido mais recente da planilha. */
+function limiteDeDias(dias) {
+  const d = new Date();
+  d.setDate(d.getDate() - Number(dias));
+  return d.toISOString().slice(0, 10);
+}
+
 const normaliza = (s) =>
   String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "")
     .toLowerCase().replace(/\s+/g, " ").trim();
@@ -54,7 +77,10 @@ const texto = (v) => {
  *   pendentes — linhas sem rastreio e com conta conhecida
  *   ignorados — linhas sem rastreio que o robô NÃO sabe onde procurar
  */
-export async function lerPendentes(caminho, { aba } = {}) {
+export async function lerPendentes(caminho, { aba, desde, dias } = {}) {
+  // Pendência velha quase nunca ganha rastreio: é pedido perdido, não
+  // trabalho a fazer. Varrer conta por causa dela é risco sem retorno.
+  const corte = desde ?? (dias ? limiteDeDias(dias) : null);
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(caminho);
 
@@ -90,6 +116,7 @@ export async function lerPendentes(caminho, { aba } = {}) {
     const c = parseConta(ler("conta"));
     const item = {
       linha: n,
+      data: normalizarData(ler("data")),
       pedido,
       nome,
       produto: ler("produto") || null,
@@ -102,6 +129,7 @@ export async function lerPendentes(caminho, { aba } = {}) {
       ignorados.push({ ...item, motivo: `rastreio ilegível: "${ler("rastreio")}"` });
       return;
     }
+    if (corte && item.data && item.data < corte) return;   // fora da janela
     if (c.numeros.length === 1) pendentes.push({ ...item, conta: c.numeros[0] });
     else ignorados.push({ ...item, motivo: c.numeros.length > 1 ? "mais de uma conta na célula" : "conta não reconhecida" });
   });
@@ -115,5 +143,5 @@ export async function lerPendentes(caminho, { aba } = {}) {
     .map(([conta, pedidos]) => ({ conta, pedidos }))
     .sort((a, b) => b.pedidos.length - a.pedidos.length);
 
-  return { contas, pendentes, ignorados, total, aba: ws.name };
+  return { contas, pendentes, ignorados, total, aba: ws.name, corte };
 }

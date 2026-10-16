@@ -26,7 +26,12 @@ export async function descobrirContas(args = [], { aoLog = () => {} } = {}) {
 
   const planilha = process.env.PLANILHA;
   if (planilha && existsSync(planilha)) {
-    const r = await lerPendentes(planilha, { aba: process.env.PLANILHA_ABA });
+    const r = await lerPendentes(planilha, {
+      aba: process.env.PLANILHA_ABA,
+      desde: process.env.PLANILHA_DESDE,          // AAAA-MM-DD
+      dias: process.env.PLANILHA_DIAS,            // ou "últimos N dias"
+    });
+    if (r.corte) aoLog(`filtrando pendências a partir de ${r.corte}`);
     aoLog(`planilha "${r.aba}": ${r.total} linhas · ${r.pendentes.length} sem rastreio · ${r.contas.length} contas a abrir`);
     if (r.ignorados.length) aoLog(`${r.ignorados.length} linha(s) sem conta reconhecível — vão para revisão, não para a fila`);
 

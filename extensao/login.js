@@ -28,9 +28,15 @@
   function preencher(el, valor) {
     const proto = Object.getPrototypeOf(el);
     const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
-    setter ? setter.call(el, valor) : (el.value = valor);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
+    const por = (v) => {
+      setter ? setter.call(el, v) : (el.value = v);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    el.focus();
+    por("");        // limpa o que o gerenciador de senhas já colocou
+    por(valor);
+    el.blur();
   }
 
   const esperar = (sel, ms = 15000) => new Promise((r) => {
@@ -99,6 +105,24 @@
     const botao = await esperar(SEL.entrar);
     if (!botao) return avisar("login-falhou", { motivo: "botão ENTRAR não apareceu" });
 
+    // O gerenciador de senhas do perfil repõe o telefone e a senha salva
+    // DEPOIS que preenchemos, e aí o que vai para a Shopee é a credencial
+    // antiga — que volta como "senha inválida". Reconferir no instante do
+    // clique é a única forma de garantir o que está sendo enviado.
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, 400));
+      if (campoUsuario.value === cred.email && campoSenha.value === cred.senha) break;
+      preencher(campoUsuario, cred.email);
+      preencher(campoSenha, cred.senha);
+    }
+
+    if (campoUsuario.value !== cred.email) {
+      return avisar("login-falhou", {
+        motivo: `o campo voltou para "${campoUsuario.value.slice(0, 24)}" — autopreenchimento do perfil`,
+      });
+    }
+    avisar("campo-conferido", { valor: campoUsuario.value, senhaOk: campoSenha.value === cred.senha });
+
     const inicio = Math.floor(Date.now() / 1000);
     await fecharModais();   // o modal pode reaparecer entre o preenchimento e o clique
 
@@ -152,10 +176,12 @@
   function talvezEntrar() {
     if (jaTentou || !/\/buyer\/login/.test(location.pathname)) return;
     jaTentou = true;
-    // Sem o catch, qualquer erro aqui dentro vira silêncio: o log mostrava
-    // "credencial entregue" e nada depois, sem dizer o que quebrou.
-    entrar().catch((e) =>
-      avisar("login-falhou", { motivo: `erro no login.js: ${e?.message ?? e}` }));
+    pedir("login-ligado").then((r) => {
+      if (r?.ok === false) return avisar("sessao-caida");
+      entrar().catch((e) =>
+        avisar("login-falhou", { motivo: `erro no login.js: ${e?.message ?? e}` }));
+    });
+    return;
   }
 
   talvezEntrar();
