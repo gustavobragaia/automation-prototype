@@ -11,6 +11,11 @@
 (function(){
 "use strict";
 if (!window.esteira) { console.info("[esteira] sem ponte — dados de exemplo"); return; }
+// Antes de qualquer coisa: a tela não sabe em que janela está. No macOS a
+// barra de título fica escondida e os botões do sistema caem em cima da
+// marca — o CSS abre espaço quando sabe disso.
+try { document.documentElement.dataset.janela = window.esteira.plataforma || ""; } catch (e) {}
+
 var TELA = window.TELA, GANCHOS = window.GANCHOS;
 if (!TELA || !GANCHOS) { console.error("[esteira] a tela não expôs TELA/GANCHOS"); return; }
 

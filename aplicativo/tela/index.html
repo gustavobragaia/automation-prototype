@@ -63,6 +63,15 @@ input{font:inherit}
   padding-left:max(18px,env(safe-area-inset-left,0px));
   padding-right:max(18px,env(safe-area-inset-right,0px));
   position:sticky;top:env(safe-area-inset-top,0px);background:var(--canvas);z-index:6}
+/* No macOS a janela não tem barra de título: os três botões do sistema
+   ficam flutuando sobre o cabeçalho. Abrimos espaço para eles e deixamos a
+   barra inteira arrastar a janela, que é o que a barra de título fazia. */
+:root[data-janela="darwin"] .barra{
+  height:52px; padding-left:84px; -webkit-app-region:drag;
+}
+:root[data-janela="darwin"] .barra button,
+:root[data-janela="darwin"] .barra a,
+:root[data-janela="darwin"] .barra input{-webkit-app-region:no-drag}
 .marca{display:flex;align-items:center;gap:8px;flex:none}
 .marca svg{width:17px;height:17px;overflow:visible}
 .marca svg *{stroke:var(--marca);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}

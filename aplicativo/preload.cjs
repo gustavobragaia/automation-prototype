@@ -4,6 +4,10 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("esteira", {
+  /** A tela precisa saber: no macOS a barra de título fica escondida, e os
+   *  três botões do sistema caem em cima do cabeçalho se ela não abrir
+   *  espaço. Só o nome da plataforma, nada mais do processo. */
+  plataforma: process.platform,
   /** Pede uma ação da lista fechada em ponte.mjs. */
   pedir: (acao, carga) => ipcRenderer.invoke("ponte", acao, carga),
   logs: () => ipcRenderer.invoke("logs"),
