@@ -63,6 +63,7 @@ export async function processarConta({ serial, userId, conta }, {
     aoEsperar: (msg, i, n) => aoLog(`conta ${conta}: ${msg} (tentativa ${i}/${n})`),
   });
   const porta = d.debugPort;
+  abertosAgora.add(ref);
   aoLog(`conta ${conta}: perfil aberto (porta ${porta})`);
 
   try {
@@ -90,6 +91,7 @@ export async function processarConta({ serial, userId, conta }, {
     throw new Error(`conta ${conta}: nada chegou ao coletor em ${timeoutMs / 1000}s`);
   } finally {
     await fecharPerfil(ref).catch(() => {}); // nunca desloga
+    abertosAgora.delete(ref);
   }
 }
 
