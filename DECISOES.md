@@ -540,3 +540,47 @@ lembrar de dois passos; o pedido voltaria no dia seguinte já despachado e
 tomaria o motivo "já está FULFILLED". Existe agora `resolverManual`, que
 prepara, escreve e baixa numa chamada só. O olho humano continua sendo um
 passo à parte, por `confirmado: true`.
+
+---
+
+## 12. Conexão com o AdsPower na máquina do cliente (2026-10-18)
+
+O cliente baixa o aplicativo e precisa configurar sozinho. São quatro coisas,
+e **duas delas falham com o mesmo sintoma**:
+
+| | Precisa |
+|---|---|
+| 1 | AdsPower instalado e **aberto** — a API só existe com ele rodando |
+| 2 | **API local ligada** em Configurações |
+| 3 | A **chave** copiada de lá e colada no nosso app |
+| 4 | A **porta**, 50325 por padrão |
+
+1 e 2 dão exatamente a mesma recusa de conexão. Sem separar um do outro, a
+tela diz "não conectou" e ele liga para o suporte. Por isso existe
+`diagnosticar()`, que devolve a etapa, o título em português e **o que fazer**
+— e distingue programa fechado, chave recusada, plano sem listagem e limite
+de requisições.
+
+### Três coisas medidas, que mudam o que a tela pode dizer
+
+**A Local API aceita ~1 requisição por segundo.** Duas chamadas seguidas
+devolvem "Too many request per second" — o diagnóstico fazia exatamente isso
+e reportava "resposta inesperada" sem motivo. Agora espera entre as chamadas
+e tenta de novo.
+
+**Esta instalação não valida a chave.** Responde igual com chave boa, chave
+falsa e sem chave nenhuma. Então o diagnóstico **não diz** que a chave foi
+aceita — ele lista só o que provou. Em instalações que exigem a chave, a
+falha aparece como erro de autorização e é tratada.
+
+**A API não devolve o total de perfis** numa página: só `list`, `page` e
+`page_size`. Dizer "972 perfis" a partir de uma página de 1 seria inventar.
+O número real sai da varredura completa, que a tela de Contas já faz.
+
+### Para o dono da máquina saber
+
+Com a API local ligada sem exigir chave, **qualquer programa naquele
+computador pode abrir e dirigir os navegadores com as contas da Shopee**. Ela
+só escuta em localhost, então não é exposição para a internet — mas é
+informação que o dono merece ter. `apiAbertaSemChave()` detecta e a tela
+avisa.

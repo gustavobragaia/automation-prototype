@@ -7,12 +7,12 @@
 
 import { resolve } from "node:path";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { abrirPerfil, fecharPerfil, statusPerfil } from "./adspower.mjs";
+// BASE e KEY vêm daqui também: duas cópias da mesma configuração já
+// custaram caro neste projeto.
+import { abrirPerfil, fecharPerfil, statusPerfil, BASE, KEY } from "./adspower.mjs";
 import { soltarTrava } from "./trava-login.mjs";
 import { novoToken, limparToken, extensaoDaConta } from "./credenciais.mjs";
 
-const BASE = process.env.ADSPOWER_BASE ?? "http://local.adspower.net:50325";
-const KEY = process.env.ADSPOWER_API_KEY ?? "";
 const EXT = resolve("extensao");
 
 // Login (formulário + código no e-mail) leva bem mais que uma coleta. Sem
