@@ -86,7 +86,7 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "icon": "marca/icon.png",
+      "icon": "marca/icon.icns",
       "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false

@@ -155,6 +155,12 @@ async function subirColetor() {
 }
 
 app.whenReady().then(async () => {
+  // Em desenvolvimento o Dock mostraria o ícone do Electron; empacotado,
+  // quem manda é o icon.icns do instalador.
+  if (!app.isPackaged) {
+    try { app.dock?.setIcon(join(AQUI, "marca", "icon.png")); } catch { /* sem Dock, sem problema */ }
+  }
+
   try {
     coletor = await subirColetor();
     registrar(`coletor ouvindo em 127.0.0.1:${coletor.porta}`);
