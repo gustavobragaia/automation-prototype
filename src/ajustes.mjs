@@ -11,7 +11,10 @@ import { readFileSync, writeFileSync, chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { emEstado } from "./caminhos.mjs";
 
-const ARQ = process.env.AJUSTES_ARQUIVO ?? emEstado("ajustes.json");
+// Lido na hora, não na importação: no app a pasta de estado é decidida
+// antes de importar o robô, mas um módulo já carregado nunca veria uma
+// mudança posterior — e era isso que fazia um teste parecer passar.
+const arquivo = () => process.env.AJUSTES_ARQUIVO ?? emEstado("ajustes.json");
 
 const PADRAO = {
   // AdsPower
@@ -53,7 +56,7 @@ const CAMPOS = Object.keys(PADRAO);
 
 export function lerAjustes() {
   try {
-    const cru = JSON.parse(readFileSync(ARQ, "utf8"));
+    const cru = JSON.parse(readFileSync(arquivo(), "utf8"));
     const fora = {};
     for (const c of CAMPOS) if (cru[c] !== undefined) fora[c] = cru[c];
     return { ...PADRAO, ...fora };
@@ -67,9 +70,9 @@ export function salvarAjustes(mudancas = {}) {
   for (const [c, v] of Object.entries(mudancas)) {
     if (CAMPOS.includes(c)) atual[c] = v;
   }
-  mkdirSync(dirname(ARQ), { recursive: true });
-  writeFileSync(ARQ, JSON.stringify(atual, null, 2));
-  try { chmodSync(ARQ, 0o600); } catch {}
+  mkdirSync(dirname(arquivo()), { recursive: true });
+  writeFileSync(arquivo(), JSON.stringify(atual, null, 2));
+  try { chmodSync(arquivo(), 0o600); } catch {}
   return atual;
 }
 

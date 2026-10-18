@@ -321,6 +321,27 @@ tudo &= ok(/Ajustes/.test(semConfig ?? ""), `e a mensagem diz onde resolver (${s
 tudo &= ok(/senha/.test(semConfig ?? ""), "dizendo o que falta, não só que falta algo");
 tudo &= ok(!(await chamar("rodada:emCurso")), "e nenhuma rodada ficou pendurada");
 
+/* ───────── 19. sem coletor, a rodada também não começa ───────── */
+sec("19 · a rodada recusa quando o coletor não está atendendo");
+// Sem este guarda, cada conta abre, espera 150s e falha com "nada chegou ao
+// coletor": três navegadores e sete minutos para descobrir que o problema
+// nunca esteve na Shopee — e o alarme ainda culpa a extensão.
+// (A ponte deste teste foi construída sem coletor nenhum.)
+//
+// Com os Ajustes preenchidos: senão é a OUTRA checagem que dispara, e o
+// teste passaria sem nunca exercitar esta.
+process.env.AJUSTES_ARQUIVO = join(dir, "ajustes-cheios.json");
+const { salvarAjustes: salvar19 } = await import("../src/ajustes.mjs?19");
+salvar19({ shopeeSenha: "x", codigoChave: "y",
+           emailPrefixo: "loja", emailDominio: "ex.com" });
+let semColetor = null;
+try {
+  await chamar("rodada:iniciar", { contas: [{ conta: 124, serial: 1 }] });
+} catch (e) { semColetor = e.message; }
+tudo &= ok(!!semColetor, "a rodada foi recusada");
+tudo &= ok(/coletor/.test(semColetor ?? ""), `e diz que é o coletor (${semColetor})`);
+tudo &= ok(/127\.0\.0\.1/.test(semColetor ?? ""), "dizendo em qual porta ele deveria estar");
+
 rmSync(dir, { recursive: true, force: true });
 console.log(tudo ? "\n\x1b[32m\x1b[1m  o fluxo fecha de ponta a ponta\x1b[0m\n"
                  : "\n\x1b[31m\x1b[1m  o fluxo tem furo\x1b[0m\n");

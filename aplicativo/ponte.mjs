@@ -26,6 +26,7 @@ import { lerAjustes, salvarAjustes, aplicarNoAmbiente, SEGREDOS,
          faltaConfigurar } from "../src/ajustes.mjs";
 import { aoEvento, emitir } from "../src/eventos.mjs";
 import { pedirParada } from "../src/fila.mjs";
+import net from "node:net";
 
 /** Erro que atravessa a ponte vira dado, não exceção perdida. */
 const tentar = async (fn) => {
@@ -58,6 +59,16 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
   // A aba que cada planilha usa de fato, descoberta ao lê-la. Guardar é o
   // que impede a rodada de procurar a aba de OUTRO arquivo — foi assim que
   // o .env do projeto derrubou uma rodada com "aba não encontrada".
+  // Alguém atende nesta porta? É o que importa — não quem subiu o servidor.
+  const coletorEscutando = () => new Promise((pronto) => {
+    const s = net.connect({ host: "127.0.0.1", port: porta });
+    const fim = (r) => { s.destroy(); pronto(r); };
+    s.setTimeout(1500);
+    s.once("connect", () => fim(true));
+    s.once("error", () => fim(false));
+    s.once("timeout", () => fim(false));
+  });
+
   const abas = new Map();
   const abaDe = (caminho) => abas.get(caminho);
 
@@ -297,6 +308,14 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
       if (falta.length)
         throw new Error("antes de rodar, preencha em Ajustes → Contas da Shopee: " +
                         falta.join("; "));
+
+      // O coletor é quem recebe os pedidos que a extensão lê. Sem ele, cada
+      // conta abre, espera 150s e falha com "nada chegou ao coletor" — três
+      // navegadores e sete minutos para descobrir que o problema nunca
+      // esteve na Shopee. E o alarme culpa a extensão.
+      if (!(await coletorEscutando()))
+        throw new Error(`o coletor não está atendendo em 127.0.0.1:${porta} — ` +
+                        "feche e abra o Esteira; se persistir, alguma coisa tomou a porta");
       if (concorrencia) process.env.CONCORRENCIA = String(concorrencia);
       // As planilhas que a pessoa escolheu vão junto: sem isto a rodada
       // relê o PLANILHA do ambiente, que no app é o .env do projeto.
