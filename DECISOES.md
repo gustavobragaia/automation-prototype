@@ -515,3 +515,28 @@ são todos recusados — os três primeiros antes de tocar na rede.
 Contra a loja de teste: as cinco recusas com mensagem própria, e a escrita
 real de `#1007` a partir do texto solto *"peguei no app da shopee:
 BR268507789509M"*, confirmada como `FULFILLED` na Shopify.
+
+### Três defeitos achados na auditoria da própria feature (2026-10-18)
+
+Escrita a feature dos quatro desfechos, uma revisão dela encontrou três
+problemas — dois deles perdas silenciosas, que é a categoria que mais custa
+aqui.
+
+**1. Pedido recusado pela Shopify sumia da carteira.** Quem decidia o que
+baixar era `planejado`, a lista do que IA ser escrito. O pedido cuja escrita
+falhava entrava na carteira pelo motivo `falha-ao-escrever` e saía na linha
+seguinte — some no dia seguinte. É a mesma perda que a carteira existe para
+impedir, entrando pela porta dos fundos. Agora `escreverRastreios` devolve
+`gravados`, preenchido só depois de o `enviar()` dar certo.
+
+**2. A correção de conta durava um dia.** "A planilha de hoje vence" é certo
+para o nome e o valor, mas não para uma conta que o operador corrigiu na mão
+— ele corrigiu justamente porque a planilha estava errada. Se o cliente
+repetisse a linha, a correção era revertida em silêncio. A pendência passou a
+carregar `contaCorrigida`, e só esse campo vence a planilha.
+
+**3. `escreverManual` não baixava a pendência.** Quem chamasse teria que
+lembrar de dois passos; o pedido voltaria no dia seguinte já despachado e
+tomaria o motivo "já está FULFILLED". Existe agora `resolverManual`, que
+prepara, escreve e baixa numa chamada só. O olho humano continua sendo um
+passo à parte, por `confirmado: true`.

@@ -84,7 +84,24 @@ export function juntarPendentes(contasDaPlanilha, atrasados) {
   const jaTem = new Set(contasDaPlanilha.flatMap((c) => c.pedidos.map((p) => p.pedido)));
 
   for (const a of atrasados) {
-    if (!a.pedido || jaTem.has(a.pedido)) continue;   // a planilha de hoje manda
+    if (!a.pedido) continue;
+
+    if (jaTem.has(a.pedido)) {
+      // A planilha de hoje manda — EXCETO na conta que o operador corrigiu
+      // na mão. Ele corrigiu sabendo que a planilha estava errada; deixar a
+      // planilha reverter faria a correção durar um dia.
+      if (a.contaCorrigida) {
+        for (const c of porConta.values()) {
+          const i = c.pedidos.findIndex((p) => p.pedido === a.pedido);
+          if (i < 0) continue;
+          const linha = c.pedidos.splice(i, 1)[0];
+          if (!porConta.has(a.conta)) porConta.set(a.conta, { conta: a.conta, pedidos: [] });
+          porConta.get(a.conta).pedidos.push({ ...linha, contaCorrigida: true });
+          break;
+        }
+      }
+      continue;
+    }
     if (!porConta.has(a.conta)) porConta.set(a.conta, { conta: a.conta, pedidos: [] });
     porConta.get(a.conta).pedidos.push({
       pedido: a.pedido, nome: a.nome, valor: a.valor,
@@ -155,8 +172,9 @@ export async function rodarCiclo({ contas, escrever = true, simular = false, aoL
     // A carteira anda nos dois sentidos: entra quem ficou pendente, sai
     // quem foi escrito.
     guardarPendentes(pendencias);
-    const resolvidos = (res.planejado ?? []).map((x) => x.l.p.pedido).filter(Boolean);
-    const baixados = baixarPendentes(escrever ? resolvidos : []);
+    // `gravados`, não `planejado`: o que a Shopify recusou TEM que continuar
+    // na carteira, senão some amanhã.
+    const baixados = baixarPendentes(res.gravados ?? []);
     if (baixados) aoLog(`${baixados} pedido(s) saíram da lista de pendentes`);
 
     const precisa = pendencias.filter((p) => p.motivo.grupo === "precisa").length;

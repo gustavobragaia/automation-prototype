@@ -35,6 +35,25 @@ tudo &= ok(d[0].pedidos.length === 1, "não duplica");
 tudo &= ok(d[0].pedidos[0].nome === "Ana Lima CORRIGIDA",
            "e a planilha de hoje vence — é a correção do cliente");
 
+sec("correção de conta sobrevive à planilha de amanhã");
+// O operador corrigiu sabendo que a planilha estava errada. Sem isto, a
+// planilha do dia seguinte reverteria e a correção duraria um dia.
+const corr = juntarPendentes(
+  [{ conta: 124, pedidos: [{ pedido: "#165091", nome: "José Tolentino", valor: 23.99 }] }],
+  [{ pedido: "#165091", conta: 161, nome: "José Tolentino", valor: 23.99, dias: 6,
+     contaCorrigida: true }]);
+tudo &= ok(!corr.find((c) => c.conta === 124)?.pedidos.length,
+           "sai da conta errada que a planilha repetiu");
+tudo &= ok(corr.find((c) => c.conta === 161)?.pedidos[0].pedido === "#165091",
+           "e fica na conta que o operador corrigiu");
+tudo &= ok(corr.flatMap((c) => c.pedidos).length === 1, "sem duplicar");
+
+const semCorr = juntarPendentes(
+  [{ conta: 124, pedidos: [{ pedido: "#165091", nome: "Nome corrigido pelo cliente" }] }],
+  [{ pedido: "#165091", conta: 161, nome: "Nome velho", dias: 6 }]);
+tudo &= ok(semCorr.find((c) => c.conta === 124)?.pedidos[0].nome === "Nome corrigido pelo cliente",
+           "sem correção manual, a planilha continua vencendo");
+
 sec("o original não é modificado");
 const orig = [{ conta: 9, pedidos: [{ pedido: "#1", nome: "X" }] }];
 juntarPendentes(orig, [{ pedido: "#2", conta: 9, nome: "Y", dias: 1 }]);

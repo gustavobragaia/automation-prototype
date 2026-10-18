@@ -112,6 +112,17 @@ tudo &= ok(/normalizarNumero/.test(escrita), "a escrita busca o pedido pelo núm
 tudo &= ok(/naShopee !== naLoja/.test(escrita), "a conferência de nome continua barrando antes de escrever");
 tudo &= ok(/registro\[num\]\?\.fulfillmentId/.test(escrita), "a idempotência continua no caminho único");
 
+sec("só sai da carteira o que a Shopify aceitou");
+// Já aconteceu: quem decidia era `planejado`, a lista do que IA ser escrito.
+// Pedido recusado pela Shopify saía da carteira e sumia no dia seguinte.
+tudo &= ok(/const gravados = \[\]/.test(escrita), "a escrita acumula o que foi gravado de fato");
+tudo &= ok(/gravados\.push/.test(escrita), "e só depois do enviar() dar certo");
+const cicloTxt = readFileSync(new URL("../src/ciclo.mjs", import.meta.url), "utf8");
+tudo &= ok(/baixarPendentes\(res\.gravados/.test(cicloTxt),
+           "o ciclo baixa pela lista de gravados, não pela de planejados");
+tudo &= ok(!/baixarPendentes\([^)]*planejado/.test(cicloTxt),
+           "e não usa planejado em lugar nenhum para baixar");
+
 sec("todo motivo é apresentável");
 import { MOTIVOS } from "../src/conciliar.mjs";
 const ruins = Object.entries(MOTIVOS).filter(([, m]) =>

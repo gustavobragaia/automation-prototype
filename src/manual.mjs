@@ -12,6 +12,7 @@
 
 import { parseTracking } from "./tracking.mjs";
 import { pedidosPorNumero, normalizarNumero, montarEntrada, transportadoraDe, enviar } from "./shopify.mjs";
+import { encerrarPendente } from "./estado.mjs";
 
 const PARECE_SIMULADO = /^BR269999999999/;
 
@@ -53,4 +54,29 @@ export async function escreverManual(preparado, { conexao, notificar = false } =
   }), { conexao });
   return { fulfillmentId: f.id, pedido: preparado.alvo.pedido,
            codigos: f.trackingInfo.map((x) => x.number) };
+}
+
+/**
+ * Prepara, escreve e tira da carteira — em uma chamada só.
+ *
+ * `escreverManual` sozinho deixava o pedido na carteira: ele voltava no dia
+ * seguinte já despachado, e aí tomava o motivo "já está FULFILLED". Quem
+ * chama não deve ter que lembrar de dois passos.
+ *
+ * O olho humano continua sendo um passo separado: chame `prepararManual`,
+ * mostre o resultado, e só então chame isto com `confirmado`.
+ */
+export async function resolverManual(pedido, textoDoRastreio, {
+  conexao, notificar = false, confirmado = false, nota = null,
+} = {}) {
+  const prep = await prepararManual(pedido, textoDoRastreio, { conexao });
+  if (!prep.ok) return prep;
+  if (!confirmado) return { ...prep, precisaConfirmar: true };
+
+  const escrito = await escreverManual(prep, { conexao, notificar });
+  encerrarPendente(pedido, {
+    desfecho: "manual",
+    nota: nota ?? `código colado na mão: ${escrito.codigos.join(", ")}`,
+  });
+  return { ok: true, escrito };
 }

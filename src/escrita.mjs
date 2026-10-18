@@ -102,9 +102,10 @@ export async function escreverRastreios(contas, coletas, {
   }
 
   if (!escrever)
-    return { escritos: 0, falhas: 0, pulados, pendencias, planejado, resumo };
+    return { escritos: 0, falhas: 0, pulados, pendencias, planejado, gravados: [], resumo };
 
   let escritos = 0, falhas = 0;
+  const gravados = [];   // só o que a Shopify aceitou de verdade
   for (const { num, l, alvo, codigos } of planejado) {
     try {
       const f = await enviar(montarEntrada({
@@ -118,6 +119,7 @@ export async function escreverRastreios(contas, coletas, {
         codigos: f.trackingInfo.map((x) => x.number), em: new Date().toISOString(),
       };
       gravarRegistro(registro);
+      gravados.push(l.p.pedido);
       escritos++;
       aoLog(`${alvo.pedido} · ${alvo.nome} · ${f.trackingInfo.map((x) => x.number).join(", ")}`);
     } catch (e) {
@@ -126,5 +128,5 @@ export async function escreverRastreios(contas, coletas, {
       aoLog(`${alvo.pedido}: ERRO ao escrever — ${e.message}`);
     }
   }
-  return { escritos, falhas, pulados, pendencias, planejado, resumo };
+  return { escritos, falhas, pulados, pendencias, planejado, gravados, resumo };
 }

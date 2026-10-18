@@ -14,3 +14,8 @@ ALTER TABLE pendentes ADD COLUMN desfecho TEXT;      -- resolvido|manual|conta|e
 ALTER TABLE pendentes ADD COLUMN desfecho_nota TEXT; -- o porquê, escrito por quem decidiu
 
 CREATE INDEX idx_pendentes_desfecho ON pendentes (desfecho) WHERE desfecho IS NOT NULL;
+
+-- A correção de conta feita na mão precisa sobreviver à planilha do dia
+-- seguinte. O operador corrigiu sabendo que a planilha estava errada; sem
+-- esta marca, "a planilha vence" faria a correção durar um dia só.
+ALTER TABLE pendentes ADD COLUMN conta_corrigida INTEGER NOT NULL DEFAULT 0;

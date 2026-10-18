@@ -146,6 +146,7 @@ export function guardarPendentes(pendencias, { em = new Date().toISOString() } =
       dias: velho && velho.ultimaEm?.slice(0, 10) !== em.slice(0, 10)
         ? (velho.dias ?? 1) + 1 : (velho?.dias ?? 1),
       adiadoAte: p.adiadoAte ?? velho?.adiadoAte ?? null,
+      contaCorrigida: velho?.contaCorrigida ?? false,
       baixadoEm: null,
     };
   }
@@ -185,7 +186,8 @@ export function encerrarPendente(pedido, { desfecho, nota = null, conta = null,
   const p = atuais[pedido];
   if (!p) return false;
   if (desfecho === "conta") {
-    p.conta = conta; p.desfecho = null; p.desfechoNota = nota; p.adiadoAte = null;
+    p.conta = conta; p.contaCorrigida = true; p.desfecho = null;
+    p.desfechoNota = nota; p.adiadoAte = null;
   } else {
     if (p.baixadoEm) return false;
     p.baixadoEm = em; p.desfecho = desfecho; p.desfechoNota = nota;

@@ -245,6 +245,7 @@ export function pendentesAbertos({ hoje = hojeISO() } = {}) {
       pedido: r.pedido_shopify, conta: r.conta, nome: r.nome, valor: r.valor,
       produto: r.produto, unidades: r.unidades, motivo: r.motivo, grupo: r.grupo,
       vistoEm: r.visto_em, ultimaEm: r.ultima_em, dias: r.dias,
+      contaCorrigida: !!r.conta_corrigida,
       adiadoAte: r.adiado_ate, baixadoEm: r.baixado_em,
     }));
 }
@@ -272,7 +273,7 @@ export function encerrarPendente(pedido, { desfecho, nota = null, conta = null,
                                            em = new Date().toISOString() } = {}) {
   if (desfecho === "conta") {
     // não baixa: muda de conta e volta, que é o ponto
-    return db().prepare(`UPDATE pendentes SET conta = @conta, desfecho = NULL,
+    return db().prepare(`UPDATE pendentes SET conta = @conta, conta_corrigida = 1, desfecho = NULL,
                          desfecho_nota = @nota, adiado_ate = NULL WHERE pedido_shopify = @pedido`)
       .run({ conta, nota, pedido }).changes > 0;
   }
