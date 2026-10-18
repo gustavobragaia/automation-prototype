@@ -13,6 +13,20 @@ import { mkdirSync } from "node:fs";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
+// Em desenvolvimento, o .env do projeto vale, e vem primeiro: é como o robô
+// já roda pelo terminal. Sem ele a rodada pelo app não consegue logar numa
+// conta cuja sessão morreu — a senha da Shopee mora lá.
+//
+// Nunca no app empacotado: o cliente não tem .env, e ler segredos de uma
+// pasta ao lado do app instalado seria convidar problema. Para ele valem os
+// Ajustes, e é lá que a senha da Shopee ainda precisa de um campo.
+if (!app.isPackaged) {
+  try {
+    process.loadEnvFile(join(AQUI, "..", ".env"));
+    console.log("[esteira] .env do projeto carregado (modo desenvolvimento)");
+  } catch { /* não existe, e tudo bem */ }
+}
+
 // Onde guardar o que precisa sobreviver a fechar o app: carteira, mapeamento,
 // token da loja. Tem que ser decidido ANTES de importar o robô — lá os
 // caminhos viram constantes na hora da importação, e import estático sobe pro
