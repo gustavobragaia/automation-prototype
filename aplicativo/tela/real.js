@@ -37,36 +37,59 @@ var trocou = [], falhou = [];
 async function maquina(){ TELA.maquina(await pedir("maquina:ler")); }
 
 /* ── Ajustes guardados: a chave do AdsPower e o endereço ── */
+// Os campos de segredo. O robô nunca devolve o valor — só "guardada" —
+// então o campo mostra um marcador e, no primeiro clique, esvazia: digitar
+// por cima é a única forma de trocar, e não trocar é a única forma de
+// manter. Nunca há como a senha real passar pela tela.
+var SEGREDOS = [["shSenha","shopeeSenha"],["shCodigo","codigoChave"],["adsChave","adspowerChave"]];
+function prepararSegredo(campo, temGuardado){
+  if (!temGuardado) return;
+  campo.value = "••••••••••••••••••••";
+  campo.dataset.guardada = "1";
+  campo.addEventListener("focus", function(){
+    if (this.dataset.guardada) { this.value = ""; delete this.dataset.guardada; }
+  });
+}
+function valorDoSegredo(campo){
+  return campo.dataset.guardada ? "guardada" : campo.value;
+}
+
 async function ajustes(){
   var a = await pedir("ajustes:ler");
-  var chave = document.getElementById("adsChave"), base = document.getElementById("adsBase");
-  // A chave salva NUNCA volta inteira do robô. O campo mostra um marcador do
-  // mesmo tamanho só pra dizer "tem uma guardada"; se o cliente digitar por
-  // cima, aí sim vai a nova. Enquanto estiver no marcador, mandamos
-  // "guardada" e o robô usa a dele.
-  if (a.adspowerChave === "guardada") {
-    chave.value = "••••••••••••••••••••";
-    chave.dataset.guardada = "1";
-    chave.addEventListener("focus", function(){
-      if (this.dataset.guardada) { this.value = ""; delete this.dataset.guardada; }
-    });
-  }
-  if (a.adspowerBase) base.value = a.adspowerBase;
+  var $ = function(i){ return document.getElementById(i); };
+
+  SEGREDOS.forEach(function(par){
+    prepararSegredo($(par[0]), a[par[1]] === "guardada");
+  });
+
+  var simples = [["shPrefixo","emailPrefixo"],["shPrefixoAlto","emailPrefixoAlto"],
+                 ["shDominio","emailDominio"],["shFaixa","emailFaixa"],
+                 ["adsBase","adspowerBase"]];
+  simples.forEach(function(par){
+    if (a[par[1]] != null) $(par[0]).value = a[par[1]];
+  });
+  TELA.ajustes(a);
+
   var gravar = function(){
-    pedir("ajustes:salvar", {
-      adspowerChave: chave.dataset.guardada ? undefined : chave.value,
-      adspowerBase: base.value,
-    }).catch(function(e){ console.error("[esteira] ajustes:", e.message); });
+    var m = {};
+    SEGREDOS.forEach(function(par){ m[par[1]] = valorDoSegredo($(par[0])); });
+    simples.forEach(function(par){ m[par[1]] = $(par[0]).value.trim(); });
+    m.emailFaixa = Number($("shFaixa").value.trim()) || 0;
+    m.loginAutomatico = $("chLogin").getAttribute("aria-pressed") === "true";
+    pedir("ajustes:salvar", m)
+      .catch(function(e){ console.error("[esteira] ajustes:", e.message); });
   };
-  chave.addEventListener("change", gravar);
-  base.addEventListener("change", gravar);
+  SEGREDOS.concat(simples).forEach(function(par){
+    $(par[0]).addEventListener("change", gravar);
+  });
+  $("chLogin").addEventListener("click", function(){ setTimeout(gravar, 0); });
+  return;
 }
 
 /* ── AdsPower: o botão testa de verdade ── */
 function adspower(){
   function chaveAtual(){
-    var c = document.getElementById("adsChave");
-    return c.dataset.guardada ? "guardada" : c.value;
+    return valorDoSegredo(document.getElementById("adsChave"));
   }
   GANCHOS.testarAds = async function(){
     try {

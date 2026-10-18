@@ -56,15 +56,77 @@ sec("arquivo corrompido não derruba o app");
 writeFileSync(process.env.AJUSTES_ARQUIVO, "{ isto não é json");
 tudo &= ok(lerAjustes().adspowerBase.includes("50325"), "volta pro padrão em vez de estourar");
 
-sec("quem definiu a variável de propósito manda");
+sec("os Ajustes vencem o ambiente");
+// Mudou de ideia em relação à versão anterior deste teste, e por um motivo:
+// a tela é o ÚNICO lugar onde o cliente consegue mexer. Se ele digita a
+// senha nos Ajustes e um .env esquecido na pasta continuasse ganhando, ele
+// mudaria o campo, nada aconteceria, e não teria como descobrir por quê.
 salvarAjustes({ adspowerChave: "a-do-arquivo" });
 process.env.ADSPOWER_API_KEY = "a-de-fora";
 aplicarNoAmbiente();
-tudo &= ok(process.env.ADSPOWER_API_KEY === "a-de-fora",
-  "o .env e os testes continuam vencendo o arquivo de ajustes");
-delete process.env.ADSPOWER_API_KEY;
+tudo &= ok(process.env.ADSPOWER_API_KEY === "a-do-arquivo",
+  "o que está nos Ajustes vence o .env");
+
+sec("campo em branco não sobrepõe nada");
+// Quem não configurou não pode apagar o que o .env ou o padrão do código
+// já davam — senão abrir a tela uma vez zeraria a configuração.
+salvarAjustes({ adspowerChave: "" });
+process.env.ADSPOWER_API_KEY = "so-o-env";
 aplicarNoAmbiente();
-tudo &= ok(process.env.ADSPOWER_API_KEY === "a-do-arquivo", "e sem ela, vale a do arquivo");
+tudo &= ok(process.env.ADSPOWER_API_KEY === "so-o-env",
+  "campo vazio deixa o ambiente em paz");
+delete process.env.ADSPOWER_API_KEY;
+
+sec("a senha da Shopee e o padrão de e-mail saem dos Ajustes");
+salvarAjustes({
+  shopeeSenha: "senha-de-teste", codigoChave: "chave-de-teste",
+  emailPrefixo: "loja", emailPrefixoAlto: "", emailDominio: "exemplo.com",
+});
+aplicarNoAmbiente();
+tudo &= ok(process.env.SHOPEE_SENHA === "senha-de-teste", "a senha chega ao robô");
+tudo &= ok(process.env.RAPIDAPI_KEY === "chave-de-teste", "a chave do código também");
+
+// A prova que importa: o robô MONTA o e-mail a partir disso, e não do
+// padrão fixo no código. É este e-mail que ele digita na tela da Shopee.
+const { emailDaConta } = await import("../src/tracking.mjs");
+tudo &= ok(emailDaConta(124) === "loja124@exemplo.com",
+  `a conta 124 entra como ${emailDaConta(124)}`);
+tudo &= ok(emailDaConta(207) === "loja207@exemplo.com",
+  "e sem segundo prefixo, a faixa não se aplica");
+
+salvarAjustes({ emailPrefixoAlto: "Outro", emailFaixa: 200 });
+aplicarNoAmbiente();
+tudo &= ok(emailDaConta(207) === "Outro207@exemplo.com",
+  `com a faixa, a 207 entra como ${emailDaConta(207)}`);
+tudo &= ok(emailDaConta(124) === "loja124@exemplo.com", "e a 124 continua no primeiro");
+
+sec("segundo prefixo sem faixa não vale para ninguém");
+// O cliente digita o segundo começo e esquece de dizer a partir de qual
+// conta. Faixa em zero faria `n >= 0` ser sempre verdade, e TODAS as contas
+// entrariam com o prefixo errado — todas as senhas recusadas, e nenhuma
+// pista do porquê.
+salvarAjustes({ emailPrefixoAlto: "Outro", emailFaixa: 0 });
+aplicarNoAmbiente();
+tudo &= ok(emailDaConta(207) === "loja207@exemplo.com",
+  `sem faixa, a 207 fica no primeiro começo (ficou ${emailDaConta(207)})`);
+tudo &= ok(emailDaConta(9) === "loja9@exemplo.com", "e a 9 também");
+
+sec("o login automático dá para desligar");
+salvarAjustes({ loginAutomatico: false });
+aplicarNoAmbiente();
+tudo &= ok(process.env.LOGIN_AUTOMATICO === "0", "desligado chega ao robô");
+
+sec("os segredos sobrevivem a fechar o app");
+const vistos = JSON.parse((await import("node:child_process")).execFileSync(process.execPath,
+  ["--input-type=module", "-e", `
+    const { lerAjustes } = await import("${process.cwd()}/src/ajustes.mjs");
+    const a = lerAjustes();
+    console.log(JSON.stringify({ senha: a.shopeeSenha, prefixo: a.emailPrefixo,
+                                 dominio: a.emailDominio, login: a.loginAutomatico }));
+  `], { encoding: "utf8", env: { ...process.env } }).trim());
+tudo &= ok(vistos.senha === "senha-de-teste", "a senha está lá depois de reabrir");
+tudo &= ok(vistos.dominio === "exemplo.com", "e o domínio também");
+tudo &= ok(vistos.login === false, "e o login desligado");
 
 rmSync(pasta, { recursive: true, force: true });
 console.log(tudo ? "\n\x1b[32m\x1b[1m  ajustes de pé\x1b[0m\n"

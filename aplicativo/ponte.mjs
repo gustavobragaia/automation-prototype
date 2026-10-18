@@ -22,7 +22,7 @@ import { lerDetalhe } from "../src/armazenamento/detalhe.mjs";
 import { rodarCiclo, descobrirContas } from "../src/ciclo.mjs";
 import { iniciarConexao, conexaoEmAndamento, cancelarConexao } from "../src/shopify-oauth.mjs";
 import { resolverManual, prepararManual } from "../src/manual.mjs";
-import { lerAjustes, salvarAjustes, aplicarNoAmbiente } from "../src/ajustes.mjs";
+import { lerAjustes, salvarAjustes, aplicarNoAmbiente, SEGREDOS } from "../src/ajustes.mjs";
 import { aoEvento, emitir } from "../src/eventos.mjs";
 import { pedirParada } from "../src/fila.mjs";
 
@@ -41,6 +41,19 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
   // sai daqui e não de PLANILHA no ambiente: quem instala o app não tem .env.
   let planilhas = [];
   let escritaEmCurso = false;
+
+  const semSegredos = (a) => {
+    const fora = { ...a };
+    for (const s of SEGREDOS) fora[s] = a[s] ? "guardada" : "";
+    return fora;
+  };
+  // "guardada" é o que a tela devolve quando a pessoa não encostou no campo.
+  // Salvar isso literalmente trocaria a senha pela palavra "guardada".
+  const limparGuardados = (m) => {
+    const fora = { ...m };
+    for (const s of SEGREDOS) if (fora[s] === "guardada") delete fora[s];
+    return fora;
+  };
   // A aba que cada planilha usa de fato, descoberta ao lê-la. Guardar é o
   // que impede a rodada de procurar a aba de OUTRO arquivo — foi assim que
   // o .env do projeto derrubou uma rodada com "aba não encontrada".
@@ -93,16 +106,14 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
 
   return {
     // ── ajustes que o cliente escolhe uma vez ─────────────────────────
-    "ajustes:ler": async () => {
-      const a = lerAjustes();
-      // a chave nunca volta inteira pra tela; só o bastante pra ela mostrar
-      // que existe uma salva. Quem precisa dela de verdade é o robô, aqui.
-      return { ...a, adspowerChave: a.adspowerChave ? "guardada" : "" };
-    },
+    // Nenhum segredo volta inteiro para a tela — nem a senha da Shopee, nem
+    // as chaves. Ela recebe só "guardada", o bastante para mostrar que
+    // existe um valor salvo. Quem precisa do valor é o robô, aqui dentro.
+    "ajustes:ler": async () => semSegredos(lerAjustes()),
     "ajustes:salvar": (mudancas) => tentar(async () => {
-      const a = salvarAjustes(mudancas ?? {});
+      const a = salvarAjustes(limparGuardados(mudancas ?? {}));
       aplicarNoAmbiente(a);
-      return { ...a, adspowerChave: a.adspowerChave ? "guardada" : "" };
+      return semSegredos(a);
     }),
 
     // ── estado da máquina e das conexões ──────────────────────────────

@@ -10,7 +10,8 @@
     "start": "electron .",
     "dev": "electron .",
     "empacotar": "electron-builder",
-    "ensaio": "electron ensaio.mjs"
+    "ensaio": "electron ensaio.mjs",
+    "ensaio:ajustes": "electron ensaio-ajustes.mjs"
   },
   "devDependencies": {
     "electron": "^34.0.0",

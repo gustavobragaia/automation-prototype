@@ -89,10 +89,26 @@ export function parseConta(raw) {
 //
 //   conta  <  200  →  chompspee076@givmail.com
 //   conta >=  200  →  Brushopee506@givmail.com
-export const FAIXA_PREFIXO = Number(process.env.SHOPEE_FAIXA_PREFIXO ?? 200);
+// Lido na hora, não na importação: os Ajustes do app chegam ao ambiente
+// depois que os módulos já foram carregados.
+export const FAIXA_PREFIXO = () => Number(process.env.SHOPEE_FAIXA_PREFIXO ?? 200);
+
+// O padrão do e-mail das contas é do CLIENTE, não do produto: outro
+// comprador do Esteira vai ter outro prefixo e outro domínio. Os valores
+// abaixo continuam sendo os da Chomps por padrão, para nada mudar para
+// quem já usa, mas agora saem dos Ajustes.
+const PREFIXO_BAIXO = () => process.env.SHOPEE_PREFIXO ?? "chompspee";
+const PREFIXO_ALTO = () => process.env.SHOPEE_PREFIXO_ALTO ?? "Brushopee";
+const DOMINIO = () => process.env.SHOPEE_EMAIL_DOMINIO ?? "givmail.com";
 
 export function prefixoDaConta(numero) {
-  return Number(numero) >= FAIXA_PREFIXO ? "Brushopee" : "chompspee";
+  const alto = PREFIXO_ALTO();
+  const faixa = FAIXA_PREFIXO();
+  // Sem segundo prefixo, ou sem faixa, vale um começo só para todas as
+  // contas. Uma faixa em zero faria `n >= 0` ser sempre verdade, e TODAS
+  // as contas cairiam no segundo prefixo.
+  if (!alto || !(faixa > 0)) return PREFIXO_BAIXO();
+  return Number(numero) >= faixa ? alto : PREFIXO_BAIXO();
 }
 
 // Sem zero à esquerda: a conta 76 é chompspee76, não chompspee076 — foi
@@ -100,5 +116,5 @@ export function prefixoDaConta(numero) {
 // do perfil no AdsPower ("Shopee 076"), que é outra coisa.
 export function emailDaConta(numero, { digitos = Number(process.env.SHOPEE_DIGITOS ?? 0) } = {}) {
   const n = digitos > 0 ? String(numero).padStart(digitos, "0") : String(Number(numero));
-  return `${prefixoDaConta(numero)}${n}@givmail.com`;
+  return `${prefixoDaConta(numero)}${n}@${DOMINIO()}`;
 }

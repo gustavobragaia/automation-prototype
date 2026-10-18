@@ -232,6 +232,9 @@ td.dir,th.dir{text-align:right;font-variant-numeric:tabular-nums}
 .op .chave,.op .btn{margin-left:auto;flex:none}
 
 /* ══ Entrada de planilha ══ */
+.par-campos{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+@media(max-width:720px){.par-campos{grid-template-columns:1fr}}
+.linha-chave{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
 .comOlho{position:relative;display:block}
 .comOlho input{width:100%;padding-right:34px}
 .comOlho button{position:absolute;right:1px;top:1px;bottom:1px;width:32px;border:0;
@@ -892,6 +895,57 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
         <div id="adsResultado" style="margin-top:14px"></div>
         <p class="nota">O AdsPower precisa estar <b>aberto</b> para a conexão existir —
           ela some quando você fecha o programa.</p>
+      </div>
+
+      <div class="bloco">
+        <div class="rotulo"><h2>Contas da Shopee</h2></div>
+        <p class="nota" style="margin:0 0 14px">Só é usado quando a sessão de uma conta
+          cai e o robô precisa entrar de novo. No dia a dia as contas já estão conectadas
+          nos perfis, e nada disto é tocado.</p>
+
+        <label class="campo"><span>Senha das contas</span>
+          <span class="comOlho">
+            <input id="shSenha" type="password" value="" autocomplete="off"
+                   placeholder="a mesma senha de todas as contas">
+            <button type="button" id="bOlhoSenha" aria-label="Mostrar a senha" aria-pressed="false">
+              <svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/>
+                <circle cx="12" cy="12" r="3"/></svg></button></span>
+          <em>Fica só neste computador, num arquivo que só você consegue ler.</em></label>
+
+        <label class="campo"><span>Chave para ler o código de verificação</span>
+          <span class="comOlho">
+            <input id="shCodigo" type="password" value="" autocomplete="off"
+                   spellcheck="false" placeholder="chave da RapidAPI">
+            <button type="button" id="bOlhoCodigo" aria-label="Mostrar a chave" aria-pressed="false">
+              <svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/>
+                <circle cx="12" cy="12" r="3"/></svg></button></span>
+          <em>A Shopee manda um código por e-mail ao entrar. É com esta chave que o robô
+            lê esse e-mail.</em></label>
+
+        <div class="par-campos">
+          <label class="campo"><span>E-mail das contas</span>
+            <input id="shPrefixo" spellcheck="false" placeholder="ex.: chompspee">
+            <em>O começo, antes do número da conta.</em></label>
+          <label class="campo"><span>Domínio</span>
+            <input id="shDominio" spellcheck="false" placeholder="ex.: givmail.com"></label>
+        </div>
+
+        <div class="par-campos">
+          <label class="campo"><span>Outro começo a partir de</span>
+            <input id="shFaixa" class="curto" inputmode="numeric" placeholder="200">
+            <em>Deixe em branco se todas as contas usam o mesmo.</em></label>
+          <label class="campo"><span>Esse outro começo</span>
+            <input id="shPrefixoAlto" spellcheck="false" placeholder="ex.: Brushopee"></label>
+        </div>
+
+        <p class="nota" id="shExemplo" style="margin-top:4px"></p>
+
+        <div class="linha-chave" style="margin-top:16px">
+          <div><b>Entrar sozinho quando a sessão cair</b>
+            <p class="nota" style="margin:3px 0 0">Desligado, a conta vai para a etapa 3
+              esperando você entrar à mão.</p></div>
+          <button class="chave" id="chLogin" role="switch" aria-pressed="true"></button>
+        </div>
       </div>
 
       <div class="bloco">
@@ -1918,6 +1972,30 @@ $("bOlho").onclick=function(){
   this.setAttribute("aria-label",v?"Esconder a chave":"Mostrar a chave");
   $("adsChave").type=v?"text":"password";
 };
+$("bOlhoSenha").onclick=olho("shSenha");
+$("bOlhoCodigo").onclick=olho("shCodigo");
+function olho(campo){ return function(){
+  var v=this.getAttribute("aria-pressed")!=="true";
+  this.setAttribute("aria-pressed",String(v));
+  this.setAttribute("aria-label",v?"Esconder":"Mostrar");
+  $(campo).type=v?"text":"password";
+}; }
+
+// O cliente não deve ter que adivinhar se acertou o padrão: mostramos o
+// e-mail que SERÁ usado, com números de conta de verdade.
+function pintaExemploEmail(){
+  var pre=$("shPrefixo").value.trim(), alto=$("shPrefixoAlto").value.trim();
+  var dom=$("shDominio").value.trim(), faixa=Number($("shFaixa").value.trim());
+  if(!pre||!dom){ $("shExemplo").textContent=""; return; }
+  var e=function(n){ return ((alto&&faixa&&n>=faixa)?alto:pre)+n+"@"+dom; };
+  $("shExemplo").innerHTML="A conta 124 vai entrar como <b class=\"mono\">"+esc(e(124))+
+    "</b>"+((alto&&faixa)?", e a 207 como <b class=\"mono\">"+esc(e(207))+"</b>":"")+".";
+}
+["shPrefixo","shPrefixoAlto","shDominio","shFaixa"].forEach(function(id){
+  $(id).addEventListener("input",pintaExemploEmail);
+});
+chave("chLogin",function(){});
+
 $("bTestarAds").onclick=function(){ pintaDiag(null,true); GANCHOS.testarAds(); };
 pintaDiag(DIAGS[0]); qualDiag=1;
 
@@ -1990,6 +2068,16 @@ window.TELA = {
   planilha: somar,
   avisar: avisar,
   erroNaRodada: erroNaRodada,
+  // Os ajustes guardados chegam aqui quando o app abre.
+  ajustes: function(a){
+    if(a.emailPrefixo!=null) $("shPrefixo").value=a.emailPrefixo;
+    if(a.emailPrefixoAlto!=null) $("shPrefixoAlto").value=a.emailPrefixoAlto;
+    if(a.emailDominio!=null) $("shDominio").value=a.emailDominio;
+    if(a.emailFaixa!=null) $("shFaixa").value=a.emailFaixa;
+    if(a.loginAutomatico!=null)
+      $("chLogin").setAttribute("aria-pressed",String(a.loginAutomatico!==false));
+    pintaExemploEmail();
+  },
 
   // ── a escrita em lote ──
   // A lista do que vai sair vem do robô, já com o pedido que a Shopify

@@ -14,14 +14,33 @@ import { emEstado } from "./caminhos.mjs";
 const ARQ = process.env.AJUSTES_ARQUIVO ?? emEstado("ajustes.json");
 
 const PADRAO = {
+  // AdsPower
   adspowerBase: "http://local.adspower.net:50325",
   adspowerChave: "",
-  navegadores: null,      // null = usar a recomendação da máquina
+
+  // Contas da Shopee. Tudo isto era .env, que o cliente não tem e não
+  // saberia editar. Os padrões são os da Chomps, para nada mudar para quem
+  // já usa; outro comprador do Esteira troca na tela.
+  shopeeSenha: "",            // a mesma para todas as contas
+  emailPrefixo: "chompspee",  // o começo do e-mail das contas
+  emailPrefixoAlto: "Brushopee", // vazio = um prefixo só para todas
+  emailFaixa: 200,            // a partir deste número vale o prefixo de cima
+  emailDominio: "givmail.com",
+  codigoChave: "",            // RapidAPI: lê o código de verificação no e-mail
+  loginAutomatico: true,      // se o robô entra sozinho quando a sessão cai
+
+  // Rodada
+  navegadores: null,          // null = usar a recomendação da máquina
   som: true,
   notificacao: true,
   escreverDireto: false,
+  notificarCliente: false,    // a Shopify manda "pedido enviado" ao comprador
   tema: "sistema",
 };
+
+// O que é credencial: nunca volta inteiro para a tela, e a tela nunca
+// precisa do valor — só de saber que existe um guardado.
+export const SEGREDOS = ["adspowerChave", "shopeeSenha", "codigoChave"];
 
 // Lista fechada: o que a tela mandar fora disto é descartado, pra uma tela
 // comprometida não conseguir plantar campo que outro pedaço do robô leia.
@@ -49,10 +68,43 @@ export function salvarAjustes(mudancas = {}) {
   return atual;
 }
 
-// O robô lê de process.env; os ajustes do app entram por aqui, sem sobrepor
-// quem já definiu a variável de propósito (é assim que os testes isolam).
+// Os ajustes viram as variáveis que o robô lê.
+//
+// Eles VENCEM o ambiente, e isso é de propósito: a tela é o único lugar
+// onde o cliente consegue mexer. Se ele digitou a senha nos Ajustes e um
+// .env esquecido na pasta continuasse ganhando, ele mudaria o campo, nada
+// aconteceria, e não teria como descobrir por quê.
+//
+// O que ele deixou em branco não sobrepõe nada: aí o .env (em
+// desenvolvimento) ou o padrão do código continuam valendo.
+const NO_AMBIENTE = {
+  adspowerChave: "ADSPOWER_API_KEY",
+  adspowerBase: "ADSPOWER_BASE",
+  shopeeSenha: "SHOPEE_SENHA",
+  emailPrefixo: "SHOPEE_PREFIXO",
+  emailPrefixoAlto: "SHOPEE_PREFIXO_ALTO",
+  emailFaixa: "SHOPEE_FAIXA_PREFIXO",
+  emailDominio: "SHOPEE_EMAIL_DOMINIO",
+  codigoChave: "RAPIDAPI_KEY",
+};
+
+// Campos em que VAZIO é uma resposta, não a falta de uma. "Nenhum segundo
+// prefixo" quer dizer que todas as contas usam o mesmo começo de e-mail —
+// e isso precisa chegar ao robô, senão o padrão da Chomps volta sozinho.
+const VAZIO_VALE = new Set(["emailPrefixoAlto"]);
+
 export function aplicarNoAmbiente(a = lerAjustes()) {
-  if (a.adspowerChave) process.env.ADSPOWER_API_KEY ??= a.adspowerChave;
-  if (a.adspowerBase) process.env.ADSPOWER_BASE ??= a.adspowerBase;
+  for (const [campo, variavel] of Object.entries(NO_AMBIENTE)) {
+    const v = a[campo];
+    if (v == null) continue;
+    // "" quer dizer "não configurei", exceto onde o vazio é a resposta.
+    if (v === "" && !VAZIO_VALE.has(campo)) continue;
+    process.env[variavel] = String(v);
+  }
+  // Este é ao contrário: o padrão é ligado, então o que se escreve é o
+  // desligamento. `?? true` no PADRAO garante que só um "false" explícito
+  // chega aqui.
+  if (a.loginAutomatico === false) process.env.LOGIN_AUTOMATICO = "0";
+  if (a.notificarCliente === true) process.env.NOTIFICAR_CLIENTE = "1";
   return a;
 }
