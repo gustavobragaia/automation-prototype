@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tokenValido, credencialDaConta } from "./credenciais.mjs";
 import { obterCodigo } from "./otp.mjs";
 import { pedirTrava, soltarTrava, donoAtual } from "./trava-login.mjs";
+import { receberToken } from "./shopify-oauth.mjs";
 
 export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
   mkdirSync("captura/coletas", { recursive: true });
@@ -55,6 +56,29 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         res.statusCode = 500;
         return res.end(JSON.stringify({ erro: e.message }));
       }
+    }
+
+    // ── retorno do OAuth da Shopify ──────────────────────────────────
+    // Chega como POST de formulário, vindo da nossa página em esteira.cloud.
+    // A proteção NÃO é a origem (é cross-origin por natureza) e sim o
+    // `state`: só vale o retorno da conexão que ESTA máquina começou.
+    if (u.pathname === "/shopify/pronto") {
+      if (req.method !== "POST") { res.statusCode = 405; return res.end(); }
+      let corpo = "";
+      req.on("data", (c) => { corpo += c; if (corpo.length > 8192) req.destroy(); });
+      req.on("end", () => {
+        const campos = Object.fromEntries(new URLSearchParams(corpo));
+        const r = receberToken(campos);
+        aoLog(r.ok ? `Shopify conectada: ${r.loja}` : `retorno da Shopify recusado: ${r.erro}`);
+        res.statusCode = r.ok ? 200 : 400;
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.end(`<!doctype html><meta charset="utf-8"><title>Esteira</title>` +
+          `<body style="font:15px/1.6 -apple-system,sans-serif;display:grid;place-items:center;` +
+          `height:100vh;margin:0"><p>${r.ok
+            ? "Shopify conectada. Pode fechar esta janela."
+            : "Não consegui concluir: " + r.erro}</p>`);
+      });
+      return;
     }
 
     res.setHeader("Access-Control-Allow-Origin", "*");

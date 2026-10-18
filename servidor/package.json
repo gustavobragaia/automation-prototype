@@ -1,0 +1,7 @@
+{
+  "name": "esteira-servidor",
+  "private": true,
+  "type": "module",
+  "description": "Retorno do OAuth da Shopify. O token NUNCA fica aqui.",
+  "engines": { "node": ">=20" }
+}

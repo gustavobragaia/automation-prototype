@@ -584,3 +584,53 @@ computador pode abrir e dirigir os navegadores com as contas da Shopee**. Ela
 só escuta em localhost, então não é exposição para a internet — mas é
 informação que o dono merece ter. `apiAbertaSemChave()` detecta e a tela
 avisa.
+
+---
+
+## 13. Cenário B: conectar a Shopify em dois cliques (2026-10-18)
+
+Domínio comprado: **esteira.cloud**. O app passa a ser nosso, com custom
+distribution, e o lojista conecta clicando — sem copiar chave nenhuma.
+
+### O caminho
+
+1. o aplicativo gera um `state` = `porta.nonce` e abre o navegador em
+   `esteira.cloud/shopify/instalar`
+2. o lojista vê a tela de permissões da Shopify e aprova
+3. a Shopify volta em `esteira.cloud/shopify/callback`
+4. o callback confere tudo e troca o `code` pelo token
+5. devolve o token **por POST** para `127.0.0.1:<porta>/shopify/pronto`
+6. o aplicativo grava na máquina e o servidor esquece
+
+### O token nunca fica no nosso servidor
+
+É a promessa que dá para fazer ao cliente com honestidade: a credencial da
+loja dele vive só no computador dele.
+
+Por isso **POST, e não redirecionamento com o token na URL** — URL vai para
+o histórico do navegador e para o `Referer`.
+
+### O que impede um link forjado de virar token
+
+| | Onde | Por que existe |
+|---|---|---|
+| HMAC em tempo constante | servidor | sem ele, quem chamar a URL ganha um token |
+| Formato `*.myshopify.com` | servidor | `shop=evil.com` faria a troca acontecer no servidor do atacante |
+| `state` no formato certo | servidor | porta privilegiada e lixo são recusados |
+| `state` **igual ao que esta máquina gerou** | aplicativo | uma página aberta no navegador consegue montar um POST; o nonce é o que ela não tem |
+| `state` de uso único | aplicativo | repetir o retorno não reconecta |
+| loja igual à pedida | aplicativo | impede trocar a loja no meio do caminho |
+
+### Uma falha do teste, achada por mutação
+
+Tirar a comparação do `state` no aplicativo **não derrubava a suíte**: o
+state forjado do teste era malformado e morria numa checagem anterior. Um
+state bem-formado e diferente — que é justamente o que uma página hostil
+consegue montar — teria passado. O teste ganhou esse caso, e agora a mutação
+é pega.
+
+### Ainda falta
+
+Criar o app no Dev Dashboard com custom distribution, apontar o DNS e
+exercitar contra a Shopify de verdade. A lógica está pronta e provada contra
+uma Shopify simulada.
