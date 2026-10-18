@@ -24,6 +24,15 @@ export { historico };
 export async function descobrirContas(args = [], { aoLog = () => {} } = {}) {
   if (args.length) return args.map((a) => ({ serial: Number(a), conta: Number(a) }));
 
+  // contas.json vem ANTES da planilha: é recorte manual, feito para limitar
+  // a rodada. Com a planilha na frente, escrever o arquivo não tinha efeito
+  // nenhum e a rodada abria as 33 contas achando que ia abrir uma.
+  if (existsSync("contas.json")) {
+    const lista = JSON.parse(readFileSync("contas.json", "utf8"));
+    aoLog(`contas.json: ${lista.length} conta(s) — recorte manual, a planilha não é lida`);
+    return lista;
+  }
+
   const planilha = process.env.PLANILHA;
   if (planilha && existsSync(planilha)) {
     const r = await lerPendentes(planilha, {
@@ -44,8 +53,6 @@ export async function descobrirContas(args = [], { aoLog = () => {} } = {}) {
       r.contas.map((c) => ({ conta: c.conta, pedidosEsperados: c.pedidos.length })), { aoLog });
     return resolvidas;
   }
-
-  if (existsSync("contas.json")) return JSON.parse(readFileSync("contas.json", "utf8"));
 
   const lista = await listarPerfisOuNull(1, 500);
   if (!lista) throw new Error("sem PLANILHA, sem contas.json e user/list indisponível — passe os seriais como argumento");
