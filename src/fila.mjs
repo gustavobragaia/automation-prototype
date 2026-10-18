@@ -8,6 +8,7 @@
 import { resolve } from "node:path";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { abrirPerfil, fecharPerfil, statusPerfil } from "./adspower.mjs";
+import { soltarTrava } from "./trava-login.mjs";
 import { novoToken, limparToken, extensaoDaConta } from "./credenciais.mjs";
 
 const BASE = process.env.ADSPOWER_BASE ?? "http://local.adspower.net:50325";
@@ -134,6 +135,10 @@ export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pau
       } catch (e) {
         resultados.push({ ...c, ok: false, erro: e.message });
         aoLog(`conta ${c.conta}: FALHOU — ${e.message}`);
+      } finally {
+        // Rede de segurança: se o perfil morreu antes de soltar a vez, a
+        // fila inteira ficaria esperando a trava expirar.
+        soltarTrava(c.conta);
       }
       if (pendentes.length) await dormir(entre(pausaMin, pausaMax));
     }

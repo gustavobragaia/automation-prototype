@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { tokenValido, credencialDaConta } from "./credenciais.mjs";
 import { obterCodigo } from "./otp.mjs";
+import { pedirTrava, soltarTrava, donoAtual } from "./trava-login.mjs";
 
 export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
   mkdirSync("captura/coletas", { recursive: true });
@@ -17,7 +18,7 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
     // ── rotas sensíveis: nunca respondem a uma página web ─────────────
     // O service worker da extensão não manda Origin de site; uma página
     // manda. É o que separa "nossa extensão" de "qualquer aba aberta".
-    if (u.pathname === "/credencial" || u.pathname === "/otp") {
+    if (u.pathname === "/credencial" || u.pathname === "/otp" || u.pathname === "/trava-login") {
       const origem = req.headers.origin ?? "";
       const negar = (motivo) => { res.statusCode = 403; res.end(JSON.stringify({ erro: motivo })); };
       if (/^https?:\/\//i.test(origem)) return negar("origem de site não é aceita aqui");
@@ -26,6 +27,19 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
       res.setHeader("Content-Type", "application/json");
       const conta = u.searchParams.get("conta");
       try {
+        // Fila de login da RODADA inteira: a trava do service worker é por
+        // perfil e não enxerga os outros navegadores abertos.
+        if (u.pathname === "/trava-login") {
+          if (u.searchParams.get("acao") === "soltar") {
+            const soltou = soltarTrava(conta);
+            if (soltou) aoLog(`conta ${conta}: soltou a vez de logar`);
+            return res.end(JSON.stringify({ soltou, dono: donoAtual() }));
+          }
+          const r = pedirTrava(conta);
+          if (r.meu && r.roubou) aoLog(`conta ${conta}: assumiu a vez (a anterior passou do tempo)`);
+          else if (!r.meu) aoLog(`conta ${conta}: esperando a conta ${r.dono} terminar o login`);
+          return res.end(JSON.stringify(r));
+        }
         if (u.pathname === "/credencial") {
           const c = credencialDaConta(conta);
           aoLog(`conta ${conta}: credencial entregue à extensão`);

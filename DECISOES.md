@@ -333,3 +333,55 @@ para o dia em que a entrada não tiver o número — não é o caminho padrão.
 `estado/escritas-shopify.json` registra o que já foi escrito, e antes de
 escrever o robô também confere se o pedido já está `FULFILLED` na Shopify.
 Rodar a mesma rodada de novo não cria um segundo fulfillment.
+
+---
+
+## 8. Fila de login entre perfis (2026-10-18)
+
+**Um login por vez, na rodada inteira.** Vários navegadores abertos ao mesmo
+tempo é seguro; vários *logins* ao mesmo tempo não é.
+
+### De onde veio
+
+A primeira trava nasceu do episódio das 4 abas: o perfil restaura as abas da
+sessão anterior, todas caem no `/buyer/login`, e a Shopee respondeu a quatro
+logins simultâneos com verificação por imagem — que a gente chegou a atribuir
+a bloqueio dela.
+
+Essa trava ficou no service worker da extensão. O que passou despercebido é
+que **o service worker é por perfil**: ele impede duas abas do mesmo
+navegador, e não sabe que existem outros quatro navegadores abertos pela
+fila. Com `CONCORRENCIA=3` e duas contas deslogadas, o problema volta inteiro.
+
+### Como ficou
+
+Duas camadas, e a de baixo é a que importa:
+
+| Camada | Onde | Arbitra |
+|---|---|---|
+| 1 | `extensao/background.js` | abas do mesmo perfil — barata, sem ida à rede |
+| 2 | `src/trava-login.mjs`, via rota do coletor | **perfis entre si** |
+
+A aba que ganha a 1 ainda precisa ganhar a 2. O coletor é o único ponto que
+enxerga a rodada inteira, porque roda no mesmo processo da fila.
+
+### Regras
+
+- **Dona que não concluiu em 45 s perde a vez** (`TRAVA_LOGIN_MS`). Sem isso,
+  um perfil travado no meio do login paralisaria a rodada toda.
+- **Só o dono solta.** Uma recusa que chega atrasada não pode derrubar quem
+  já entrou.
+- **Pedir de novo sendo dono não derruba ninguém** — o content script pode
+  perguntar mais de uma vez durante o mesmo login.
+- **Solta em todo desfecho**: `login-ok`, `login-falhou` e `precisa-humano`.
+  É o que faz a fila andar; esperar a expiração custaria 45 s por conta.
+- **Três redes de segurança**: aba fechada solta (`chrome.tabs.onRemoved`), a
+  fila solta no `finally` de cada conta, e a expiração cobre o resto.
+- A rota `/trava-login` tem a mesma proteção de `/credencial`: recusa
+  requisição com `Origin` de site e exige o token da rodada.
+
+### O que isso destrava
+
+Oferecer 5 ou 10 navegadores na tela deixa de ser uma promessa que o código
+não cumpre. O limite real de paralelismo volta a ser a máquina, não o risco
+de queimar conta.
