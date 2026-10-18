@@ -16,9 +16,11 @@
     "importar": "node scripts/importar-planilha.mjs",
     "proof": "node run-proof.mjs",
     "e2e": "node run-e2e.mjs",
-    "test": "node scripts/gerar-fixture.mjs && node run-e2e.mjs && node scripts/testar-armazenamento.mjs && node scripts/testar-credencial.mjs",
+    "test": "node scripts/gerar-fixture.mjs && node run-e2e.mjs && node scripts/testar-armazenamento.mjs && node scripts/testar-credencial.mjs && node scripts/testar-shopify.mjs",
     "contrato": "node scripts/testar-armazenamento.mjs",
-    "credencial": "node scripts/testar-credencial.mjs"
+    "credencial": "node scripts/testar-credencial.mjs",
+    "conectar": "node --env-file=.env scripts/conectar-shopify.mjs",
+    "shopify": "node --env-file=.env run-shopify.mjs"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

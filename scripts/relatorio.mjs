@@ -6,56 +6,23 @@
 // Serve para conferir ANTES de escrever na Shopify. Um número no terminal
 // não deixa ninguém auditar; uma tabela lado a lado deixa.
 
-import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { lerPendentes } from "../src/planilha.mjs";
-import { extrairPedido } from "../src/shopee.mjs";
-import { normNome } from "../src/match.mjs";
+import { lerColetas, conciliar } from "../src/conciliar.mjs";
 import { emailDaConta } from "../src/tracking.mjs";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 const r = await lerPendentes(process.env.PLANILHA, { aba: process.env.PLANILHA_ABA });
-const porConta = new Map(r.contas.map((c) => [c.conta, c.pedidos]));
-
-// o que foi coletado em captura/coletas/
-const coletas = new Map();
-if (existsSync("captura/coletas"))
-  for (const f of readdirSync("captura/coletas").filter((x) => x.endsWith(".json"))) {
-    const d = JSON.parse(readFileSync(`captura/coletas/${f}`, "utf8"));
-    const conta = Number(d.conta);
-    if (!Number.isFinite(conta)) continue;
-    coletas.set(conta, (d.pedidos ?? []).filter((p) => p.bruto)
-      .map((p) => extrairPedido(p.bruto, { orderId: p.orderId })));
-  }
+const coletas = lerColetas();
 
 if (coletas.size === 0) {
   console.error("nenhuma coleta em captura/coletas/ — rode a coleta antes");
   process.exit(1);
 }
 
-const linhas = [];
-let casados = 0, ambiguos = 0, naoAchados = 0, semCodigo = 0;
-
-for (const [conta, colhidos] of [...coletas].sort((a, b) => a[0] - b[0])) {
-  for (const p of porConta.get(conta) ?? []) {
-    const iguais = colhidos.filter((c) => normNome(c.nome) === normNome(p.nome));
-    let estado, codigo = "", achado = null;
-
-    if (iguais.length === 0) { estado = "nao-achado"; naoAchados++; }
-    else if (iguais.length === 1) {
-      achado = iguais[0];
-      if (achado.codigos.length) { estado = "ok"; codigo = achado.codigos.join(" · "); casados++; }
-      else { estado = "sem-codigo"; semCodigo++; }
-    } else {
-      // desempata por valor quando o nome repete na mesma conta
-      const porValor = iguais.filter((c) => p.valor != null && Math.abs(c.valor - p.valor) < 0.01);
-      if (porValor.length === 1 && porValor[0].codigos.length) {
-        achado = porValor[0]; codigo = achado.codigos.join(" · "); estado = "ok-valor"; casados++;
-      } else { estado = "ambiguo"; ambiguos++; }
-    }
-    linhas.push({ conta, p, achado, codigo, estado, candidatos: iguais.length });
-  }
-}
+const { linhas, resumo } = conciliar(r.contas, coletas);
+const { casados, ambiguos, semCodigo, naoAchados } = resumo;
 
 const total = linhas.length;
 const pct = (n) => (total ? ((n / total) * 100).toFixed(1) : "0") + "%";

@@ -232,3 +232,104 @@ erro claro, na hora do upload, para a pessoa que pode corrigir.
 | VALOR PAGO | não | desempata cliente com mais de um pedido |
 | CÓDIGO DE RASTREIO | **sim** | vazia: é o que o robô preenche |
 | ONDE FOI FEITO O PEDIDO | **sim** | a conta Shopee, no formato `shopee 120` |
+
+---
+
+## 7. Como o cliente conecta a Shopify (2026-10-18)
+
+A Shopify encerrou os apps personalizados criados no admin em **01/01/2026**:
+não existe mais token estático em tela. Todo app novo nasce no Dev Dashboard,
+e aí a escolha é de **método de distribuição** — e o método **não pode ser
+trocado depois**.
+
+### O que foi decidido
+
+**Agora, cenário A — o lojista cria o app e nos passa as credenciais.**
+Ele cria o app no Dev Dashboard da organização dele, marca os escopos e copia
+`client_id` + `client_secret`. Trocamos por um token de 24h via
+`client_credentials`, e o robô renova sozinho.
+
+**Depois, cenário B — app nosso com custom distribution.**
+O app é nosso, com distribuição restrita à loja do cliente. Ele clica em um
+link de instalação, vê a tela de permissões da Shopify e autoriza. Nenhum
+token é copiado por ninguém.
+
+O B é melhor para o cliente e é o destino. Está em A hoje porque o B exige um
+**domínio com HTTPS** para o retorno do OAuth, que ainda não temos.
+
+### Por que o A não serve em produção
+
+`client_credentials` **só funciona quando o app e a loja estão na mesma
+organização**. Isso vale para uma loja de teste criada por nós; na loja do
+cliente, o app tem que ser criado por ele. Ou seja: o A funciona, mas empurra
+uns dez passos técnicos para o lojista.
+
+### O que o B precisa
+
+| | |
+|---|---|
+| Conta Partner | nossa, uma só, serve para todos os clientes |
+| Domínio HTTPS | para `application_url` e `redirect_urls` — `localhost` não é aceito de forma confiável |
+| Endpoint de retorno | recebe `code`, valida `state` e o HMAC-SHA256, troca pelo token |
+| Renovação | access token vale 1h, refresh token vale 90 dias |
+
+Fluxo no aplicativo de desktop, que é onde ele vai rodar:
+
+1. o cliente clica em **Conectar Shopify** no painel;
+2. abre o navegador na nossa página, que redireciona para a Shopify;
+3. ele aprova as permissões;
+4. a Shopify chama nosso endpoint com o `code`;
+5. o endpoint valida e troca pelo token;
+6. o aplicativo busca o token e guarda no keychain da máquina;
+7. nosso servidor apaga o token.
+
+O passo 7 é regra, não detalhe: **credencial de cliente não fica no nosso
+servidor.**
+
+### Como isso aparece no código
+
+Trocar A por B é trocar o `modo` em `src/shopify-conexao.mjs`. Nada mais no
+projeto sabe de onde vem o token:
+
+| Arquivo | Papel |
+|---|---|
+| `src/shopify-conexao.mjs` | guarda a conexão e entrega um token válido — é o único que conhece os modos |
+| `src/shopify.mjs` | lê e escreve na Admin GraphQL; pede o token e não pergunta a origem |
+| `scripts/conectar-shopify.mjs` | o "conectar" do painel: valida contra a Shopify de verdade e só salva se a loja responder |
+
+O modo `oauth` (B) já está escrito, incluindo a renovação pelo refresh token,
+mas **ainda não foi exercitado** contra a Shopify — depende do app com custom
+distribution, que depende do domínio.
+
+### Escopos
+
+```
+read_orders                                write_orders
+read_fulfillments                          write_fulfillments
+read_assigned_fulfillment_orders           write_assigned_fulfillment_orders
+read_merchant_managed_fulfillment_orders   write_merchant_managed_fulfillment_orders
+```
+
+O `conectar` compara os escopos **concedidos ao token** com essa lista e avisa
+o que falta. Vale mais que a configuração do app: é o que diz se a escrita vai
+falhar antes de a gente tentar escrever.
+
+### Onde o segredo fica
+
+Hoje em `estado/conexao-shopify.json`, com permissão `0600`, fora do git. Na
+fase do aplicativo isso vira keychain do sistema operacional.
+
+### A planilha dá o número do pedido — então não há casamento por nome
+
+A planilha do dia traz o número da Shopify (`Pedido #164891`). O pedido é
+buscado **pelo número**, exato. O nome entra só como conferência: se o
+destinatário na Shopify não for o mesmo da Shopee, **não escreve**.
+
+O casamento por nome + valor + produto continua existindo em `src/match.mjs`
+para o dia em que a entrada não tiver o número — não é o caminho padrão.
+
+### Escrever duas vezes não duplica
+
+`estado/escritas-shopify.json` registra o que já foi escrito, e antes de
+escrever o robô também confere se o pedido já está `FULFILLED` na Shopify.
+Rodar a mesma rodada de novo não cria um segundo fulfillment.
