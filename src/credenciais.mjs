@@ -14,9 +14,13 @@ import { randomBytes } from "node:crypto";
 import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { emailDaConta } from "./tracking.mjs";
+import { emRecursos, emTrabalho } from "./caminhos.mjs";
 
-const BASE_EXT = resolve("extensao");
-const RAIZ_RODADA = resolve("extensao-rodada");
+// A extensão original vem com o app; a cópia por conta é escrita a cada
+// rodada, e precisa estar em disco de verdade — o Chrome não carrega
+// extensão de dentro do pacote.
+const BASE_EXT = emRecursos("extensao");
+const RAIZ_RODADA = emTrabalho("extensao-rodada");
 let tokenAtual = null;
 let dirRodada = null;
 

@@ -8,9 +8,10 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { extrairPedido } from "./shopee.mjs";
 import { normNome } from "./match.mjs";
+import { DIR_COLETAS } from "./caminhos.mjs";
 
 /** Lê captura/coletas/*.json e devolve Map<conta, pedidos extraídos>. */
-export function lerColetas(dir = "captura/coletas") {
+export function lerColetas(dir = DIR_COLETAS) {
   const coletas = new Map();
   if (!existsSync(dir)) return coletas;
 

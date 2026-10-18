@@ -19,15 +19,41 @@
     "appId": "cloud.esteira.app",
     "productName": "Esteira",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "marca"
     },
     "files": [
       "principal.mjs",
       "preload.cjs",
       "ponte.mjs",
       "tela/**",
-      "../src/**",
-      "../migracoes/**"
+      "package.json",
+      {
+        "from": "../src",
+        "to": "src",
+        "filter": [
+          "**/*.mjs"
+        ]
+      },
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "../extensao",
+        "to": "extensao",
+        "filter": [
+          "**/*",
+          "!sessao.js",
+          "!**/node_modules/**"
+        ]
+      },
+      {
+        "from": "../migracoes",
+        "to": "migracoes",
+        "filter": [
+          "**/*.sql"
+        ]
+      }
     ],
     "mac": {
       "target": [
@@ -48,5 +74,8 @@
         "repo": "automation-prototype"
       }
     ]
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
   }
 }

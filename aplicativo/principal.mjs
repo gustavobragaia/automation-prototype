@@ -22,8 +22,22 @@ const AQUI = dirname(fileURLToPath(import.meta.url));
 // o cliente abriria todo dia sem carteira e sem a loja conectada, sem erro
 // nenhum na tela. Na pasta do usuário também sobrevive à atualização, que
 // troca o app inteiro de lugar.
-const ESTADO = join(app.getPath("userData"), "estado");
-mkdirSync(ESTADO, { recursive: true });
+// RECURSOS: o que veio junto com o app e nunca muda (a extensão, as
+// migrações). Empacotado fica em Contents/Resources, fora do asar, porque o
+// Chrome não carrega extensão de dentro de um pacote. Em desenvolvimento, a
+// raiz do projeto, que é onde essas pastas estão.
+const RECURSOS = app.isPackaged ? process.resourcesPath : join(AQUI, "..");
+
+// TRABALHO: o que o robô reescreve a cada rodada (coletas, cópia da
+// extensão por conta, planilha gerada). Pode ser apagado sem dó.
+// ESTADO: o que não pode ser perdido — carteira, mapeamento, token, ajustes.
+const USUARIO = app.getPath("userData");
+const TRABALHO = join(USUARIO, "trabalho");
+const ESTADO = join(USUARIO, "estado");
+for (const d of [TRABALHO, ESTADO]) mkdirSync(d, { recursive: true });
+
+process.env.RECURSOS_DIR ??= RECURSOS;
+process.env.TRABALHO_DIR ??= TRABALHO;
 process.env.ESTADO_DIR ??= ESTADO;
 
 const { iniciarColetor } = await import("../src/coletor.mjs");
@@ -31,6 +45,7 @@ const { construir } = await import("./ponte.mjs");
 const { aplicarNoAmbiente } = await import("../src/ajustes.mjs");
 aplicarNoAmbiente();   // a chave do AdsPower vira ADSPOWER_API_KEY antes de alguém pedir
 const PORTA = Number(process.env.COLETOR_PORTA ?? 3000);
+let PORTA_EM_USO = PORTA;
 
 let janela = null, coletor = null, ponte = null;
 const logs = [];
@@ -77,10 +92,42 @@ function criarJanela() {
   janela.on("closed", () => { janela = null; });
 }
 
+// Abrir o app duas vezes era um diálogo de erro do Electron e o segundo
+// morria antes da janela: os dois tentam a mesma porta. Agora o segundo
+// traz a janela do primeiro para a frente, que é o que a pessoa queria.
+if (!app.requestSingleInstanceLock()) app.quit();
+app.on("second-instance", () => {
+  if (!janela) return;
+  if (janela.isMinimized()) janela.restore();
+  janela.focus();
+});
+
+// A porta 3000 é a preferida porque é a que o resto do projeto usa, mas ela
+// é concorrida — qualquer servidor de desenvolvimento aberto a ocupa. Se
+// estiver tomada, vale outra: o endereço de volta da Shopify carrega o
+// número da porta, então o caminho inteiro continua fechando.
+async function subirColetor() {
+  let ultimo;
+  for (let p = PORTA; p < PORTA + 10; p++) {
+    try {
+      const c = await iniciarColetor({ porta: p, aoLog: registrar });
+      if (p !== PORTA) registrar(`a porta ${PORTA} estava ocupada — usando a ${p}`);
+      PORTA_EM_USO = p;
+      return c;
+    } catch (e) {
+      if (e?.code !== "EADDRINUSE") throw e;
+      ultimo = e;
+    }
+  }
+  throw ultimo;
+}
+
 app.whenReady().then(async () => {
   try {
-    coletor = await iniciarColetor({ porta: PORTA, aoLog: registrar });
-    registrar(`coletor ouvindo em 127.0.0.1:${PORTA}`);
+    coletor = await subirColetor();
+    registrar(`coletor ouvindo em 127.0.0.1:${coletor.porta}`);
+    registrar(`recursos em ${process.env.RECURSOS_DIR}`);
+    registrar(`trabalho em ${process.env.TRABALHO_DIR}`);
     registrar(`estado em ${process.env.ESTADO_DIR}`);
   } catch (e) {
     registrar(`coletor não subiu: ${e.message}`);
@@ -92,7 +139,7 @@ app.whenReady().then(async () => {
     // enquanto a rodada corre. `?.` porque o coletor pode emitir depois de
     // a janela ter sido fechada.
     aoEvento: (e) => janela?.webContents.send("evento", e),
-    porta: PORTA,
+    porta: PORTA_EM_USO,
   });
 
   // Uma porta só, com lista fechada. Nome fora da lista não executa nada.

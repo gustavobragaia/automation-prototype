@@ -8,11 +8,12 @@ import { obterCodigo } from "./otp.mjs";
 import { pedirTrava, soltarTrava, donoAtual } from "./trava-login.mjs";
 import { receberToken } from "./shopify-oauth.mjs";
 import { emitir } from "./eventos.mjs";
+import { join } from "node:path";
+import { DIR_COLETAS, DIR_EVENTOS, DIR_LOGIN, coletaDaConta, loginDaConta } from "./caminhos.mjs";
 
 export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
-  mkdirSync("captura/coletas", { recursive: true });
-  mkdirSync("captura/eventos", { recursive: true });
-  mkdirSync("captura/login", { recursive: true });
+  for (const d of [DIR_COLETAS, DIR_EVENTOS, DIR_LOGIN])
+    mkdirSync(d, { recursive: true });
 
   const servidor = createServer(async (req, res) => {
     const u = new URL(req.url, "http://127.0.0.1");
@@ -98,7 +99,7 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         if (m.tipo === "ping") return;
         if (m.tipo === "coleta") {
           const conta = m.conta ?? "sem-conta";
-          writeFileSync(`captura/coletas/conta-${conta}.json`, JSON.stringify(m, null, 2));
+          writeFileSync(coletaDaConta(conta), JSON.stringify(m, null, 2));
           aoLog(`conta ${conta}: ${(m.pedidos ?? []).length} pedido(s) em ${m.duracaoMs} ms · ${String(m.pagina ?? "").slice(0, 55)}`);
           return;
         }
@@ -111,12 +112,12 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
           .filter(Boolean).join(" · ");
         aoLog(`conta ${conta}: ${m.tipo ?? "(sem tipo)"}${detalhe ? " — " + detalhe : ""}` +
               (m.pagina ? ` · ${String(m.pagina).slice(0, 60)}` : ""));
-        writeFileSync(`captura/eventos/${Date.now()}-${m.tipo ?? "sem-tipo"}.json`, JSON.stringify(m, null, 2));
+        writeFileSync(join(DIR_EVENTOS, `${Date.now()}-${m.tipo ?? "sem-tipo"}.json`), JSON.stringify(m, null, 2));
 
         // A fila lê este arquivo para saber se vale esperar mais: login em
         // andamento merece prazo; login falhado merece desistir na hora.
         if (/^(login-|otp-|precisa-humano|nao-autenticado)/.test(m.tipo ?? "")) {
-          writeFileSync(`captura/login/conta-${conta}.json`,
+          writeFileSync(loginDaConta(conta),
             JSON.stringify({ tipo: m.tipo, motivo: m.motivo ?? null, em: Date.now() }, null, 2));
 
           // A tela precisa separar dois casos que no log parecem o mesmo:
@@ -133,10 +134,14 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
     });
   });
 
-  return new Promise((resolve) => {
-    servidor.listen(porta, "127.0.0.1", () => resolve({
-      porta,
-      fechar: () => new Promise((r) => servidor.close(r)),
-    }));
+  return new Promise((resolve, reject) => {
+    // Sem este `error`, uma porta ocupada vira exceção não tratada: no
+    // terminal é um stack trace, no app é um diálogo de erro do Electron e
+    // o programa morre antes de abrir a janela.
+    servidor.once("error", reject);
+    servidor.listen(porta, "127.0.0.1", () => {
+      servidor.removeListener("error", reject);
+      resolve({ porta, fechar: () => new Promise((r) => servidor.close(r)) });
+    });
   });
 }

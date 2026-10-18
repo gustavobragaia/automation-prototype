@@ -2,7 +2,6 @@
 // É o que o agendador dispara e o que o painel mostra.
 
 import { readFileSync, existsSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { rodarFila } from "./fila.mjs";
 import { extrairPedido } from "./shopee.mjs";
 import { carregar, salvar, registrar, historico, registrarRodada, gravarMotivos,
@@ -16,6 +15,7 @@ import { lerColetas } from "./conciliar.mjs";
 import { escreverRastreios } from "./escrita.mjs";
 import { alarmar, avaliarRodada } from "./alarme.mjs";
 import { emitir } from "./eventos.mjs";
+import { escreverPlanilha } from "./planilha-saida.mjs";
 
 export { historico };
 
@@ -209,7 +209,9 @@ export async function rodarCiclo({ contas, escrever = true, simular = false, aoL
   // ── planilha ────────────────────────────────────────────────────
   let planilha = null;
   try {
-    planilha = execFileSync("node", ["escrever-planilha.mjs", "--tudo"], { encoding: "utf8" }).trim().split("\n")[0];
+    const r = await escreverPlanilha({ tudo: true });
+    if (r) { planilha = r.arquivo; aoLog(`${r.linhas} pedido(s) em ${r.arquivo}`); }
+    else aoLog("nenhum pedido a escrever na planilha");
   } catch (e) { aoLog(`planilha não gerada: ${e.message}`); }
 
   const rodada = {

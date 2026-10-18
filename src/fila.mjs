@@ -13,6 +13,7 @@ import { abrirPerfil, fecharPerfil, statusPerfil, BASE, KEY } from "./adspower.m
 import { soltarTrava } from "./trava-login.mjs";
 import { novoToken, limparToken, extensaoDaConta } from "./credenciais.mjs";
 import { emitir } from "./eventos.mjs";
+import { coletaDaConta, loginDaConta } from "./caminhos.mjs";
 
 const EXT = resolve("extensao");
 
@@ -71,7 +72,7 @@ export async function processarConta({ serial, userId, conta }, {
 } = {}) {
   const ref = serial != null ? { serial } : { userId };
   emitir("conta:abrindo", { conta });
-  const arq = `captura/coletas/conta-${conta}.json`;
+  const arq = coletaDaConta(conta);
   const antes = existsSync(arq) ? statSync(arq).mtimeMs : 0;
 
   if ((await statusPerfil(ref).catch(() => "Inactive")) === "Active") {
@@ -131,7 +132,7 @@ function resumoDaColeta(conta, arq, comecou) {
   // O robô só grava este arquivo quando precisa mexer com login. Mas ele
   // nunca é apagado: olhar só se existe faria a conta aparecer como "o robô
   // logou" para sempre, depois de uma única vez meses atrás. Vale a data.
-  const marca = `captura/login/conta-${conta}.json`;
+  const marca = loginDaConta(conta);
   const precisouLogin = existsSync(marca) && statSync(marca).mtimeMs >= comecou;
   return { pedidos, precisouLogin };
 }
