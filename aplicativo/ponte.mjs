@@ -18,6 +18,8 @@ import { rodarCiclo, descobrirContas } from "../src/ciclo.mjs";
 import { iniciarConexao, conexaoEmAndamento, cancelarConexao } from "../src/shopify-oauth.mjs";
 import { resolverManual, prepararManual } from "../src/manual.mjs";
 import { lerAjustes, salvarAjustes, aplicarNoAmbiente } from "../src/ajustes.mjs";
+import { aoEvento, emitir } from "../src/eventos.mjs";
+import { pedirParada } from "../src/fila.mjs";
 
 /** Erro que atravessa a ponte vira dado, não exceção perdida. */
 const tentar = async (fn) => {
@@ -25,8 +27,14 @@ const tentar = async (fn) => {
   catch (e) { return { ok: false, erro: e.message }; }
 };
 
-export function construir({ aoLog = () => {}, porta = 3000 } = {}) {
+export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } = {}) {
+  // Os eventos do robô viram eventos da janela. Inscreve uma vez, no
+  // arranque: o coletor sobe antes da rodada e emite por conta própria.
+  if (enviar) aoEvento(enviar);
   let rodadaEmCurso = null;
+  // As planilhas que o cliente escolheu nesta sessão, na ordem. A rodada
+  // sai daqui e não de PLANILHA no ambiente: quem instala o app não tem .env.
+  let planilhas = [];
 
   return {
     // ── ajustes que o cliente escolhe uma vez ─────────────────────────
@@ -79,6 +87,7 @@ export function construir({ aoLog = () => {}, porta = 3000 } = {}) {
     // ── planilha e carteira ───────────────────────────────────────────
     "planilha:ler": ({ caminho, aba }) => tentar(async () => {
       const r = await lerPendentes(caminho, { aba });
+      if (!planilhas.includes(caminho)) planilhas.push(caminho);
       return {
         aba: r.aba, total: r.total, pendentes: r.pendentes.length,
         contas: r.contas.map((c) => ({ conta: c.conta, pedidos: c.pedidos.length })),
@@ -104,14 +113,45 @@ export function construir({ aoLog = () => {}, porta = 3000 } = {}) {
     "motivos:vocabulario": async () => MOTIVOS,
 
     // ── a rodada ──────────────────────────────────────────────────────
-    "rodada:contas": (args) => tentar(() => descobrirContas(args ?? [], { aoLog })),
+    "planilha:esquecer": async ({ caminho }) => {
+      planilhas = caminho ? planilhas.filter((p) => p !== caminho) : [];
+      return planilhas.length;
+    },
+
+    "rodada:contas": (args) => tentar(async () => {
+      if (Array.isArray(args) && args.length) return descobrirContas(args, { aoLog });
+      if (!planilhas.length) throw new Error("nenhuma planilha escolhida ainda");
+
+      // O cliente pode subir mais de uma planilha no mesmo dia. Uma conta que
+      // aparece em duas é uma conta só: abrir o mesmo perfil duas vezes na
+      // mesma rodada é o caminho mais curto para a Shopee pedir verificação.
+      const porConta = new Map();
+      for (const planilha of planilhas)
+        for (const c of await descobrirContas([], { aoLog, planilha, ignorarRecorte: true }))
+          if (!porConta.has(c.conta)) porConta.set(c.conta, c);
+      return [...porConta.values()];
+    }),
     "rodada:emCurso": async () => Boolean(rodadaEmCurso),
+    "rodada:parar": async () => {
+      if (!rodadaEmCurso) return false;
+      pedirParada();
+      aoLog("parada pedida — as contas que já abriram terminam, o resto fica de fora");
+      return true;
+    },
     "rodada:iniciar": ({ contas, escrever = false, concorrencia }) => tentar(async () => {
       if (rodadaEmCurso) throw new Error("já existe uma rodada em andamento");
       if (concorrencia) process.env.CONCORRENCIA = String(concorrencia);
       rodadaEmCurso = rodarCiclo({ contas, escrever, aoLog })
         .finally(() => { rodadaEmCurso = null; });
-      return await rodadaEmCurso;
+      try {
+        return await rodadaEmCurso;
+      } catch (e) {
+        // Sem isto, uma rodada que estoura deixa a tela girando para sempre:
+        // o "rodada:fim" do ciclo fica para trás do throw.
+        emitir("rodada:fim", { erro: e.message, contas: (contas ?? []).length,
+                               coletadas: 0, falhas: (contas ?? []).length });
+        throw e;
+      }
     }),
 
     // ── escrita manual ────────────────────────────────────────────────

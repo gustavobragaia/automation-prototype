@@ -927,6 +927,7 @@ var GANCHOS = window.GANCHOS = {
     setTimeout(function(){ window.TELA.shopify("conectada"); }, rapido?0:2400);
   },
   cancelarShopify: function(){},
+  esquecerPlanilha: function(){},
   testarAds: function(){},                                // redefinido mais abaixo
 };
 var rapido=matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1036,15 +1037,15 @@ function pintaArquivos(){
   $("blLeitura").hidden=!arquivos.length;
   $("lePed").textContent=t.p; $("leCont").textContent=Object.keys(t.c).length; $("leJa").textContent=t.j;
   $("bRodar").disabled=rodando||!arquivos.length;
-  $("rLidos").textContent="de "+(TOTAL||0)+" rastreios lidos";
+  $("rLidos").textContent=TOTAL?("de "+TOTAL+" rastreios lidos"):"rastreios lidos";
   pintaCtrl(); if(!rodando&&!coletou) pintaColeta();
   pintaFechada(); pintaTrilha();
 }
 function somar(nome,real){
   if(escrito) comecarProxima();   // planilha nova = rodada nova
   if(real){
-    arquivos.push({nome:nome,linhas:real.linhas,pedidos:real.pedidos,contas:real.contas,
-      ja:real.ja,hora:hora(),lista:real.lista});
+    arquivos.push({nome:nome,caminho:real.caminho,linhas:real.linhas,pedidos:real.pedidos,
+      contas:real.contas,ja:real.ja,hora:hora(),lista:real.lista});
     pintaArquivos(); return;
   }
   var e=exemplos[Math.min(arquivos.length,exemplos.length-1)];
@@ -1069,7 +1070,11 @@ solta.addEventListener("drop",function(e){
 });
 $("listaArq").addEventListener("click",function(e){
   var b=e.target.closest("[data-tirar]"); if(!b) return;
-  arquivos.splice(Number(b.dataset.tirar),1); pintaArquivos();
+  var fora=arquivos.splice(Number(b.dataset.tirar),1)[0];
+  pintaArquivos();
+  // Sumir da lista tem que sumir da rodada também: senão o cliente tira a
+  // planilha da tela e ela continua mandando contas para a fila.
+  GANCHOS.esquecerPlanilha(fora && fora.caminho);
 });
 $("bModelo").onclick=function(){};
 
@@ -1138,6 +1143,7 @@ Array.prototype.forEach.call(document.querySelectorAll("#seg button"),function(b
   };
 });
 
+// Exemplo até a rodada de verdade montar a tabela por cima.
 var CONTAS_RODADA=[
   {n:124,perfil:"k1boua9d",viva:true,pedidos:9,seg:48},
   {n:128,perfil:"k1cexbyh",viva:true,pedidos:7,seg:52},
@@ -1148,20 +1154,27 @@ var estadoConta={}; CONTAS_RODADA.forEach(function(c){estadoConta[c.n]="fila";})
 
 function est(cls,txt){ return '<span class="est '+cls+'"><span class="pt"></span>'+txt+'</span>'; }
 
+// O e-mail muda de prefixo a partir da conta 200 — errar aqui vira
+// "senha inválida" na cara do cliente, então é regra, não enfeite.
+function emailDaConta(n){
+  return (n < 200 ? "chompspee" : "Brushopee") + n + "@givmail.com";
+}
 function linhaConta(c){
   var e=estadoConta[c.n], entrada="—", pedidos="—", tempo="—", situacao;
   var feita = c.viva ? est("ok","já conectada") : est("at","o robô logou");
   if(e==="fila") situacao=est("","na fila");
   else if(e==="abrindo") situacao=est("andando","abrindo perfil");
-  else if(e==="logando") situacao=est("andando","o robô está logando");
+  else if(e==="logando"){ situacao=est("andando","o robô está logando"); }
+  else if(e==="humano") situacao=est("at","precisa de você");
+  else if(e==="falhou") situacao=est("er", c.erro ? "falhou: "+c.erro : "falhou");
   else if(e==="lendo"){ situacao=est("andando","lendo pedidos"); entrada=feita; }
   else { situacao=est("ok","coletada"); entrada=feita;
-         pedidos='<span class="num">'+c.pedidos+'</span>';
-         tempo='<span class="num ter">'+c.seg+'s</span>'; }
+         pedidos='<span class="num">'+(c.pedidos==null?"—":c.pedidos)+'</span>';
+         tempo='<span class="num ter">'+(c.seg==null?"—":c.seg+"s")+'</span>'; }
   return '<tr'+(/abrindo|logando|lendo/.test(e)?' class="agora"':'')+'>'+
     '<td><div class="conta-nome">Shopee '+c.n+'</div>'+
-    '<div class="conta-mail">chompspee'+c.n+'@givmail.com</div></td>'+
-    '<td class="mono ter">'+c.perfil+'</td><td>'+entrada+'</td><td>'+situacao+'</td>'+
+    '<div class="conta-mail">'+emailDaConta(c.n)+'</div></td>'+
+    '<td class="mono ter">'+(c.perfil||"—")+'</td><td>'+entrada+'</td><td>'+situacao+'</td>'+
     '<td class="dir">'+pedidos+'</td><td class="dir">'+tempo+'</td></tr>';
 }
 function pintaColeta(){
@@ -1172,7 +1185,8 @@ function pintaColeta(){
   $("vContas").textContent=f.length+"/"+CONTAS_RODADA.length;
   $("vLidos").textContent=prontos;
   $("vSemLogin").textContent=f.length?sem+" de "+f.length:"—";
-  $("resumoContas").textContent=CONTAS_RODADA.length+" contas · "+(TOTAL||0)+" pedidos esperados";
+  $("resumoContas").textContent=CONTAS_RODADA.length+" contas"+
+    (TOTAL?(" · "+TOTAL+" pedidos esperados"):"");
   if(!rodando&&!coletou) $("vTempo").textContent=arquivos.length
     ? "~"+fmt(contasDoDia()*SEG/paralelo) : "—";
 }
@@ -1184,8 +1198,10 @@ function pararColeta(){
   rodando=false; document.body.classList.remove("rodando");
   $("bRodar").disabled=!arquivos.length; $("bParar").disabled=true;
 }
-$("bParar").onclick=function(){pararColeta();pintaColeta();pintaTrilha();};
-$("bRodar").onclick=function(){
+$("bParar").onclick=function(){ GANCHOS.pararRodada(); };
+GANCHOS.pararRodada=function(){ pararColeta(); pintaColeta(); pintaTrilha(); };
+$("bRodar").onclick=function(){ GANCHOS.rodar(); };
+GANCHOS.rodar=function(){
   if(rodando||!arquivos.length) return;
   rodando=true; coletou=false; escrito=false; escritos=0;
   document.body.classList.add("rodando");
@@ -1797,6 +1813,48 @@ window.TELA = {
   },
   planilha: somar,
   avisar: avisar,
+
+  // ── a rodada de verdade ──
+  // Quem manda na tabela passa a ser o robô. A tela só desenha o que chega.
+  rodada: {
+    // A tabela inteira antes de a primeira conta abrir: o cliente vê o que
+    // vai acontecer, em vez de linhas aparecendo do nada.
+    montar: function(contas){
+      CONTAS_RODADA = contas.map(function(c){
+        return { n:c.conta, perfil:c.perfil, viva:true, pedidos:null, seg:null };
+      });
+      estadoConta = {};
+      CONTAS_RODADA.forEach(function(c){ estadoConta[c.n]="fila"; });
+      rodando=true; coletou=false; escrito=false; escritos=0;
+      document.body.classList.add("rodando");
+      $("bRodar").disabled=true; $("bParar").disabled=false;
+      pintaColeta(); pintaTrilha();
+    },
+    conta: function(n, estado, dados){
+      var c = CONTAS_RODADA.filter(function(x){ return x.n===n; })[0];
+      if(!c) return;                         // conta que não está nesta rodada
+      estadoConta[n]=estado;
+      if(dados){
+        if(dados.perfil!=null) c.perfil=dados.perfil;
+        if(dados.pedidos!=null) c.pedidos=dados.pedidos;
+        if(dados.segundos!=null) c.seg=dados.segundos;
+        if(dados.precisouLogin!=null) c.viva=!dados.precisouLogin;
+        if(dados.erro!=null) c.erro=dados.erro;
+      }
+      // "o robô está logando" já prova que a sessão tinha morrido, antes
+      // mesmo de a conta terminar — senão a coluna fica mentindo no meio.
+      if(estado==="logando") c.viva=false;
+      pintaColeta(); pintaTrilha();
+    },
+    terminar: function(resumo){
+      pararColeta(); coletou=true;
+      $("vTempo").textContent = resumo && resumo.segundos ? fmt(resumo.segundos) : "—";
+      pintaColeta(); pintaEscrita(); pintaTrilha();
+      if(resumo && resumo.erro) return;      // quem avisa do erro é quem chamou
+      avisar("Coleta terminada", prontos+" rastreios lidos. "+pendencias()+" esperando você.");
+      if(direto) escreverTudo(); else ir("3");
+    },
+  },
 };
 
 var h=(location.hash||"").slice(1);

@@ -15,6 +15,7 @@ import { anotarMapeamento } from "./estado.mjs";
 import { lerColetas } from "./conciliar.mjs";
 import { escreverRastreios } from "./escrita.mjs";
 import { alarmar, avaliarRodada } from "./alarme.mjs";
+import { emitir } from "./eventos.mjs";
 
 export { historico };
 
@@ -22,13 +23,17 @@ export { historico };
  * De onde sai a lista de contas a abrir, em ordem de preferência
  * (DECISOES.md §4): planilha → contas.json → todos os perfis do AdsPower.
  */
-export async function descobrirContas(args = [], { aoLog = () => {} } = {}) {
+export async function descobrirContas(args = [], { aoLog = () => {}, planilha: planilhaPedida, ignorarRecorte = false } = {}) {
   if (args.length) return args.map((a) => ({ serial: Number(a), conta: Number(a) }));
 
   // contas.json vem ANTES da planilha: é recorte manual, feito para limitar
   // a rodada. Com a planilha na frente, escrever o arquivo não tinha efeito
   // nenhum e a rodada abria as 33 contas achando que ia abrir uma.
-  if (existsSync("contas.json")) {
+  //
+  // Mas isso é ferramenta de quem roda pelo terminal. No app, quem manda é a
+  // planilha que o cliente acabou de escolher: um contas.json esquecido na
+  // pasta faria a rodada ignorar a escolha dele sem dizer nada.
+  if (!ignorarRecorte && existsSync("contas.json")) {
     const lista = JSON.parse(readFileSync("contas.json", "utf8"));
     aoLog(`contas.json: ${lista.length} conta(s) — recorte manual, a planilha não é lida`);
     // Lista escrita à mão: aqui dois alvos PODEM apontar para o mesmo
@@ -43,7 +48,7 @@ export async function descobrirContas(args = [], { aoLog = () => {} } = {}) {
     return lista;
   }
 
-  const planilha = process.env.PLANILHA;
+  const planilha = planilhaPedida ?? process.env.PLANILHA;
   if (planilha && existsSync(planilha)) {
     const r = await lerPendentes(planilha, {
       aba: process.env.PLANILHA_ABA,
@@ -121,6 +126,11 @@ export async function rodarCiclo({ contas, escrever = true, simular = false, aoL
   const SIMULADO = "BR269999999999S";
 
   aoLog(`rodada iniciada · ${contas.length} conta(s)`);
+  // A tela desenha a tabela inteira antes de a primeira conta abrir: assim
+  // o cliente vê o que vai acontecer, em vez de linhas surgindo do nada.
+  emitir("rodada:inicio", {
+    contas: contas.map((c) => ({ conta: c.conta, perfil: c.serial ?? c.userId ?? null })),
+  });
   const resultados = await rodarFila(contas, {
     concorrencia: Number(process.env.CONCORRENCIA ?? 3),
     aoLog,
@@ -225,5 +235,9 @@ export async function rodarCiclo({ contas, escrever = true, simular = false, aoL
   const motivos = avaliarRodada({ contas: contas.length, coletadas, pedidosVistos: vistos, falhas });
   if (motivos.length) await alarmar("Rodada com problema", motivos.join("\n"));
 
+  emitir("rodada:fim", {
+    contas: contas.length, coletadas, falhas: falhas.length,
+    pedidos: vistos, motivos,
+  });
   return rodada;
 }

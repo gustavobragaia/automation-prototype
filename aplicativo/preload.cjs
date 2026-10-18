@@ -1,4 +1,4 @@
-// A superfície que a tela enxerga. Três funções, e nada de Node.
+// A superfície que a tela enxerga. Meia dúzia de funções, e nada de Node.
 //
 // É CommonJS de propósito: preload com sandbox ligado não carrega ESM.
 const { contextBridge, ipcRenderer } = require("electron");
@@ -9,6 +9,12 @@ contextBridge.exposeInMainWorld("esteira", {
   logs: () => ipcRenderer.invoke("logs"),
   avisar: (titulo, corpo) => ipcRenderer.invoke("avisar", { titulo, corpo }),
   escolherPlanilha: () => ipcRenderer.invoke("escolher-planilha"),
+  /** O que está acontecendo agora, com nome fixo. Devolve como cancelar. */
+  aoEvento: (fn) => {
+    const ouvir = (_e, evento) => fn(evento);
+    ipcRenderer.on("evento", ouvir);
+    return () => ipcRenderer.removeListener("evento", ouvir);
+  },
   /** Log ao vivo da rodada. Devolve a função que cancela a escuta. */
   aoLog: (fn) => {
     const ouvir = (_e, linha) => fn(linha);

@@ -17,10 +17,35 @@
   "build": {
     "appId": "cloud.esteira.app",
     "productName": "Esteira",
-    "directories": { "output": "dist" },
-    "files": ["principal.mjs", "preload.cjs", "ponte.mjs", "tela/**", "../src/**", "../migracoes/**"],
-    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.productivity" },
-    "win": { "target": ["nsis"] },
-    "publish": [{ "provider": "github", "owner": "gustavobragaia", "repo": "automation-prototype" }]
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "principal.mjs",
+      "preload.cjs",
+      "ponte.mjs",
+      "tela/**",
+      "../src/**",
+      "../migracoes/**"
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gustavobragaia",
+        "repo": "automation-prototype"
+      }
+    ]
   }
 }

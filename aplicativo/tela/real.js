@@ -125,6 +125,10 @@ async function mostrarShopify(){
 
 /* ── Planilha: o diálogo do sistema, e leitura de verdade ── */
 function planilha(){
+  GANCHOS.esquecerPlanilha = function(caminho){
+    if (caminho) pedir("planilha:esquecer", { caminho: caminho })
+      .catch(function(e){ console.error("[esteira] esquecer:", e.message); });
+  };
   GANCHOS.escolherPlanilha = async function(){
     var caminhos = await window.esteira.escolherPlanilha();
     for (var i = 0; i < caminhos.length; i++) await ler(caminhos[i]);
@@ -135,6 +139,7 @@ async function ler(caminho){
   try {
     var r = await pedir("planilha:ler", { caminho: caminho });
     TELA.planilha(nome, {
+      caminho: caminho,
       linhas: r.total, pedidos: r.pendentes, contas: r.contas.length,
       ja: Math.max(0, r.total - r.pendentes - (r.ignorados||0)),
       lista: r.contas.map(function(c){ return c.conta; }),
@@ -145,6 +150,66 @@ async function ler(caminho){
   }
 }
 
+/* ── A rodada de verdade ── */
+var ESTADO_DO_EVENTO = {
+  "conta:abrindo": "abrindo", "conta:aberta": "abrindo", "conta:logando": "logando",
+  "conta:humano": "humano", "conta:lendo": "lendo", "conta:feita": "feita",
+  "conta:falhou": "falhou",
+};
+function rodada(){
+  // A escuta começa antes de qualquer rodada: o coletor sobe junto com o app
+  // e já emite por conta própria enquanto o cliente ainda está na etapa 1.
+  window.esteira.aoEvento(function(e){
+    if (e.tipo === "rodada:inicio") return TELA.rodada.montar(e.contas || []);
+    if (e.tipo === "rodada:fim") return TELA.rodada.terminar(e);
+    var estado = ESTADO_DO_EVENTO[e.tipo];
+    if (!estado) return;
+    TELA.rodada.conta(e.conta, estado, e);
+    // Só este caso merece som: a rodada parou e não anda sem uma pessoa.
+    if (e.tipo === "conta:humano")
+      TELA.avisar("A conta " + e.conta + " precisa de você",
+                  e.motivo || "A Shopee pediu verificação.");
+  });
+
+  GANCHOS.rodar = async function(){
+    if (await pedir("rodada:emCurso")) return;
+    var botao = document.getElementById("bRodar");
+    botao.disabled = true;
+    document.getElementById("bParar").textContent = "Parar";
+    try {
+      // Quais contas e qual perfil de cada uma: sai da planilha cruzada com
+      // os perfis do AdsPower, não de um palpite da tela.
+      var contas = await pedir("rodada:contas", []);
+      if (!contas.length) throw new Error("nenhuma conta para abrir nesta planilha");
+      await pedir("rodada:iniciar", {
+        contas: contas,
+        escrever: document.getElementById("chDireto").getAttribute("aria-pressed") === "true",
+        concorrencia: paraleloEscolhido(),
+      });
+    } catch (e) {
+      // A rodada já mandou "rodada:fim", então a tela não fica girando;
+      // aqui é só dizer por quê.
+      TELA.rodada.terminar({ erro: e.message });
+      TELA.avisar("A rodada não terminou", e.message);
+      console.error("[esteira] rodada:", e.message);
+    } finally { botao.disabled = false; }
+  };
+
+  GANCHOS.pararRodada = async function(){
+    var b = document.getElementById("bParar");
+    b.disabled = true; b.textContent = "Parando…";
+    try { await pedir("rodada:parar"); }
+    catch (e) { console.error("[esteira] parar:", e.message); }
+    // O botão não volta: a rodada vai terminar sozinha e o "rodada:fim"
+    // devolve a tela ao estado parado. Dizer "parado" antes disso seria
+    // mentira — as contas que já abriram ainda estão lá.
+  };
+}
+function paraleloEscolhido(){
+  var b = document.querySelector('#seg button[aria-pressed="true"]');
+  return b ? Number(b.dataset.n) : undefined;
+}
+
 /* ── Aviso pelo sistema operacional, não pelo navegador ── */
 function avisos(){
   var doNavegador = TELA.avisar;
@@ -153,7 +218,7 @@ function avisos(){
 
 (async function(){
   var partes = [["ajustes",ajustes],["máquina",maquina],["AdsPower",adspower],["Shopify",shopify],
-                ["planilha",planilha],["avisos",avisos]];
+                ["planilha",planilha],["rodada",rodada],["avisos",avisos]];
   for (var i = 0; i < partes.length; i++) {
     try { await partes[i][1](); trocou.push(partes[i][0]); }
     catch (e) { falhou.push(partes[i][0] + ": " + e.message); }

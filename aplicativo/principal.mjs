@@ -86,7 +86,14 @@ app.whenReady().then(async () => {
     registrar(`coletor não subiu: ${e.message}`);
   }
 
-  ponte = construir({ aoLog: registrar, porta: PORTA });
+  ponte = construir({
+    aoLog: registrar,
+    // Vai direto pra janela, sem passar pelo log: é o que pinta a tabela
+    // enquanto a rodada corre. `?.` porque o coletor pode emitir depois de
+    // a janela ter sido fechada.
+    aoEvento: (e) => janela?.webContents.send("evento", e),
+    porta: PORTA,
+  });
 
   // Uma porta só, com lista fechada. Nome fora da lista não executa nada.
   ipcMain.handle("ponte", async (_evento, acao, carga) => {

@@ -12,6 +12,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { abrirPerfil, fecharPerfil, statusPerfil, BASE, KEY } from "./adspower.mjs";
 import { soltarTrava } from "./trava-login.mjs";
 import { novoToken, limparToken, extensaoDaConta } from "./credenciais.mjs";
+import { emitir } from "./eventos.mjs";
 
 const EXT = resolve("extensao");
 
@@ -69,6 +70,7 @@ export async function processarConta({ serial, userId, conta }, {
   timeoutMs = Number(process.env.TIMEOUT_CONTA_MS ?? 150_000),
 } = {}) {
   const ref = serial != null ? { serial } : { userId };
+  emitir("conta:abrindo", { conta });
   const arq = `captura/coletas/conta-${conta}.json`;
   const antes = existsSync(arq) ? statSync(arq).mtimeMs : 0;
 
@@ -87,6 +89,7 @@ export async function processarConta({ serial, userId, conta }, {
   const porta = d.debugPort;
   abertosAgora.add(ref);
   aoLog(`conta ${conta}: perfil aberto (porta ${porta})`);
+  emitir("conta:aberta", { conta, perfil: serial ?? userId, porta });
 
   try {
     await dormir(entre(3000, 5000));
@@ -105,6 +108,8 @@ export async function processarConta({ serial, userId, conta }, {
     const url = "https://shopee.com.br/user/purchase?type=7";
     await fetch(`http://127.0.0.1:${porta}/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
 
+    emitir("conta:lendo", { conta });
+
     const limite = Date.now() + timeoutMs;
     while (Date.now() < limite) {
       await dormir(2000);
@@ -117,24 +122,65 @@ export async function processarConta({ serial, userId, conta }, {
   }
 }
 
+// Quantos pedidos entraram e se a sessão estava viva. Sai do que o coletor
+// gravou, não de um contador nosso: é o mesmo arquivo que a rodada vai ler
+// depois, então a tela não pode mostrar um número e a conciliação outro.
+function resumoDaColeta(conta, arq, comecou) {
+  let pedidos = null;
+  try { pedidos = (JSON.parse(readFileSync(arq, "utf8")).pedidos ?? []).length; } catch {}
+  // O robô só grava este arquivo quando precisa mexer com login. Mas ele
+  // nunca é apagado: olhar só se existe faria a conta aparecer como "o robô
+  // logou" para sempre, depois de uma única vez meses atrás. Vale a data.
+  const marca = `captura/login/conta-${conta}.json`;
+  const precisouLogin = existsSync(marca) && statSync(marca).mtimeMs >= comecou;
+  return { pedidos, precisouLogin };
+}
+
+// Parar no meio.
+//
+// Não é matar o que está rodando: a conta que já abriu o perfil termina, e
+// o `finally` do processarConta é que fecha o navegador. Abortar no meio
+// deixaria perfil aberto e aba pela metade — que é como a sessão da conta
+// morre e o robô precisa logar de novo amanhã.
+//
+// Então parar quer dizer: não pegue mais nenhuma da fila.
+let pararPedido = false;
+export function pedirParada() { pararPedido = true; }
+export function paradaPedida() { return pararPedido; }
+
 /** Roda a fila com concorrência limitada e pausa aleatória entre contas. */
 export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pausaMax = 12_000, aoLog = () => {} } = {}) {
   const pendentes = [...contas];
   const resultados = [];
+
+  pararPedido = false;   // uma parada de ontem não cancela a rodada de hoje
 
   // Token novo a cada rodada: se vazar, vale só por esta execução.
   novoToken();
 
   const trabalhador = async (n) => {
     while (pendentes.length) {
+      if (pararPedido) {
+        // As que sobraram não viram falha: ninguém tentou abrir.
+        for (const resto of pendentes.splice(0))
+          aoLog(`conta ${resto.conta}: fora da rodada — parada pedida`);
+        return;
+      }
       const c = pendentes.shift();
+      const comecou = Date.now();
       try {
         const arq = await processarConta(c, { aoLog });
         resultados.push({ ...c, ok: true, arq });
         aoLog(`conta ${c.conta}: coletada`);
+        emitir("conta:feita", {
+          conta: c.conta,
+          segundos: Math.round((Date.now() - comecou) / 1000),
+          ...resumoDaColeta(c.conta, arq, comecou),
+        });
       } catch (e) {
         resultados.push({ ...c, ok: false, erro: e.message });
         aoLog(`conta ${c.conta}: FALHOU — ${e.message}`);
+        emitir("conta:falhou", { conta: c.conta, erro: e.message });
       } finally {
         // Rede de segurança: se o perfil morreu antes de soltar a vez, a
         // fila inteira ficaria esperando a trava expirar.

@@ -7,6 +7,7 @@ import { tokenValido, credencialDaConta } from "./credenciais.mjs";
 import { obterCodigo } from "./otp.mjs";
 import { pedirTrava, soltarTrava, donoAtual } from "./trava-login.mjs";
 import { receberToken } from "./shopify-oauth.mjs";
+import { emitir } from "./eventos.mjs";
 
 export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
   mkdirSync("captura/coletas", { recursive: true });
@@ -114,9 +115,18 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
 
         // A fila lê este arquivo para saber se vale esperar mais: login em
         // andamento merece prazo; login falhado merece desistir na hora.
-        if (/^(login-|otp-|precisa-humano|nao-autenticado)/.test(m.tipo ?? ""))
+        if (/^(login-|otp-|precisa-humano|nao-autenticado)/.test(m.tipo ?? "")) {
           writeFileSync(`captura/login/conta-${conta}.json`,
             JSON.stringify({ tipo: m.tipo, motivo: m.motivo ?? null, em: Date.now() }, null, 2));
+
+          // A tela precisa separar dois casos que no log parecem o mesmo:
+          // o robô vai resolver sozinho, ou a rodada parou esperando uma
+          // pessoa. O segundo é o único que merece som e notificação.
+          if (/^precisa-humano/.test(m.tipo))
+            emitir("conta:humano", { conta, motivo: m.motivo ?? null });
+          else
+            emitir("conta:logando", { conta });
+        }
       } catch (e) {
         aoLog(`erro ao tratar payload: ${e.message}`);
       }
