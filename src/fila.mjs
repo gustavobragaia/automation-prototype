@@ -23,6 +23,27 @@ const ESPERA_LOGIN_MS = Number(process.env.ESPERA_LOGIN_MS ?? 180_000);
 // e é exatamente o fluxo que o produto promete.
 const ESPERA_HUMANO_MS = Number(process.env.ESPERA_HUMANO_MS ?? 300_000);
 
+// Perfis abertos por este processo. Um kill no meio da rodada não executa
+// o finally de processarConta, e o navegador fica órfão na máquina do
+// operador — aconteceu e deixou uma janela aberta sem dono.
+const abertosAgora = new Set();
+let encerrando = false;
+
+async function fecharTodos() {
+  if (encerrando) return;
+  encerrando = true;
+  for (const ref of abertosAgora) await fecharPerfil(ref).catch(() => {});
+  abertosAgora.clear();
+}
+
+for (const sinal of ["SIGINT", "SIGTERM", "SIGHUP"])
+  process.on(sinal, async () => {
+    if (abertosAgora.size)
+      console.log(`\n  ${sinal}: fechando ${abertosAgora.size} perfil(is) antes de sair`);
+    await fecharTodos();
+    process.exit(130);
+  });
+
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const entre = (a, b) => a + Math.floor(Math.random() * (b - a));
 
