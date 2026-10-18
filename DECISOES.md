@@ -180,3 +180,55 @@ senão o Gatekeeper bloqueia. Para uso só do desenvolvedor isso pode esperar.
 **Beta na máquina do desenvolvedor, estável na do cliente.** Nenhuma versão
 chega ao cliente sem ter rodado antes numa máquina real com AdsPower e contas
 de verdade.
+
+---
+
+## 6. Formato da planilha de entrada (2026-10-17)
+
+O cliente passa a enviar **só os pedidos pagos do dia**, não a planilha de
+controle inteira. São 210 pedidos em 33 contas, contra 19.975 linhas e 91
+contas — o recorte que a operação realmente tem para fazer, e muito menos
+superfície para erro.
+
+### Hoje: cabeçalho opcional
+
+A planilha diária que o cliente exporta hoje vem **sem cabeçalho**, com os
+dados começando na linha 1. O leitor detecta: tenta mapear o cabeçalho e,
+não reconhecendo, usa a ordem fixa das colunas — mas só se a linha 1 parecer
+dado, para não ler um cabeçalho estranho como se fosse pedido.
+
+Isso é tolerância de transição, não o destino.
+
+### Em produção: cabeçalho obrigatório
+
+Quando houver a tela de upload, **a planilha passa a exigir cabeçalho**, e o
+upload recusa o arquivo que não o tiver, dizendo qual coluna falta.
+
+O motivo é que ordem fixa é uma suposição silenciosa: se alguém reordenar as
+colunas, o robô lê nome no lugar de produto e conta no lugar de rastreio sem
+reclamar. Com cabeçalho, errar a ordem é inofensivo e faltar coluna é um
+erro claro, na hora do upload, para a pessoa que pode corrigir.
+
+**A tela precisa:**
+
+- listar as colunas obrigatórias e o que vai em cada uma;
+- oferecer **a planilha-modelo para baixar**, com cabeçalho e exemplos
+  preenchidos (`modelo/planilha-modelo.xlsx`, gerada por
+  `scripts/gerar-modelo-planilha.mjs`);
+- validar antes de aceitar, e mostrar o que está errado linha a linha —
+  conta não reconhecida, rastreio já preenchido, pedido sem nome;
+- mostrar o resumo antes de rodar: quantos pedidos, quantas contas, quantas
+  linhas serão ignoradas e por quê.
+
+### Colunas
+
+| Coluna | Obrigatória | Conteúdo |
+|---|---|---|
+| DATA | não | data do pedido |
+| NÚMERO DO PEDIDO | **sim** | exatamente como aparece na Shopify |
+| NOME DO CLIENTE | **sim** | nome de quem recebe, igual ao da entrega |
+| PRODUTO | não | o nome na Shopee costuma ser outro; não serve para casar |
+| UNIDADES | não | — |
+| VALOR PAGO | não | desempata cliente com mais de um pedido |
+| CÓDIGO DE RASTREIO | **sim** | vazia: é o que o robô preenche |
+| ONDE FOI FEITO O PEDIDO | **sim** | a conta Shopee, no formato `shopee 120` |
