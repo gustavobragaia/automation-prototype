@@ -53,10 +53,43 @@ export function conciliarPedido(pedido, colhidos) {
   if (porValor.length === 1 && porValor[0].codigos.length)
     return { estado: "ok-valor", achado: porValor[0], codigo: porValor[0].codigos.join(" · "), candidatos: iguais.length };
 
+  // UM pedido da Shopify pode ter virado DUAS compras na Shopee — vendedores
+  // diferentes, entregas separadas. Aí os candidatos não competem: são partes
+  // do mesmo pedido. A assinatura é o mesmo destinatário, o mesmo CEP, e os
+  // valores SOMANDO o valor da planilha. Os códigos vão juntos no mesmo
+  // fulfillment, que a Shopify aceita.
+  const partes = pedidoDividido(pedido, iguais);
+  if (partes)
+    return {
+      estado: "ok-partes",
+      achado: partes[0],
+      partes,
+      codigo: partes.flatMap((p) => p.codigos).join(" · "),
+      candidatos: iguais.length,
+    };
+
   return { estado: "ambiguo", achado: null, codigo: "", candidatos: iguais.length };
 }
 
-const RESOLVIDO = new Set(["ok", "ok-valor"]);
+/**
+ * Os candidatos são partes de um pedido só?
+ * Exige os três ao mesmo tempo, porque qualquer um sozinho erra:
+ * mesmo CEP, todos com código, e a soma batendo com a planilha.
+ */
+export function pedidoDividido(pedido, candidatos) {
+  if (candidatos.length < 2 || pedido.valor == null) return null;
+
+  const ceps = new Set(candidatos.map((c) => (c.cep ?? "").replace(/\D/g, "")));
+  if (ceps.size !== 1 || [...ceps][0] === "") return null;
+  if (!candidatos.every((c) => c.codigos?.length)) return null;
+
+  const soma = candidatos.reduce((t, c) => t + Number(c.valor ?? 0), 0);
+  if (Math.abs(soma - Number(pedido.valor)) > 0.01) return null;
+
+  return candidatos;
+}
+
+const RESOLVIDO = new Set(["ok", "ok-valor", "ok-partes"]);
 export const resolvido = (estado) => RESOLVIDO.has(estado);
 
 /**

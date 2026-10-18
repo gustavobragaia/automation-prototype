@@ -59,21 +59,45 @@
     // "Tudo" primeiro porque supor a aba certa já nos custou duas rodadas:
     // pedi 7 e vieram pedidos concluídos. Os outros dois ficam como reforço,
     // e a deduplicação por order_id cuida da sobreposição.
-    const listas = [];
-    for (const tipo of [6, 8, 7])
-      for (const c of [
-        `/api/v4/order/get_all_order_and_checkout_list?limit=20&offset=0&list_type=${tipo}`,
-        `/api/v4/order/get_order_list?limit=20&offset=0&list_type=${tipo}`,
-      ]) listas.push({ tipo, ...(await pegar(c)) });
+    //
+    // PAGINAÇÃO. Antes isto era uma chamada só, com offset=0: todas as contas
+    // voltavam com exatamente 20 pedidos e o que passasse disso sumia sem
+    // aviso nenhum. Agora avança o offset enquanto a página trouxer id novo.
+    const LIMITE = 20;
+    const MAX_PAGINAS = Number(self.MAX_PAGINAS ?? 10);   // teto: 200 pedidos por aba
+    const MAX_DETALHES = Number(self.MAX_DETALHES ?? 60);
 
+    const listas = [];
     const ids = new Set();
-    for (const l of listas) if (l.ok) coletarIds(l.corpo, ids);
+
+    for (const tipo of [6, 8, 7]) {
+      for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
+        const offset = pagina * LIMITE;
+        const antes = ids.size;
+        let respondeu = false;
+
+        for (const c of [
+          `/api/v4/order/get_all_order_and_checkout_list?limit=${LIMITE}&offset=${offset}&list_type=${tipo}`,
+          `/api/v4/order/get_order_list?limit=${LIMITE}&offset=${offset}&list_type=${tipo}`,
+        ]) {
+          const r = { tipo, pagina, ...(await pegar(c)) };
+          listas.push(r);
+          if (r.ok) { respondeu = true; coletarIds(r.corpo, ids); }
+        }
+
+        // nenhuma resposta, ou a página não trouxe nada novo: acabou esta aba
+        if (!respondeu || ids.size === antes) break;
+        await new Promise((r) => setTimeout(r, 200)); // ritmo humano entre páginas
+      }
+    }
 
     const pedidos = [];
-    for (const id of [...ids].slice(0, 25)) {
+    for (const id of [...ids].slice(0, MAX_DETALHES)) {
       // Só o get_order_detail responde — os outros dois eram 2 chamadas
       // desperdiçadas por pedido, e com 25 pedidos isso estourava o prazo
       // da fila. Ficam como reserva, usados apenas se o primeiro falhar.
+      // (o teto de detalhes é MAX_DETALHES; a lista já vem do mais novo
+      //  para o mais antigo, então os do dia estão sempre no começo)
       const respostas = [await pegar(`/api/v4/order/get_order_detail?order_id=${id}`)];
       if (!respostas[0].ok)
         for (const c of [

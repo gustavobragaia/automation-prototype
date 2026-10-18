@@ -3,7 +3,7 @@
 
 import { normalizarLoja, ESCOPOS } from "../src/shopify-conexao.mjs";
 import { normalizarNumero, montarEntrada, urlRastreio, transportadoraDe } from "../src/shopify.mjs";
-import { conciliarPedido, resolvido } from "../src/conciliar.mjs";
+import { conciliarPedido, resolvido, pedidoDividido } from "../src/conciliar.mjs";
 
 const ok = (c, m) => console.log(c ? `  \x1b[32m✓\x1b[0m ${m}` : `  \x1b[31m✗ ${m}\x1b[0m`) || c;
 const sec = (t) => console.log(`\n\x1b[1m${t}\x1b[0m`);
@@ -42,6 +42,39 @@ tudo &= ok(c4.estado === "ok-valor" && c4.codigo === "BR262357370052B",
            "nome repetido com valor diferente desempata no pedido certo");
 const c5 = conciliarPedido({ nome: "Maria Silva", valor: 99.0 }, colhidos);
 tudo &= ok(c5.estado === "ambiguo", "valor que não bate com nenhum não desempata");
+
+sec("pedido da Shopify comprado em duas vezes na Shopee");
+// caso real: #164925 valia R$ 88,30 e virou duas compras de R$ 58,41 e R$ 29,89,
+// mesmo destinatário, mesmo CEP. Não são dois pedidos — são duas encomendas.
+const duas = [
+  { nome: "Jose Ernesto Camargo", valor: 58.41, cep: "01448010", codigos: ["BR262981565516C"] },
+  { nome: "Jose Ernesto Camargo", valor: 29.89, cep: "01448010", codigos: ["BR269462194730E"] },
+];
+const d1 = conciliarPedido({ nome: "Jose Ernesto Camargo", valor: 88.3 }, duas);
+tudo &= ok(d1.estado === "ok-partes" && resolvido(d1.estado), "soma exata resolve como um pedido só");
+tudo &= ok(d1.partes?.length === 2 && d1.codigo.includes("BR262981565516C") && d1.codigo.includes("BR269462194730E"),
+           "os dois códigos vão juntos, nenhum fica para trás");
+
+tudo &= ok(pedidoDividido({ valor: 88.3 }, [
+    { valor: 58.41, cep: "01448010", codigos: ["A"] },
+    { valor: 29.89, cep: "99999000", codigos: ["B"] }]) === null,
+           "CEP diferente não é pedido dividido, é cliente homônimo");
+tudo &= ok(pedidoDividido({ valor: 90.0 }, [
+    { valor: 58.41, cep: "01448010", codigos: ["A"] },
+    { valor: 29.89, cep: "01448010", codigos: ["B"] }]) === null,
+           "soma que não fecha não resolve");
+tudo &= ok(pedidoDividido({ valor: 88.3 }, [
+    { valor: 58.41, cep: "01448010", codigos: ["A"] },
+    { valor: 29.89, cep: "01448010", codigos: [] }]) === null,
+           "se uma das partes não tem rastreio, não escreve nada");
+tudo &= ok(pedidoDividido({ valor: null }, [
+    { valor: 58.41, cep: "01448010", codigos: ["A"] },
+    { valor: 29.89, cep: "01448010", codigos: ["B"] }]) === null,
+           "sem valor na planilha não dá para somar");
+tudo &= ok(pedidoDividido({ valor: 88.3 }, [
+    { valor: 88.3, cep: "", codigos: ["A"] },
+    { valor: 0, cep: "", codigos: ["B"] }]) === null,
+           "CEP vazio nos dois não serve de prova");
 
 sec("montagem do fulfillment");
 const um = montarEntrada({ fulfillmentOrderId: "gid://1", codigos: ["BR263500935831Z"], transportadora: "Correios", notificar: false });

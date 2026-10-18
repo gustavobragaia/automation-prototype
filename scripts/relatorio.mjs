@@ -28,6 +28,7 @@ const total = linhas.length;
 const pct = (n) => (total ? ((n / total) * 100).toFixed(1) : "0") + "%";
 const ROTULO = {
   ok: ["resolvido", "ok"], "ok-valor": ["resolvido pelo valor", "ok"],
+  "ok-partes": ["pedido dividido em 2 encomendas", "ok"],
   ambiguo: ["ambíguo — revisão", "aten"], "sem-codigo": ["ainda sem rastreio", "aten"],
   "nao-achado": ["não encontrado na conta", "ruim"],
 };
