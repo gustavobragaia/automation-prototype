@@ -136,6 +136,36 @@ export const MOTIVOS = {
     texto: "Duas contas apontam para o mesmo perfil do AdsPower.",
     acao: "Os cookies de uma sobrescrevem os da outra. Separe os perfis antes de rodar.",
   },
+  "sem-numero-de-pedido": {
+    grupo: "precisa",
+    texto: "A linha tem rastreio, mas não tem número de pedido da Shopify.",
+    acao: "Preencha a coluna NÚMERO DO PEDIDO e suba a planilha de novo.",
+  },
+  "nao-existe-na-loja": {
+    grupo: "precisa",
+    texto: "Esse número de pedido não existe na loja conectada.",
+    acao: "Confira o número na planilha, ou se a loja conectada é a certa.",
+  },
+  "sem-fulfillment-order": {
+    grupo: "precisa",
+    texto: "O pedido existe mas não tem entrega aberta para receber o rastreio.",
+    acao: "Costuma ser pedido já despachado ou cancelado na Shopify.",
+  },
+  "rastreio-nao-reconhecido": {
+    grupo: "precisa",
+    texto: "O texto encontrado na Shopee não tem a cara de um código de rastreio.",
+    acao: "Confira na Shopee o que está no lugar do código.",
+  },
+  "rastreio-simulado": {
+    grupo: "precisa",
+    texto: "O código veio marcado como simulado e foi recusado.",
+    acao: "É proteção contra teste ligado por engano. Rode a coleta de novo.",
+  },
+  "falha-ao-escrever": {
+    grupo: "precisa",
+    texto: "A Shopify recusou a escrita.",
+    acao: "Nada foi gravado. Tente de novo; se repetir, veja a mensagem da Shopify.",
+  },
   "verificacao-humana": {
     grupo: "precisa",
     texto: "A Shopee pediu confirmação de que é uma pessoa.",

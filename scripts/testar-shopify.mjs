@@ -96,6 +96,32 @@ tudo &= ok(transportadoraDe(["BR263500935831Z", "SPXLM17485496"]) === "Outros", 
 tudo &= ok(urlRastreio("SPXLM17485496").includes("spx.com.br"), "link do SPX aponta para a Shopee Xpress");
 tudo &= ok(urlRastreio("BR263500935831Z").includes("correios"), "link do BR aponta para os Correios");
 
+sec("uma implementação só");
+// O bug que isto previne: o ciclo de produção tinha a PRÓPRIA função de
+// casamento, pior que a provada, e ninguém percebia porque o relatório
+// media a outra.
+import { readFileSync } from "node:fs";
+const ciclo = readFileSync(new URL("../src/ciclo.mjs", import.meta.url), "utf8");
+tudo &= ok(/escreverRastreios/.test(ciclo), "o ciclo de produção usa escreverRastreios");
+tudo &= ok(!/function casar\s*\(/.test(ciclo), "o ciclo não tem mais função de casamento própria");
+tudo &= ok(!/pedidosAbertos/.test(ciclo), "o ciclo não casa mais contra os pedidos abertos da loja");
+
+const escrita = readFileSync(new URL("../src/escrita.mjs", import.meta.url), "utf8");
+tudo &= ok(/PARECE_SIMULADO/.test(escrita), "a proteção contra rastreio simulado sobreviveu à unificação");
+tudo &= ok(/normalizarNumero/.test(escrita), "a escrita busca o pedido pelo número, não por nome");
+tudo &= ok(/naShopee !== naLoja/.test(escrita), "a conferência de nome continua barrando antes de escrever");
+tudo &= ok(/registro\[num\]\?\.fulfillmentId/.test(escrita), "a idempotência continua no caminho único");
+
+sec("todo motivo é apresentável");
+import { MOTIVOS } from "../src/conciliar.mjs";
+const ruins = Object.entries(MOTIVOS).filter(([, m]) =>
+  !m.grupo || !["precisa", "sozinho"].includes(m.grupo) || !m.texto || !m.acao);
+tudo &= ok(ruins.length === 0, `os ${Object.keys(MOTIVOS).length} motivos têm grupo, texto e ação`);
+const usados = [...escrita.matchAll(/anotar\(l, "([a-z-]+)"/g)].map((m) => m[1]);
+const semCadastro = usados.filter((c) => !MOTIVOS[c]);
+tudo &= ok(semCadastro.length === 0,
+  `os ${new Set(usados).size} motivos usados na escrita estão cadastrados${semCadastro.length ? ": falta " + semCadastro.join(", ") : ""}`);
+
 sec("escopos pedidos");
 tudo &= ok(ESCOPOS.includes("write_merchant_managed_fulfillment_orders"),
            "pede o escopo que o fulfillmentCreateV2 exige");

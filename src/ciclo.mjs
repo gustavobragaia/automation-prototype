@@ -11,8 +11,8 @@ import { parseConta } from "./tracking.mjs";
 import { lerPendentes } from "./planilha.mjs";
 import { resolverContas } from "./perfis.mjs";
 import { anotarMapeamento } from "./estado.mjs";
-import { normNome } from "./match.mjs";
-import { pedidosAbertos, montarEntrada, transportadoraDe, enviar } from "./shopify.mjs";
+import { lerColetas } from "./conciliar.mjs";
+import { escreverRastreios } from "./escrita.mjs";
 import { alarmar, avaliarRodada } from "./alarme.mjs";
 
 export { historico };
@@ -62,25 +62,6 @@ export async function descobrirContas(args = [], { aoLog = () => {} } = {}) {
     .filter((c) => c.conta != null);
 }
 
-/** Casa um pedido da Shopee contra os pedidos abertos da Shopify. */
-export function casar(p, abertos) {
-  let c = abertos.filter((o) => normNome(o.nome) === normNome(p.nome));
-  if (c.length === 0) return { decisao: "nenhum", motivo: "nenhum pedido aberto com esse nome", candidatos: 0 };
-
-  let criterio = "nome";
-  if (c.length > 1 && p.cep) {
-    const porCep = c.filter((o) => o.cep === p.cep);
-    if (porCep.length) { c = porCep; criterio = "nome+cep"; }
-  }
-  if (c.length > 1 && p.valor != null) {
-    const porValor = c.filter((o) => Math.abs(o.valor - p.valor) < 0.01);
-    if (porValor.length) { c = porValor; criterio += "+valor"; }
-  }
-  if (c.length > 1)
-    return { decisao: "ambiguo", motivo: `${c.length} pedidos idênticos mesmo com CEP e valor`, candidatos: c.length };
-  return { decisao: "unico", alvo: c[0], criterio, candidatos: 1 };
-}
-
 /**
  * @param opts.escrever   false = dry-run
  * @param opts.simular    injeta rastreio falso onde ainda não há (teste)
@@ -113,66 +94,38 @@ export async function rodarCiclo({ contas, escrever = true, simular = false, aoL
   }
 
   // ── casa e escreve ──────────────────────────────────────────────
-  let escritos = 0;
-  const revisao = [];
-  let abertos = [];
+  // A MESMA função que o run-shopify.mjs usa e que o relatório prova.
+  // Antes havia aqui uma segunda implementação, que casava por nome contra
+  // os pedidos abertos da Shopify e ignorava o número que a planilha dá.
+  let escritos = 0, falhasEscrita = 0, pulados = 0;
+  let pendencias = [];
   try {
-    abertos = await pedidosAbertos({});
-    aoLog(`${abertos.length} pedido(s) aberto(s) na Shopify`);
+    const r = await lerPendentes(process.env.PLANILHA, { aba: process.env.PLANILHA_ABA });
+    const res = await escreverRastreios(r.contas, lerColetas(), {
+      escrever,
+      notificar: process.env.NOTIFICAR_CLIENTE === "1",
+      aoLog,
+    });
+    escritos = res.escritos; falhasEscrita = res.falhas; pulados = res.pulados;
+    pendencias = res.pendencias;
+
+    const precisa = pendencias.filter((p) => p.motivo.grupo === "precisa").length;
+    const sozinho = pendencias.length - precisa;
+    aoLog(`${res.resumo.casados} com rastreio · ${precisa} precisam de você · ${sozinho} aguardam a Shopee`);
+    if (!escrever) aoLog(`dry-run: ${res.planejado.length} fulfillment(s) seriam criados`);
+    if (pulados) aoLog(`${pulados} pulado(s) — já escritos antes`);
+
+    // o que exige decisão fica anotado no pedido, para o painel e a planilha
+    for (const p of pendencias) {
+      const alvo = Object.values(estado).find((x) => x.pedidoShopify === p.pedido);
+      if (alvo) alvo.revisao = { motivo: p.motivo.texto, codigo: p.motivo.codigo,
+                                 grupo: p.motivo.grupo, em: new Date().toISOString() };
+    }
   } catch (e) {
-    aoLog(`Shopify indisponível: ${e.message}`);
+    aoLog(`escrita não realizada: ${e.message}`);
+    falhasEscrita++;
   }
 
-  // Rastreio simulado nunca pode ser escrito: a extensão roda no navegador
-  // e pode voltar com a flag de teste ligada por engano.
-  const PARECE_SIMULADO = /^BR269999999999/;
-
-  for (const p of Object.values(estado)) {
-    if (p.enviadoShopify) continue;
-    if (!simular && (p.codigos ?? []).some((c) => PARECE_SIMULADO.test(c))) {
-      p.revisao = { motivo: "código parece simulado — recusado", em: new Date().toISOString() };
-      revisao.push({ orderId: p.orderId, nome: p.nome, motivo: p.revisao.motivo });
-      continue;
-    }
-
-    let codigos = p.codigos ?? [];
-    let simulado = false;
-    if (codigos.length === 0) {
-      if (!simular) {
-        p.revisao = null; // ainda não despachado não é pendência
-        continue;
-      }
-      codigos = [SIMULADO]; simulado = true;
-    }
-
-    const m = casar(p, abertos);
-    if (m.decisao !== "unico") {
-      p.revisao = { motivo: m.motivo, candidatos: m.candidatos, em: new Date().toISOString() };
-      revisao.push({ orderId: p.orderId, nome: p.nome, motivo: m.motivo });
-      continue;
-    }
-    p.revisao = null;
-
-    if (!escrever) continue;
-    try {
-      const f = await enviar(montarEntrada({
-        fulfillmentOrderId: m.alvo.fulfillmentOrderId,
-        codigos: codigos.map((c) => ({ code: c, carrier: /^SPX/i.test(c) ? "shopee-xpress" : "correios" })),
-        transportadora: transportadoraDe(codigos),
-        notificar: process.env.NOTIFICAR_CLIENTE === "1",
-      }), {});
-      p.pedidoShopify = m.alvo.pedido;
-      p.unidades = m.alvo.unidades;
-      p.enviadoShopify = !simulado;     // simulado volta na próxima rodada
-      p.escritaSimulada = simulado || undefined;
-      escritos++;
-      aoLog(`${p.nome} -> ${m.alvo.pedido} por ${m.criterio}${simulado ? " (simulado)" : ""} · ${f.status}`);
-    } catch (e) {
-      p.revisao = { motivo: `falha ao escrever na Shopify: ${e.message}`, em: new Date().toISOString() };
-      revisao.push({ orderId: p.orderId, nome: p.nome, motivo: p.revisao.motivo });
-      aoLog(`${p.nome}: ERRO ao escrever — ${e.message}`);
-    }
-  }
   salvar(estado);
 
   // ── planilha ────────────────────────────────────────────────────
@@ -186,8 +139,8 @@ export async function rodarCiclo({ contas, escrever = true, simular = false, aoL
     duracaoMs: Date.now() - t0,
     contas: contas.length, coletadas,
     falhas: falhas.map((f) => ({ conta: f.conta, erro: f.erro })),
-    pedidosVistos: vistos, novos, escritos,
-    revisao: revisao.length,
+    pedidosVistos: vistos, novos, escritos, falhasEscrita, pulados,
+    revisao: pendencias.filter((p) => p.motivo.grupo === "precisa").length,
     planilha,
   };
   registrarRodada(rodada);
