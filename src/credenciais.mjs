@@ -70,6 +70,9 @@ export function limparToken() {
 /** A senha é única para todas as contas; o e-mail vem do padrão. */
 export function credencialDaConta(conta) {
   const senha = process.env.SHOPEE_SENHA;
-  if (!senha) throw new Error("SHOPEE_SENHA não configurada");
+  // A mensagem é para quem está na frente do app, não para quem escreveu
+  // o código: ele não sabe o que é uma variável de ambiente, e o lugar de
+  // resolver isto é a tela.
+  if (!senha) throw new Error("a senha das contas da Shopee não está preenchida — Ajustes → Contas da Shopee");
   return { email: emailDaConta(Number(conta)), senha };
 }

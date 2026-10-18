@@ -10,9 +10,18 @@ const KEY = () => process.env.RAPIDAPI_KEY ?? "";
 
 const headers = () => ({ "x-rapidapi-host": HOST, "x-rapidapi-key": KEY(), accept: "application/json" });
 
+// Sem a chave, as chamadas voltam 401 e o cliente lê "HTTP 401" — que não
+// diz nada e não aponta para onde resolver. Falhar antes, com o caminho.
+function exigirChave() {
+  if (!KEY())
+    throw new Error("a chave para ler o código de verificação não está preenchida — " +
+                    "Ajustes → Contas da Shopee");
+}
+
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export async function ativarCaixa(endereco) {
+  exigirChave();
   const r = await fetch(`https://${HOST}/inboxes/${encodeURIComponent(endereco)}`, {
     method: "POST", headers: headers(), signal: AbortSignal.timeout(15_000),
   });
@@ -21,6 +30,7 @@ export async function ativarCaixa(endereco) {
 }
 
 export async function listarMensagens(endereco) {
+  exigirChave();
   const r = await fetch(`https://${HOST}/inboxes/${encodeURIComponent(endereco)}`, {
     headers: headers(), signal: AbortSignal.timeout(15_000),
   });
