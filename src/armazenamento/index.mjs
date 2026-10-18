@@ -13,6 +13,7 @@
 //   contaDoPedido(pedidoShopify) coberturaMapeamento()
 //   historico(limite) registrarRodada(r) -> id
 //   gravarMotivos(pendencias, {rodadaId}) motivosDoPedido(p) motivosDaRodada(id)
+//   guardarPendentes(p) pendentesAbertos() adiarPendente(ped, ate) baixarPendentes(peds)
 //   fechar() nome
 
 const escolhido = (process.env.ARMAZENAMENTO ?? "json").toLowerCase();
@@ -27,4 +28,5 @@ export const {
   anotarMapeamento, contaDoPedido, coberturaMapeamento,
   historico, registrarRodada, fechar, nome,
   gravarMotivos, motivosDoPedido, motivosDaRodada,
+  guardarPendentes, pendentesAbertos, adiarPendente, baixarPendentes,
 } = impl;

@@ -110,6 +110,53 @@ async function exercitar(nomeImpl, mod) {
   checar(det?.sugestoes?.[0] === 161, "o detalhe guarda a sugestão de conta");
   checar(mod.motivosDoPedido("#999999").length === 0, "pedido que nunca penou não inventa histórico");
 
+  // pendentes — o que atravessa o dia
+  checar(mod.pendentesAbertos().length === 0, "carteira de pendentes começa vazia");
+  checar(mod.guardarPendentes([]) === 0, "lista vazia não guarda nada");
+
+  const d1 = "2026-10-18T09:00:00Z", d2 = "2026-10-19T09:00:00Z";
+  mod.guardarPendentes([
+    { pedido: "#164891", conta: 124, nome: "Ana Lima", valor: 37.89,
+      motivo: { codigo: "sem-rastreio-ainda", grupo: "sozinho" } },
+    { pedido: "#165091", conta: 152, nome: "José Tolentino", valor: 23.99,
+      motivo: { codigo: "nao-achado-na-conta", grupo: "precisa" } },
+  ], { em: d1 });
+  let abertos = mod.pendentesAbertos({ hoje: "2026-10-18" });
+  checar(abertos.length === 2, "os dois entram na carteira");
+  checar(abertos.every((p) => p.dias === 1), "no primeiro dia, dias = 1");
+  const ana = abertos.find((p) => p.pedido === "#164891");
+  checar(ana.nome === "Ana Lima" && Math.abs(ana.valor - 37.89) < 0.001,
+         "guarda nome e valor — a planilha de amanhã não vai ter");
+
+  // rodar de novo no MESMO dia não envelhece
+  mod.guardarPendentes([{ pedido: "#164891", conta: 124,
+    motivo: { codigo: "sem-rastreio-ainda", grupo: "sozinho" } }], { em: d1 });
+  checar(mod.pendentesAbertos({ hoje: "2026-10-18" }).find((p) => p.pedido === "#164891").dias === 1,
+         "rodar duas vezes no mesmo dia não faz o pedido parecer mais velho");
+
+  // no dia seguinte, envelhece
+  mod.guardarPendentes([{ pedido: "#164891", conta: 124,
+    motivo: { codigo: "nao-achado-na-conta", grupo: "precisa" } }], { em: d2 });
+  const envelhecido = mod.pendentesAbertos({ hoje: "2026-10-19" }).find((p) => p.pedido === "#164891");
+  checar(envelhecido.dias === 2, "no dia seguinte, dias = 2");
+  checar(envelhecido.motivo === "nao-achado-na-conta", "o motivo é atualizado para o mais recente");
+  checar(envelhecido.nome === "Ana Lima", "e o nome do primeiro dia é preservado");
+
+  // "deixar para amanhã"
+  checar(mod.adiarPendente("#165091", "2026-10-20") === true, "dá para adiar um pedido");
+  checar(!mod.pendentesAbertos({ hoje: "2026-10-19" }).some((p) => p.pedido === "#165091"),
+         "adiado não aparece antes da data");
+  checar(mod.pendentesAbertos({ hoje: "2026-10-20" }).some((p) => p.pedido === "#165091"),
+         "e volta sozinho no dia marcado");
+  checar(mod.adiarPendente("#000000", "2026-10-20") === false, "adiar pedido inexistente não inventa um");
+
+  // resolvido sai da carteira
+  checar(mod.baixarPendentes(["#164891"]) === 1, "baixa o que foi escrito");
+  checar(mod.baixarPendentes(["#164891"]) === 0, "baixar de novo não conta duas vezes");
+  checar(!mod.pendentesAbertos({ hoje: "2026-10-20" }).some((p) => p.pedido === "#164891"),
+         "e ele não volta mais");
+  checar(mod.pendentesAbertos({ hoje: "2026-10-20" }).length === 1, "o outro continua lá");
+
   mod.fechar();
 }
 
@@ -119,6 +166,7 @@ try {
   process.env.ESTADO_RODADAS = join(base, "rodadas.json");
   process.env.ESTADO_MAPA = join(base, "mapa.json");
   process.env.ESTADO_MOTIVOS = join(base, "motivos.json");
+  process.env.ESTADO_PENDENTES = join(base, "pendentes.json");
   await exercitar("json", await import("../src/armazenamento/json.mjs"));
 
   let temSqlite = true;

@@ -46,16 +46,23 @@ export async function escreverRastreios(contas, coletas, {
   const registro = lerRegistro();
 
   const pendencias = [];
+  // A pendência atravessa o dia e vira a "linha de planilha" de amanhã — a
+  // planilha do cliente só traz os pagos daquele dia. Então leva tudo o que
+  // a conciliação precisa: sem valor, o desempate e a regra do pedido
+  // dividido deixam de funcionar no dia seguinte.
+  const comoLinha = (l, motivo) => ({
+    pedido: l.p.pedido, conta: l.conta, nome: l.p.nome,
+    valor: l.p.valor ?? null, produto: l.p.produto ?? null, unidades: l.p.unidades ?? null,
+    motivo,
+  });
   const anotar = (l, codigo, extra) => {
     const m = motivoDe(codigo, extra);
     l.motivo = m;
-    pendencias.push({ pedido: l.p.pedido, conta: l.conta, nome: l.p.nome, motivo: m });
+    pendencias.push(comoLinha(l, m));
   };
 
   // o que a conciliação já marcou (ainda sem rastreio, ambíguo, não achado)
-  for (const l of linhas) if (l.motivo) pendencias.push({
-    pedido: l.p.pedido, conta: l.conta, nome: l.p.nome, motivo: l.motivo,
-  });
+  for (const l of linhas) if (l.motivo) pendencias.push(comoLinha(l, l.motivo));
 
   const prontos = linhas.filter((l) => resolvido(l.estado) && normalizarNumero(l.p.pedido));
   for (const l of linhas)

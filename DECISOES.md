@@ -420,3 +420,52 @@ em `contas.json`, que não passa pelo `resolverContas`.
 Contra os 972 perfis reais do cliente: 972 contas mapeadas, 0 duplicadas,
 0 sem número no nome. Hoje está limpo — a checagem é para o dia em que
 alguém duplicar um perfil, que é quando ninguém está olhando.
+
+---
+
+## 10. Pedido que atravessa o dia (2026-10-18)
+
+### O buraco
+
+O trabalho da rodada vinha **só** da planilha que o cliente sobe, e ele manda
+"apenas os pedidos pagos do dia". Logo: o pedido do dia 18 que não recebeu
+rastreio **não está** na planilha do dia 19, e sumia.
+
+Não era caso raro. "A Shopee ainda não despachou" é o motivo mais comum e
+**sempre** atravessa pelo menos um dia — o pedido é pago hoje e despachado
+amanhã. Em produção isso seria perda silenciosa de rastreio todo dia, e o
+cliente só descobriria pela reclamação de quem comprou.
+
+A pergunta que revelou isso foi simples: *"cliquei em deixar para amanhã;
+como eu vou lembrar?"*. A resposta honesta era que ninguém ia.
+
+### A carteira
+
+Existe uma lista de pendentes que atravessa o dia, e a rodada é a **união**
+da planilha de hoje com ela. Se o pedido antigo é de uma conta que não ia ser
+aberta hoje, ela passa a ser.
+
+A carteira guarda a linha da planilha junto — nome, valor, produto. A
+conciliação precisa deles, e eles não existem em nenhum outro lugar depois
+que a planilha do dia sai de cena. Isso foi descoberto rodando: sem o valor,
+os acertos do dia 2 caíram de 39 para 35, porque o desempate por valor e a
+regra do pedido dividido deixam de funcionar.
+
+### Regras
+
+- **A planilha de hoje vence.** Mesmo pedido nos dois lugares: vale o da
+  planilha, que é a correção do cliente.
+- **`dias` conta dias distintos, não rodadas.** Rodar três vezes numa
+  manhã não pode fazer um pedido parecer velho de três dias.
+- **"Deixar para amanhã" é uma data**, não um sumiço: o pedido sai da lista
+  de hoje e volta sozinho no dia marcado.
+- **Sai da carteira só quando é escrito de verdade** — em dry-run nada é
+  baixado.
+- **Pendente há 5 dias ou mais é destacado na rodada.** Pedido que pena uma
+  semana não vai se resolver sozinho; alguém precisa olhar.
+
+### Medido
+
+Simulação de dois dias com o ciclo real: dia 1 com a planilha de 40 pedidos,
+dia 2 com uma planilha de **um** pedido. Os 38 pendentes voltaram sozinhos e
+37 foram conciliados de novo. Sem a carteira, os 38 teriam sumido.

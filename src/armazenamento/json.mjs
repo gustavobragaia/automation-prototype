@@ -11,6 +11,7 @@ import { dirname } from "node:path";
 const ARQ_PEDIDOS = process.env.ESTADO_PEDIDOS ?? "estado/pedidos.json";
 const ARQ_RODADAS = process.env.ESTADO_RODADAS ?? "estado/rodadas.json";
 const ARQ_MOTIVOS = process.env.ESTADO_MOTIVOS ?? "estado/motivos.json";
+const ARQ_PENDENTES = process.env.ESTADO_PENDENTES ?? "estado/pendentes.json";
 
 const ler = (arq, vazio) => {
   if (!existsSync(arq)) return vazio;
@@ -117,3 +118,62 @@ export const motivosDaRodada = (rodadaId) =>
 
 export const fechar = () => {};
 export const nome = "json";
+
+// ── pendentes ─────────────────────────────────────────────────────────────
+// O que atravessa o dia. Sem isto, o pedido que não resolveu hoje some
+// amanhã, porque a planilha do cliente só traz os pagos daquele dia.
+
+const hojeISO = () => new Date().toISOString().slice(0, 10);
+
+export function guardarPendentes(pendencias, { em = new Date().toISOString() } = {}) {
+  if (!pendencias?.length) return 0;
+  const atuais = ler(ARQ_PENDENTES, {});
+  for (const p of pendencias) {
+    if (!p.pedido) continue;
+    const velho = atuais[p.pedido];
+    atuais[p.pedido] = {
+      pedido: p.pedido, conta: p.conta ?? velho?.conta ?? null,
+      nome: p.nome ?? velho?.nome ?? null,
+      valor: p.valor ?? velho?.valor ?? null,
+      produto: p.produto ?? velho?.produto ?? null,
+      unidades: p.unidades ?? velho?.unidades ?? null,
+      motivo: p.motivo?.codigo ?? velho?.motivo ?? null,
+      grupo: p.motivo?.grupo ?? velho?.grupo ?? null,
+      vistoEm: velho?.vistoEm ?? em,
+      ultimaEm: em,
+      // conta DIAS distintos, não rodadas: rodar três vezes num dia não
+      // pode fazer um pedido parecer velho de três dias
+      dias: velho && velho.ultimaEm?.slice(0, 10) !== em.slice(0, 10)
+        ? (velho.dias ?? 1) + 1 : (velho?.dias ?? 1),
+      adiadoAte: p.adiadoAte ?? velho?.adiadoAte ?? null,
+      baixadoEm: null,
+    };
+  }
+  escrever(ARQ_PENDENTES, atuais);
+  return pendencias.length;
+}
+
+/** O que entra na rodada de hoje além da planilha. */
+export function pendentesAbertos({ hoje = hojeISO() } = {}) {
+  return Object.values(ler(ARQ_PENDENTES, {}))
+    .filter((p) => !p.baixadoEm)
+    .filter((p) => !p.adiadoAte || p.adiadoAte <= hoje)
+    .sort((a, b) => (b.dias ?? 1) - (a.dias ?? 1));
+}
+
+export function adiarPendente(pedido, ate) {
+  const atuais = ler(ARQ_PENDENTES, {});
+  if (!atuais[pedido]) return false;
+  atuais[pedido].adiadoAte = ate;
+  escrever(ARQ_PENDENTES, atuais);
+  return true;
+}
+
+/** Resolveu: sai da carteira. */
+export function baixarPendentes(pedidos, { em = new Date().toISOString() } = {}) {
+  const atuais = ler(ARQ_PENDENTES, {});
+  let n = 0;
+  for (const p of pedidos) if (atuais[p] && !atuais[p].baixadoEm) { atuais[p].baixadoEm = em; n++; }
+  if (n) escrever(ARQ_PENDENTES, atuais);
+  return n;
+}

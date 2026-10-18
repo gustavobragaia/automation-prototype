@@ -196,3 +196,68 @@ export const motivosDaRodada = (rodadaId) =>
   lerMotivos("SELECT * FROM pedido_motivos WHERE rodada_id = ? ORDER BY id", rodadaId);
 
 export const nome = "sqlite";
+
+// ── pendentes ─────────────────────────────────────────────────────────────
+// O que atravessa o dia. Ver migracoes/003-pendentes.sql.
+
+const hojeISO = () => new Date().toISOString().slice(0, 10);
+
+export function guardarPendentes(pendencias, { em = new Date().toISOString() } = {}) {
+  if (!pendencias?.length) return 0;
+  const sql = db().prepare(`
+    INSERT INTO pendentes (pedido_shopify, conta, nome, valor, produto, unidades,
+                           motivo, grupo, visto_em, ultima_em, dias, adiado_ate)
+    VALUES (@pedido, @conta, @nome, @valor, @produto, @unidades,
+            @motivo, @grupo, @em, @em, 1, @adiado_ate)
+    ON CONFLICT (pedido_shopify) DO UPDATE SET
+      conta      = COALESCE(excluded.conta, conta),
+      nome       = COALESCE(excluded.nome, nome),
+      valor      = COALESCE(excluded.valor, valor),
+      produto    = COALESCE(excluded.produto, produto),
+      unidades   = COALESCE(excluded.unidades, unidades),
+      motivo     = excluded.motivo,
+      grupo      = excluded.grupo,
+      adiado_ate = COALESCE(excluded.adiado_ate, adiado_ate),
+      baixado_em = NULL,
+      -- conta DIAS distintos, não rodadas: rodar três vezes num dia não pode
+      -- fazer um pedido parecer velho de três dias
+      dias       = dias + (CASE WHEN substr(pendentes.ultima_em,1,10) <> substr(excluded.ultima_em,1,10)
+                                THEN 1 ELSE 0 END),
+      ultima_em  = excluded.ultima_em`);
+  const tudo = db().transaction((lista) => {
+    for (const p of lista) {
+      if (!p.pedido) continue;
+      sql.run({ pedido: p.pedido, conta: p.conta ?? null, nome: p.nome ?? null,
+                valor: p.valor ?? null, produto: p.produto ?? null, unidades: p.unidades ?? null,
+                motivo: p.motivo?.codigo ?? null, grupo: p.motivo?.grupo ?? null,
+                em, adiado_ate: p.adiadoAte ?? null });
+    }
+  });
+  tudo(pendencias);
+  return pendencias.length;
+}
+
+export function pendentesAbertos({ hoje = hojeISO() } = {}) {
+  return db().prepare(`
+    SELECT * FROM pendentes
+    WHERE baixado_em IS NULL AND (adiado_ate IS NULL OR adiado_ate <= @hoje)
+    ORDER BY dias DESC`).all({ hoje }).map((r) => ({
+      pedido: r.pedido_shopify, conta: r.conta, nome: r.nome, valor: r.valor,
+      produto: r.produto, unidades: r.unidades, motivo: r.motivo, grupo: r.grupo,
+      vistoEm: r.visto_em, ultimaEm: r.ultima_em, dias: r.dias,
+      adiadoAte: r.adiado_ate, baixadoEm: r.baixado_em,
+    }));
+}
+
+export function adiarPendente(pedido, ate) {
+  return db().prepare("UPDATE pendentes SET adiado_ate = ? WHERE pedido_shopify = ?")
+    .run(ate, pedido).changes > 0;
+}
+
+export function baixarPendentes(pedidos, { em = new Date().toISOString() } = {}) {
+  const sql = db().prepare(
+    "UPDATE pendentes SET baixado_em = ? WHERE pedido_shopify = ? AND baixado_em IS NULL");
+  let n = 0;
+  db().transaction((lista) => { for (const p of lista) n += sql.run(em, p).changes; })(pedidos);
+  return n;
+}

@@ -5,7 +5,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { rodarFila } from "./fila.mjs";
 import { extrairPedido } from "./shopee.mjs";
-import { carregar, salvar, registrar, historico, registrarRodada, gravarMotivos } from "./estado.mjs";
+import { carregar, salvar, registrar, historico, registrarRodada, gravarMotivos,
+         guardarPendentes, pendentesAbertos, baixarPendentes } from "./estado.mjs";
 import { listarPerfisOuNull } from "./adspower.mjs";
 import { parseConta } from "./tracking.mjs";
 import { lerPendentes } from "./planilha.mjs";
@@ -74,6 +75,26 @@ export async function descobrirContas(args = [], { aoLog = () => {} } = {}) {
 }
 
 /**
+ * Junta as contas da planilha de hoje com os pedidos que atravessaram o dia.
+ * O pedido antigo entra na conta dele; se essa conta não ia ser aberta hoje,
+ * ela passa a ser.
+ */
+export function juntarPendentes(contasDaPlanilha, atrasados) {
+  const porConta = new Map(contasDaPlanilha.map((c) => [c.conta, { ...c, pedidos: [...c.pedidos] }]));
+  const jaTem = new Set(contasDaPlanilha.flatMap((c) => c.pedidos.map((p) => p.pedido)));
+
+  for (const a of atrasados) {
+    if (!a.pedido || jaTem.has(a.pedido)) continue;   // a planilha de hoje manda
+    if (!porConta.has(a.conta)) porConta.set(a.conta, { conta: a.conta, pedidos: [] });
+    porConta.get(a.conta).pedidos.push({
+      pedido: a.pedido, nome: a.nome, valor: a.valor,
+      produto: a.produto, unidades: a.unidades, deDiasAnteriores: a.dias ?? 1,
+    });
+  }
+  return [...porConta.values()];
+}
+
+/**
  * @param opts.escrever   false = dry-run
  * @param opts.simular    injeta rastreio falso onde ainda não há (teste)
  */
@@ -112,13 +133,31 @@ export async function rodarCiclo({ contas, escrever = true, simular = false, aoL
   let pendencias = [];
   try {
     const r = await lerPendentes(process.env.PLANILHA, { aba: process.env.PLANILHA_ABA });
-    const res = await escreverRastreios(r.contas, lerColetas(), {
+
+    // A planilha do cliente traz só os pagos DO DIA. Quem não resolveu ontem
+    // não está nela — e some, se a gente não trouxer de volta.
+    const atrasados = pendentesAbertos();
+    const contasDoDia = juntarPendentes(r.contas, atrasados);
+    if (atrasados.length) {
+      const velhos = atrasados.filter((p) => (p.dias ?? 1) >= 5).length;
+      aoLog(`${atrasados.length} pedido(s) vindo(s) de dias anteriores` +
+            (velhos ? ` · ${velhos} há 5 dias ou mais` : ""));
+    }
+
+    const res = await escreverRastreios(contasDoDia, lerColetas(), {
       escrever,
       notificar: process.env.NOTIFICAR_CLIENTE === "1",
       aoLog,
     });
     escritos = res.escritos; falhasEscrita = res.falhas; pulados = res.pulados;
     pendencias = res.pendencias;
+
+    // A carteira anda nos dois sentidos: entra quem ficou pendente, sai
+    // quem foi escrito.
+    guardarPendentes(pendencias);
+    const resolvidos = (res.planejado ?? []).map((x) => x.l.p.pedido).filter(Boolean);
+    const baixados = baixarPendentes(escrever ? resolvidos : []);
+    if (baixados) aoLog(`${baixados} pedido(s) saíram da lista de pendentes`);
 
     const precisa = pendencias.filter((p) => p.motivo.grupo === "precisa").length;
     const sozinho = pendencias.length - precisa;
