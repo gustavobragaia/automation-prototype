@@ -8,6 +8,7 @@ compatibility_date = "2026-09-01"
 
 [vars]
 BASE_URL = "https://esteira.cloud"
+SHOPIFY_CLIENT_ID = "d278ab9bc83df201d73436fb29b70f9d"   # público, não é segredo
 # SHOPIFY_CLIENT_ID entra como var pelo painel ou por `wrangler secret`
 # SHOPIFY_CLIENT_SECRET entra SÓ como secret: é com ele que o HMAC é
 # conferido, e com ele vazado qualquer um forja um retorno da Shopify.
