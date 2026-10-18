@@ -11,7 +11,9 @@
     "dev": "electron .",
     "empacotar": "electron-builder",
     "ensaio": "electron ensaio.mjs",
-    "ensaio:ajustes": "electron ensaio-ajustes.mjs"
+    "ensaio:ajustes": "electron ensaio-ajustes.mjs",
+    "ensaio:arranque": "electron ensaio-arranque.mjs",
+    "ensaios": "npm run ensaio:arranque && npm run ensaio && npm run ensaio:ajustes"
   },
   "devDependencies": {
     "electron": "^34.0.0",
@@ -62,12 +64,15 @@
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "icon": "marca/icon.png",
+      "identity": null
     },
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "marca/icon.png"
     },
     "publish": [
       {
@@ -75,7 +80,8 @@
         "owner": "gustavobragaia",
         "repo": "automation-prototype"
       }
-    ]
+    ],
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
   },
   "dependencies": {
     "exceljs": "^4.4.0"

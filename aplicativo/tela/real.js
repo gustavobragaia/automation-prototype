@@ -37,30 +37,19 @@ var trocou = [], falhou = [];
 async function maquina(){ TELA.maquina(await pedir("maquina:ler")); }
 
 /* ── Ajustes guardados: a chave do AdsPower e o endereço ── */
-// Os campos de segredo. O robô nunca devolve o valor — só "guardada" —
-// então o campo mostra um marcador e, no primeiro clique, esvazia: digitar
-// por cima é a única forma de trocar, e não trocar é a única forma de
-// manter. Nunca há como a senha real passar pela tela.
-var SEGREDOS = [["shSenha","shopeeSenha"],["shCodigo","codigoChave"],["adsChave","adspowerChave"]];
-function prepararSegredo(campo, temGuardado){
-  if (!temGuardado) return;
-  campo.value = "••••••••••••••••••••";
-  campo.dataset.guardada = "1";
-  campo.addEventListener("focus", function(){
-    if (this.dataset.guardada) { this.value = ""; delete this.dataset.guardada; }
-  });
-}
-function valorDoSegredo(campo){
-  return campo.dataset.guardada ? "guardada" : campo.value;
-}
-
 async function ajustes(){
   var a = await pedir("ajustes:ler");
   var $ = function(i){ return document.getElementById(i); };
 
-  SEGREDOS.forEach(function(par){
-    prepararSegredo($(par[0]), a[par[1]] === "guardada");
-  });
+  // Cada segredo é salvo sozinho, no momento em que a pessoa clica em
+  // Salvar. Não entra no "salva tudo" dos outros campos: assim nunca há
+  // como mandar de volta um valor que a tela não tem — ela nunca o teve.
+  GANCHOS.salvarSegredo = function(qual, valor, pronto){
+    var m = {}; m[qual] = valor;
+    pedir("ajustes:salvar", m)
+      .then(function(novo){ pronto(); TELA.ajustes(novo); })
+      .catch(function(e){ TELA.avisar("Não consegui guardar", e.message); });
+  };
 
   var simples = [["shPrefixo","emailPrefixo"],["shPrefixoAlto","emailPrefixoAlto"],
                  ["shDominio","emailDominio"],["shFaixa","emailFaixa"],
@@ -72,30 +61,29 @@ async function ajustes(){
 
   var gravar = function(){
     var m = {};
-    SEGREDOS.forEach(function(par){ m[par[1]] = valorDoSegredo($(par[0])); });
     simples.forEach(function(par){ m[par[1]] = $(par[0]).value.trim(); });
     m.emailFaixa = Number($("shFaixa").value.trim()) || 0;
     m.loginAutomatico = $("chLogin").getAttribute("aria-pressed") === "true";
     pedir("ajustes:salvar", m)
-      .then(function(novo){ TELA.ajustes(novo); })   // a lista do que falta reaparece
-      .catch(function(e){ console.error("[esteira] ajustes:", e.message); });
+      .then(function(novo){ TELA.ajustes(novo); })
+      // Antes só ia para o console: a pessoa mudava o campo, nada era
+      // guardado, e ela descobria no dia seguinte.
+      .catch(function(e){ TELA.avisar("Não consegui guardar o ajuste", e.message); });
   };
-  SEGREDOS.concat(simples).forEach(function(par){
-    $(par[0]).addEventListener("change", gravar);
-  });
+  simples.forEach(function(par){ $(par[0]).addEventListener("change", gravar); });
   $("chLogin").addEventListener("click", function(){ setTimeout(gravar, 0); });
-  return;
+
+  GANCHOS.guardarPreferencia = function(m){
+    pedir("ajustes:salvar", m)
+      .catch(function(e){ TELA.avisar("Não consegui guardar o ajuste", e.message); });
+  };
 }
 
 /* ── AdsPower: o botão testa de verdade ── */
 function adspower(){
-  function chaveAtual(){
-    return valorDoSegredo(document.getElementById("adsChave"));
-  }
   GANCHOS.testarAds = async function(){
     try {
       var d = await pedir("adspower:diagnosticar", {
-        chave: chaveAtual(),
         base:  (document.getElementById("adsBase") ||{}).value,
       });
       TELA.diagnostico({
@@ -115,6 +103,7 @@ async function shopify(){
     catch (e) { TELA.shopify("desconectada"); TELA.avisar("Não consegui abrir a Shopify", e.message); }
   };
   GANCHOS.cancelarShopify = function(){ pararEspera(); pedir("shopify:cancelar").catch(function(){}); };
+  GANCHOS.desconectarShopify = function(){ return pedir("shopify:desconectar"); };
   await mostrarShopify();
 }
 function quandoTxt(iso){
@@ -156,7 +145,7 @@ async function mostrarShopify(){
 function planilha(){
   GANCHOS.esquecerPlanilha = function(caminho){
     if (caminho) pedir("planilha:esquecer", { caminho: caminho })
-      .catch(function(e){ console.error("[esteira] esquecer:", e.message); });
+      .catch(function(e){ TELA.avisar("Não consegui tirar a planilha da rodada", e.message); });
   };
   GANCHOS.escolherPlanilha = async function(){
     var caminhos = await window.esteira.escolherPlanilha();
@@ -205,6 +194,7 @@ function rodada(){
       TELA.rodada.terminar(e);
       // A conciliação já rodou junto com a coleta; agora a lista é real.
       if (!e.erro) { carregarConferencia(); carregarEscrita(); }
+      recarregar();
       return;
     }
     var estado = ESTADO_DO_EVENTO[e.tipo];
@@ -245,7 +235,8 @@ function rodada(){
     var b = document.getElementById("bParar");
     b.disabled = true; b.textContent = "Parando…";
     try { await pedir("rodada:parar"); }
-    catch (e) { console.error("[esteira] parar:", e.message); }
+    catch (e) { TELA.avisar("Não consegui parar a rodada", e.message);
+                b.disabled = false; b.textContent = "Parar"; }
     // O botão não volta: a rodada vai terminar sozinha e o "rodada:fim"
     // devolve a tela ao estado parado. Dizer "parado" antes disso seria
     // mentira — as contas que já abriram ainda estão lá.
@@ -260,6 +251,7 @@ function paraleloEscolhido(){
 function escrita(){
   GANCHOS.escrever = async function(){
     const r = await pedir("escrita:executar", {});
+    recarregar();          // o histórico ganhou os escritos de agora
     // Depois de escrever, as duas listas mudam: quem entrou saiu da
     // conferência, quem a Shopify recusou entrou nela.
     carregarConferencia();
@@ -268,7 +260,7 @@ function escrita(){
 }
 async function carregarEscrita(){
   try { TELA.escrita(await pedir("escrita:listar")); }
-  catch (e) { console.error("[esteira] escrita:", e.message); }
+  catch (e) { TELA.avisar("Não consegui montar a etapa 4", e.message); }
 }
 
 /* ── A conferência ── */
@@ -278,6 +270,12 @@ function conferencia(){
       pedido: pedido, decisao: ordem.decisao, texto: ordem.texto,
       conta: ordem.conta, motivo: ordem.motivo, ate: ordem.ate,
     });
+  };
+  GANCHOS.conferirColado = async function(pedido, texto){
+    var r = await pedir("manual:conferir", { pedido: pedido, texto: texto });
+    if (!r || !r.ok) return { ok: false, erro: (r && r.erro) || "a Shopify não respondeu" };
+    return { ok: true, pedido: r.alvo && r.alvo.pedido, nome: r.alvo && r.alvo.nome,
+             cep: r.alvo && r.alvo.cep, codigos: r.codigos, transportadora: r.transportadora };
   };
   GANCHOS.desfazer = async function(pedido){
     return pedir("conferencia:desfazer", { pedido: pedido });
@@ -294,6 +292,58 @@ async function carregarConferencia(){
   }
 }
 
+/* ── As áreas que eram inventadas ── */
+// Antes de qualquer coisa, tudo de exemplo sai da tela. Depois cada área
+// se enche com o que o robô tem — e uma área vazia diz que está vazia.
+async function arranque(){
+  TELA.limparExemplos();
+  var fontes = [
+    ["vindos de dias anteriores", "pendentes:atrasados", TELA.atrasados],
+    ["histórico", "historico:dias", TELA.historico],
+    ["contas", "contas:listar", TELA.contas],
+  ];
+  var falhas = [];
+  for (var i = 0; i < fontes.length; i++) {
+    try { fontes[i][2](await pedir(fontes[i][1])); }
+    catch (e) { falhas.push(fontes[i][0] + ": " + e.message); }
+  }
+  // Uma área que não carregou não pode ficar parecendo vazia de verdade.
+  if (falhas.length) TELA.avisar("Parte da tela não carregou", falhas.join(" · "));
+}
+GANCHOS.proximaRodada = async function(){
+  // As planilhas de ontem saem da lista do robô — senão a próxima rodada
+  // abriria as contas delas de novo — e a etapa 1 recarrega da carteira.
+  try { await pedir("planilha:esquecer", {}); } catch (e) {}
+  recarregar();
+};
+async function recarregar(){
+  try { TELA.atrasados(await pedir("pendentes:atrasados")); } catch (e) {}
+  try { TELA.historico(await pedir("historico:dias")); } catch (e) {}
+  try { TELA.contas(await pedir("contas:listar")); } catch (e) {}
+}
+
+/* ── Arquivos que a pessoa baixa ── */
+function arquivos(){
+  GANCHOS.baixarModelo = async function(){
+    var caminho = await window.esteira.salvarComo("modelo-esteira.xlsx", "xlsx");
+    if (!caminho) return;                            // desistiu: nada a dizer
+    try {
+      await pedir("planilha:modelo", { caminho: caminho });
+      TELA.avisar("Modelo salvo", caminho.split(/[\\/]/).pop());
+    } catch (e) { TELA.avisar("Não consegui salvar o modelo", e.message); }
+  };
+  GANCHOS.exportar = async function(o){
+    var caminho = await window.esteira.salvarComo(o.nome, o.formato);
+    if (!caminho) return;
+    try {
+      var r = await pedir("historico:exportar",
+        { caminho: caminho, desde: o.desde, ate: o.ate, formato: o.formato });
+      TELA.avisar("Exportado", r.linhas + " pedido" + (r.linhas === 1 ? "" : "s") +
+                  " em " + caminho.split(/[\\/]/).pop());
+    } catch (e) { TELA.avisar("Não consegui exportar", e.message); }
+  };
+}
+
 /* ── Aviso pelo sistema operacional, não pelo navegador ── */
 function avisos(){
   var doNavegador = TELA.avisar;
@@ -301,7 +351,8 @@ function avisos(){
 }
 
 (async function(){
-  var partes = [["ajustes",ajustes],["máquina",maquina],["AdsPower",adspower],["Shopify",shopify],
+  var partes = [["arranque",arranque],["arquivos",arquivos],
+                ["ajustes",ajustes],["máquina",maquina],["AdsPower",adspower],["Shopify",shopify],
                 ["planilha",planilha],["rodada",rodada],
                 ["conferência",conferencia],["escrita",escrita],["avisos",avisos]];
   for (var i = 0; i < partes.length; i++) {

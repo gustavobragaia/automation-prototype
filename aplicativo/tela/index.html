@@ -213,7 +213,7 @@ td.dir,th.dir{text-align:right;font-variant-numeric:tabular-nums}
 
 .campo{display:block;margin-bottom:13px;max-width:460px}
 .campo span{display:block;font-size:12px;color:var(--tinta-2);margin-bottom:5px}
-.campo input{width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--linha-forte);
+.campo input,.segredo input{width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--linha-forte);
   background:var(--canvas);color:var(--tinta);font:400 12.5px/1.4 var(--mono)}
 .campo em{display:block;font-style:normal;font-size:11.5px;color:var(--tinta-3);margin-top:5px}
 
@@ -232,6 +232,16 @@ td.dir,th.dir{text-align:right;font-variant-numeric:tabular-nums}
 .op .chave,.op .btn{margin-left:auto;flex:none}
 
 /* ══ Entrada de planilha ══ */
+.passos-login{margin:0 0 14px;padding-left:18px;font-size:12.5px;line-height:1.65;color:var(--tinta-2)}
+.passos-login li{margin:3px 0}
+.passos-login b{color:var(--tinta-1);font-weight:500}
+.segredo{margin:20px 0 18px}
+.segredo .rot{display:block;font-size:12px;color:var(--tinta-2);margin-bottom:6px}
+.segredo .guardado{display:flex;align-items:center;gap:12px;padding:7px 0}
+.segredo .digitar{display:flex;gap:8px;align-items:center}
+.segredo .digitar input{flex:1;min-width:0}
+.segredo em{display:block;font-size:11.5px;color:var(--tinta-3);font-style:normal;
+  margin-top:6px;line-height:1.55}
 .par-campos{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 @media(max-width:720px){.par-campos{grid-template-columns:1fr}}
 .linha-chave{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
@@ -493,11 +503,11 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
       <tr><td class="letra"></td><td class="letra">A</td><td class="letra">B</td><td class="letra">C</td><td class="letra">D</td></tr>
       <tr><td class="nlin">1</td><th class="cab">Número do pedido</th><th class="cab">Nome do cliente</th>
         <th class="cab">Código de rastreio</th><th class="cab">Onde foi feito o pedido</th></tr>
-      <tr><td class="nlin">2</td><td class="dado">#164891</td><td>Sônia Aparecida Pinto</td>
+      <tr><td class="nlin">2</td><td class="dado">#1001</td><td>Maria Exemplo</td>
         <td class="vaga">deixe vazio</td><td class="dado">shopee 124</td></tr>
-      <tr><td class="nlin">3</td><td class="dado">#164892</td><td>Antônio Paulo Borges</td>
+      <tr><td class="nlin">3</td><td class="dado">#1002</td><td>João Exemplo</td>
         <td></td><td class="dado">shopee 124</td></tr>
-      <tr><td class="nlin">4</td><td class="dado">#164895</td><td>Leonardo José de Freitas</td>
+      <tr><td class="nlin">4</td><td class="dado">#1003</td><td>Ana Exemplo</td>
         <td></td><td class="dado">shopee 128</td></tr>
     </table></div></div>
     <p class="nota">A coluna de rastreio é a que o robô preenche — linha que já vier preenchida é pulada.
@@ -739,13 +749,15 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
       por isso a maioria entra já conectada.</p>
   </div></div>
 
-  <div class="bloco">
+  <!-- Era fixo, falando de duas contas que não existem. Só aparece quando a
+       varredura dos perfis acha uma repetição de verdade. -->
+  <div class="bloco" id="blDuplicadas" hidden>
     <div class="aviso grave">
       <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z"/></svg>
-      <span><b>Duas contas apontam para o mesmo perfil.</b> As contas <b>207</b> e <b>270</b> estão
-        as duas no perfil <span class="mono">k1cexbyh</span>. Os cookies de uma sobrescrevem os da
-        outra, e o robô pode entrar como a conta errada — e escrever o rastreio no pedido de outro
-        cliente. As duas ficam de fora da rodada até isso ser desfeito.</span>
+      <span><b>Uma conta tem mais de um perfil no AdsPower.</b> <span id="txDuplicadas"></span>
+        O robô não sabe qual abrir, e escolher errado é entrar como a conta errada —
+        e escrever o rastreio no pedido de outro cliente. Ela fica de fora da rodada até
+        sobrar um perfil só.</span>
     </div>
   </div>
 
@@ -880,14 +892,21 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
     <div>
       <div class="bloco">
         <div class="rotulo"><h2><img class="ads" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAAEGElEQVRYCb2X229UZRTFV6cXKFIoBQsClXK/h6JgQowhxhLfDOH64KPhAeOfwwOPPKO8mfAgAdSEEoIFFNsosUVuStUCpYUWaMf1m83AtM75hpowO5nJnHO+b+211758Z2quXMvnjxyXun6Snj5TVaw2J21dK32+T6o7ekI684P05GlVfL9wQsBj9lnT8Wk+Pzj04n5Vf6BE7tl4VX1OcjY+YQKT7ky5yNVMuTHdy7wlroCRSYCNW9ZI69sDxFjTMvYvXyKtbvP+xM5MAuzZuEI6vFfa+Y40s17KvwIL1jR47bb10oFOaYVJpCxJgCgA+OwTad9H0vy5aRI4nztb2vWetHuntPjNyimoS7HjGaAtc6Q9H0pLDPjVaanvdvldbYukzu3S5lWhwoSLrJJVJAAAJGZY1g86pNYW6YRJXOx9OTvqjUK6Oh352yaBcuzJWd+6WgNQBL4uZ69EoLgRYIry0G7Lu0D65oJEK+3YHORaSlJUb8e1OMcynPNoWgQKWAZbaBUO7pJWLpX+eSCtbZcaGyJqSDYYleiZdJXmTJIAygFYzhbNj8K8+ps0/DiiRXbSgY09CXXiKvs7kwBg9x9KowZqnBHRAcP4bG6SFjRHDUCQgUVtwJWxPjrmH77gfBl+lMxAOgXfX5GaZkkf74hOoL9x3OxWI784gEC977Nu1sxw/Nc9ic+5H6XLv/pewhxPtg06v1+64o99HWrQhrRksbgK+bZzVBn3mULFUx+k4ZQLlM/QSDY+T5IEWEAqHlrGO38HGNdFgwC9Tr4nfJ+OuD0gXbsRZFCFNSnLrAE2MdVosW0bApzeX9cuLV8cUeK8+BIDid4+qac/ipI1pIQUQAqC5SxJgIn2/pZoK/Y/dnH9/me0VtvCl9ENON8371opy114yXDURE6nvLsu7t9zQZdTI5MAi2c3RqQ4ZxI2vRER9zjSgUGP5lZHfV06eU5a5gnIcCp1gvqNVoEizbJMAmzAMYBIyYf2GnHPIyfnwcku6axf54huqcmUHbmAJCxJgOqe46iZbMjLTMDoDlqs+xfp0WiodNeKtM4LpSr4DJDn30kCDCCGzP3hkJ7Ib/whfdvtSr8ZtYBCjNufPRGZC5tWxkyY5CVxkSRAxA/snNYDnLH73SWJaLHSfFN8hQ5wy3b4TYqBVVOxySscRkRG1EMmcf6qdKEnRmup46AS37TldSs04rRAgqO5UBeli6b8TipA5Lfcw0Td2x9pyHJeikuHdLlGOKTeciumLEmg71Y4ZpCYyyTJU6CQZHp2e3DRqsXiLbcnkwDR992JFBhv2gYJ6qLfGFiWcpkE2ASJ/+OcvUUDI2W5wjtbasVrfMZbU267D5riW8xr9PUfaIbcVndKHX886HH+rXKmV8OInH9dX+yX/gVFgFpEoEAJCwAAAABJRU5ErkJggg==" alt="">AdsPower</h2></div>
-        <label class="campo"><span>Chave da API</span>
-          <span class="comOlho">
-            <input id="adsChave" type="password" value="" spellcheck="false"
-                   autocomplete="off" placeholder="cole aqui a chave do AdsPower">
-            <button type="button" id="bOlho" aria-label="Mostrar a chave" aria-pressed="false">
-              <svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/>
-                <circle cx="12" cy="12" r="3"/></svg></button></span>
-          <em>No AdsPower: Configurações → API local → copiar a chave.</em></label>
+        <div class="segredo" data-segredo="adsChave">
+          <span class="rot">Chave da API</span>
+          <div class="guardado" hidden>
+            <span class="est ok"><span class="pt"></span>Guardada neste computador</span>
+            <button class="btn peq" data-trocar>Trocar</button>
+          </div>
+          <div class="digitar">
+            <input type="password" spellcheck="false" autocomplete="off"
+                   placeholder="cole aqui a chave do AdsPower">
+            <button class="btn pri" data-salvar>Salvar</button>
+            <button class="btn" data-desistir hidden>Cancelar</button>
+          </div>
+          <em>No AdsPower: Configurações → API local → copiar a chave. É ela que deixa
+            o Esteira abrir os perfis.</em>
+        </div>
         <label class="campo"><span>Endereço</span>
           <input id="adsBase" value="http://local.adspower.net:50325" spellcheck="false">
           <em>A porta padrão é 50325. Só mude se você mudou lá.</em></label>
@@ -899,33 +918,24 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
 
       <div class="bloco">
         <div class="rotulo"><h2>Contas da Shopee</h2></div>
-        <p class="nota" style="margin:0 0 14px">Só é usado quando a sessão de uma conta
-          cai e o robô precisa entrar de novo. No dia a dia as contas já estão conectadas
-          nos perfis, e nada disto é tocado.</p>
-
-        <label class="campo"><span>Senha das contas</span>
-          <span class="comOlho">
-            <input id="shSenha" type="password" value="" autocomplete="off"
-                   placeholder="a mesma senha de todas as contas">
-            <button type="button" id="bOlhoSenha" aria-label="Mostrar a senha" aria-pressed="false">
-              <svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/>
-                <circle cx="12" cy="12" r="3"/></svg></button></span>
-          <em>Fica só neste computador, num arquivo que só você consegue ler.</em></label>
-
-        <label class="campo"><span>Chave para ler o código de verificação</span>
-          <span class="comOlho">
-            <input id="shCodigo" type="password" value="" autocomplete="off"
-                   spellcheck="false" placeholder="chave da RapidAPI">
-            <button type="button" id="bOlhoCodigo" aria-label="Mostrar a chave" aria-pressed="false">
-              <svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/>
-                <circle cx="12" cy="12" r="3"/></svg></button></span>
-          <em>A Shopee manda um código por e-mail ao entrar. É com esta chave que o robô
-            lê esse e-mail.</em></label>
+        <p class="nota" style="margin:0 0 6px">No dia a dia o robô não usa nada disto:
+          as contas já estão conectadas dentro dos perfis do AdsPower, e ele só abre e lê.
+          <b>Isto aqui é para quando uma sessão cai.</b> Aí ele precisa entrar como você
+          entraria, e para isso precisa de três coisas, nesta ordem:</p>
+        <ol class="passos-login">
+          <li><b>O e-mail da conta.</b> Ele não guarda 80 e-mails: monta cada um a partir
+            do número da conta, seguindo o padrão que você define abaixo.</li>
+          <li><b>A senha.</b> A mesma para todas as contas.</li>
+          <li><b>O código que a Shopee manda por e-mail</b> depois da senha. Para ler esse
+            e-mail, ele usa um serviço de caixa de entrada — a terceira chave.</li>
+        </ol>
+        <p class="nota" style="margin:0 0 16px">Se faltar qualquer uma, o robô não consegue
+          entrar: a conta vai para a etapa 3 esperando você.</p>
 
         <div class="par-campos">
-          <label class="campo"><span>E-mail das contas</span>
+          <label class="campo"><span>1 · Começo do e-mail</span>
             <input id="shPrefixo" spellcheck="false" placeholder="ex.: chompspee">
-            <em>O começo, antes do número da conta.</em></label>
+            <em>O que vem antes do número da conta.</em></label>
           <label class="campo"><span>Domínio</span>
             <input id="shDominio" spellcheck="false" placeholder="ex.: givmail.com"></label>
         </div>
@@ -943,6 +953,41 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
           <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
           <span><b>Falta preencher para o robô conseguir rodar:</b>
             <span id="shFaltaLista"></span></span></div>
+
+        <div class="segredo" data-segredo="shopeeSenha">
+          <span class="rot">2 · A senha</span>
+          <div class="guardado" hidden>
+            <span class="est ok"><span class="pt"></span>Guardada neste computador</span>
+            <button class="btn peq" data-trocar>Trocar</button>
+          </div>
+          <div class="digitar">
+            <input type="password" autocomplete="off"
+                   placeholder="a mesma senha de todas as contas">
+            <button class="btn pri" data-salvar>Salvar</button>
+            <button class="btn" data-desistir hidden>Cancelar</button>
+          </div>
+          <em>Fica num arquivo que só o seu usuário deste computador consegue abrir.
+            Ela nunca sai daqui, e nunca volta para esta tela depois de salva.</em>
+        </div>
+
+        <div class="segredo" data-segredo="codigoChave">
+          <span class="rot">3 · O código que a Shopee manda por e-mail</span>
+          <div class="guardado" hidden>
+            <span class="est ok"><span class="pt"></span>Guardada neste computador</span>
+            <button class="btn peq" data-trocar>Trocar</button>
+          </div>
+          <div class="digitar">
+            <input type="password" spellcheck="false" autocomplete="off"
+                   placeholder="chave da RapidAPI">
+            <button class="btn pri" data-salvar>Salvar</button>
+            <button class="btn" data-desistir hidden>Cancelar</button>
+          </div>
+          <em>Ao entrar, a Shopee manda um código para o e-mail da conta. O robô precisa
+            abrir essa caixa de entrada para ler o código — e quem faz isso é um serviço
+            chamado RapidAPI. Esta é a chave dele.</em>
+        </div>
+
+
 
         <div class="linha-chave" style="margin-top:16px">
           <div><b>Entrar sozinho quando a sessão cair</b>
@@ -995,6 +1040,17 @@ var GANCHOS = window.GANCHOS = {
   },
   cancelarShopify: function(){},
   esquecerPlanilha: function(){},
+  guardarPreferencia: function(){},
+  proximaRodada: function(){},
+  baixarModelo: function(){ avisar("Só no aplicativo","O modelo é gerado pelo Esteira instalado."); },
+  exportar: function(){ avisar("Só no aplicativo","A exportação é feita pelo Esteira instalado."); },
+  desconectarShopify: function(){ return Promise.resolve(); },
+  // No navegador não há Shopify para perguntar: devolve só o que o texto tem.
+  conferirColado: function(pedido, texto){
+    return Promise.resolve({ ok:true, pedido:pedido, nome:null, codigos:acharCodigos(texto) });
+  },
+  // No navegador não há onde guardar: só finge que guardou.
+  salvarSegredo: function(_qual, _valor, pronto){ pronto(); },
   // No navegador não há caminho de arquivo: segue com o exemplo.
   soltarPlanilha: function(arquivos){
     Array.prototype.forEach.call(arquivos,function(f){ somar(f.name); });
@@ -1088,9 +1144,11 @@ function chave(id,set){
   b.onclick=function(){ var v=b.getAttribute("aria-pressed")!=="true";
     b.setAttribute("aria-pressed",String(v)); set(v); };
 }
-chave("chSom",function(v){som=v;});
-chave("chNot",function(v){notif=v;});
-chave("chDireto",function(v){direto=v; pintaEscrita();});
+// Viviam só numa variável: o cliente ligava "escrever sem me perguntar",
+// fechava o app, e na manhã seguinte estava desligado de novo — sem aviso.
+chave("chSom",function(v){som=v; GANCHOS.guardarPreferencia({som:v});});
+chave("chNot",function(v){notif=v; GANCHOS.guardarPreferencia({notificacao:v});});
+chave("chDireto",function(v){direto=v; pintaEscrita(); GANCHOS.guardarPreferencia({escreverDireto:v});});
 $("bTestar").onclick=function(){ avisar("Conta 207 precisa de você","A Shopee pediu verificação humana."); };
 
 /* ── Etapa 1: planilhas ── */
@@ -1155,7 +1213,7 @@ $("listaArq").addEventListener("click",function(e){
   // planilha da tela e ela continua mandando contas para a fila.
   GANCHOS.esquecerPlanilha(fora && fora.caminho);
 });
-$("bModelo").onclick=function(){};
+$("bModelo").onclick=function(){ GANCHOS.baixarModelo(); };
 
 /* ── Vindos de dias anteriores ── */
 var SOZINHO=[
@@ -1541,25 +1599,44 @@ $("cxPrecisa").addEventListener("click",function(e){
     return abrirPainel(it,saida.dataset.saida,saida);
   }
 
+  // Colar o rastreio é a única escrita sem o lado Shopee para comparar o
+  // nome. Então quem confere é a pessoa — e para isso ela PRECISA ver o
+  // destinatário que está na Shopify. Antes a tela mostrava "o cliente
+  // deste pedido" e liberava o botão de escrever: a pessoa confirmava sem
+  // ver quem estava do outro lado, que é exatamente o erro que esta
+  // conferência existe para pegar.
   var conf=e.target.closest("[data-conferir]");
   if(conf){
-    var p=conf.closest(".painelito"), cods=acharCodigos(p.querySelector("input").value);
-    if(!cods.length) return erroNoPainel(p,"Não reconheci nenhum código de rastreio nesse texto.");
-    var cx=document.createElement("div"); cx.className="confere";
-    cx.innerHTML='<h5 style="margin:0 0 9px;font:500 11px/1 var(--ui);color:var(--tinta-3);'+
-      'text-transform:uppercase;letter-spacing:.06em">Confira antes de escrever</h5><dl>'+
-      '<div class="par"><dt>Pedido</dt><dd class="mono forte">'+
-      (it.querySelector(".item-cab .t")||{}).textContent+'</dd></div>'+
-      '<div class="par"><dt>Entrega</dt><dd>'+
-      ((it.querySelector(".caixinha dd")||{}).textContent||"o cliente deste pedido")+'</dd></div>'+
-      '<div class="par"><dt>Rastreio</dt><dd class="mono">'+cods.join(" · ")+'</dd></div></dl>'+
-      '<div class="l" style="margin-top:11px"><button class="btn" data-cancelar>Cancelar</button>'+
-      '<button class="btn pri" data-escrever="'+cods.join(",")+'">Escrever na Shopify</button></div>'+
-      '<p class="nota" style="margin-top:9px">Aqui não há lado Shopee para comparar o nome. '+
-      'Quem confere é você.</p>';
+    var p=conf.closest(".painelito"), texto=p.querySelector("input").value;
+    var pedido=it.dataset.pedido||(it.querySelector(".item-cab .t")||{}).textContent;
+    if(!acharCodigos(texto).length)
+      return erroNoPainel(p,"Não reconheci nenhum código de rastreio nesse texto.");
     var velho=p.querySelector(".confere"); if(velho) velho.remove();
     var err=p.querySelector(".erro"); if(err) err.remove();
-    p.appendChild(cx); aproximar(cx); return;
+    conf.disabled=true; var rot=conf.textContent; conf.textContent="Perguntando à Shopify…";
+    Promise.resolve(GANCHOS.conferirColado(pedido, texto)).then(function(r){
+      conf.disabled=false; conf.textContent=rot;
+      if(!r||!r.ok) return erroNoPainel(p,(r&&r.erro)||"Não consegui conferir na Shopify.");
+      var cods=r.codigos||[];
+      var cx=document.createElement("div"); cx.className="confere";
+      cx.innerHTML='<h5 style="margin:0 0 9px;font:500 11px/1 var(--ui);color:var(--tinta-3);'+
+        'text-transform:uppercase;letter-spacing:.06em">Confira antes de escrever</h5><dl>'+
+        '<div class="par"><dt>Pedido</dt><dd class="mono forte">'+esc(r.pedido||pedido)+'</dd></div>'+
+        '<div class="par"><dt>Na Shopify</dt><dd class="forte">'+esc(ou(r.nome))+'</dd></div>'+
+        (r.cep?'<div class="par"><dt>CEP</dt><dd class="mono">'+esc(r.cep)+'</dd></div>':'')+
+        '<div class="par"><dt>Rastreio</dt><dd class="mono">'+esc(cods.join(" · "))+'</dd></div>'+
+        (r.transportadora?'<div class="par"><dt>Transportadora</dt><dd>'+esc(r.transportadora)+'</dd></div>':'')+
+        '</dl>'+
+        '<div class="l" style="margin-top:11px"><button class="btn" data-cancelar>Cancelar</button>'+
+        '<button class="btn pri" data-escrever="'+esc(cods.join(","))+'">Escrever na Shopify</button></div>'+
+        '<p class="nota" style="margin-top:9px">O nome acima veio da Shopify agora. Aqui não há '+
+        'lado Shopee para comparar: <b>quem confere que é a pessoa certa é você.</b></p>';
+      p.appendChild(cx); aproximar(cx);
+    }).catch(function(x){
+      conf.disabled=false; conf.textContent=rot;
+      erroNoPainel(p, x&&x.message?x.message:"Não consegui conferir na Shopify.");
+    });
+    return;
   }
   if(e.target.closest("[data-cancelar]")) return fecharPaineis(it);
 
@@ -1724,6 +1801,11 @@ function comecarProxima(){
   $("vTempo").textContent="—";
   pintaAtrasados(); pintaArquivos(); pintaColeta(); pintaRevisao(); pintaEscrita();
   ir("1");
+  // A cópia que a tela acabou de montar é um palpite. Quem sabe de verdade
+  // o que atravessou é a carteira do robô — e as planilhas da rodada
+  // anterior precisam sair da lista dele também, senão a próxima rodada
+  // abriria as contas de ontem.
+  GANCHOS.proximaRodada();
 }
 $("bProxima").onclick=comecarProxima;
 
@@ -1774,13 +1856,22 @@ var CONTAS_INV=[
   {n:152,perfil:"k1c92sna",quando:"hoje, 08:20",viva:true,lidos:8},
   {n:207,perfil:"k1cexbyh",quando:"ontem, 09:04",viva:false,lidos:0,dup:true},
   {n:270,perfil:"k1cexbyh",quando:"—",viva:false,lidos:0,dup:true,sem:true}];
-$("tbContas").innerHTML=CONTAS_INV.map(function(c){
-  var email=(c.n>=200?"Brushopee":"chompspee")+c.n+"@givmail.com";
-  var s=c.dup?est("er","perfil duplicado"):(c.viva?est("ok","viva"):est("at","vai precisar de senha"));
-  return '<tr><td class="conta-nome">Shopee '+c.n+'</td><td class="mono ter">'+email+'</td>'+
-    '<td class="mono '+(c.dup?"difere":"ter")+'">'+c.perfil+'</td><td class="ter">'+c.quando+
-    '</td><td>'+s+'</td><td class="dir '+(c.lidos?"":"ter")+'">'+(c.sem?"—":c.lidos)+'</td></tr>';
-}).join("");
+// O e-mail vinha montado aqui com "chompspee"/"givmail.com" escritos à mão —
+// o padrão da Chomps, que já tinha saído do robô. Agora vem pronto de lá.
+function pintaContasInv(){
+  $("tbContas").innerHTML=CONTAS_INV.map(function(c){
+    var s=c.dup?est("er","perfil duplicado")
+      :(c.sessao==="logou"?est("at","o robô precisou logar")
+      :(c.viva||c.sessao==="viva"?est("ok","já estava conectada"):est("","—")));
+    return '<tr><td class="conta-nome">Shopee '+esc(c.n)+'</td>'+
+      '<td class="mono ter">'+esc(ou(c.email))+'</td>'+
+      '<td class="mono '+(c.dup?"difere":"ter")+'">'+esc(ou(c.perfil))+'</td>'+
+      '<td class="ter">'+esc(ou(c.quando))+'</td><td>'+s+'</td>'+
+      '<td class="dir '+(c.lidos?"":"ter")+'">'+esc(ou(c.lidos))+'</td></tr>';
+  }).join("")||'<tr><td colspan="6" class="ter" style="text-align:center;padding:24px">'+
+    'Nenhuma conta visitada ainda. Elas aparecem aqui depois da primeira coleta.</td></tr>';
+}
+pintaContasInv();
 
 /* ── Histórico ── */
 var semente=7;
@@ -1835,16 +1926,20 @@ function noPeriodo(x){
     if(x.iso<iso(l)) return false; }
   return true;
 }
+// O que o robô não grava sai como "—". Nunca "null", nunca um número
+// plausível para preencher a coluna.
+function ou(v){ return v==null||v===""?"—":v; }
 function pintaDias(){
   $("tbHist").innerHTML=DIAS.filter(noPeriodo).map(function(h){
     return '<tr class="clica" data-dia="'+h.iso+'"><td class="forte">'+h.br+
       ' <span class="ter" style="font-weight:400">· '+(h.hoje?"hoje":h.sem)+'</span></td>'+
       '<td class="dir">'+h.total+'</td><td class="dir" style="color:var(--ok)">'+h.escritos+'</td>'+
       '<td class="dir"'+(h.revisao?' style="color:var(--atencao)"':'')+'>'+h.revisao+'</td>'+
-      '<td class="num">'+h.semLogin+'/'+h.contas+'</td>'+
-      '<td class="dir ter">'+h.dur+'</td></tr>';
+      '<td class="num">'+(h.semLogin==null?ou(h.contas):h.semLogin+'/'+h.contas)+'</td>'+
+      '<td class="dir ter">'+ou(h.dur)+'</td></tr>';
   }).join("")||'<tr><td colspan="6" class="ter" style="text-align:center;padding:24px">'+
-    'Nenhuma rodada neste período.</td></tr>';
+    (DIAS.length?'Nenhuma rodada neste período.'
+      :'Nenhuma rodada ainda. O histórico começa a contar a partir da primeira coleta.')+'</td></tr>';
 }
 Array.prototype.forEach.call(document.querySelectorAll("#segPer button"),function(b){
   b.onclick=function(){
@@ -1870,7 +1965,9 @@ $("qBusca").oninput=function(){
     var dia=DIAS[i];
     for(var j=0;j<dia.pedidos.length;j++){
       var x=dia.pedidos[j];
-      if(x.p.toLowerCase().indexOf(q)>=0||x.c.toLowerCase().indexOf(q)>=0||
+      // o nome pode não existir (o robô não o grava nas escritas): sem este
+      // String(), a busca quebrava na primeira letra digitada
+      if(String(x.p||"").toLowerCase().indexOf(q)>=0||String(x.c||"").toLowerCase().indexOf(q)>=0||
          (x.r&&x.r.toLowerCase().indexOf(q)>=0)){ achados.push({dia:dia,x:x});
          if(achados.length>=60) break; }
     }
@@ -1902,7 +1999,7 @@ function pintaPedidosDia(){
   var l=diaAberto.pedidos.filter(function(x){return !filtroSit||x.s===filtroSit;});
   $("ctDia").textContent=l.length+" de "+diaAberto.total;
   $("tbDia").innerHTML=l.slice(0,120).map(function(x){
-    return '<tr><td class="mono forte">'+x.p+'</td><td>'+x.c+'</td><td class="ter num">'+x.ct+'</td>'+
+    return '<tr><td class="mono forte">'+esc(x.p)+'</td><td>'+esc(ou(x.c))+'</td><td class="ter num">'+esc(ou(x.ct))+'</td>'+
       '<td class="mono'+(x.r?'':' ter')+'">'+(x.r||"—")+'</td><td>'+pinSit(x.s)+'</td>'+
       '<td class="dir ter">'+x.h+'</td></tr>';
   }).join("")+(l.length>120?'<tr><td colspan="6" class="ter" style="text-align:center">e mais '+
@@ -1922,7 +2019,17 @@ $("t-historico").addEventListener("click",function(e){
 });
 $("bVoltar").onclick=function(){ $("histDia").hidden=true; $("histLista").hidden=false;
   window.scrollTo(0,0); };
-$("bExpDia").onclick=$("bExpCsv").onclick=$("bExpPer").onclick=function(){};
+// Os três eram `function(){}`: a pessoa clicava e nada acontecia.
+$("bExpDia").onclick=function(){ if(diaAberto) GANCHOS.exportar({desde:diaAberto.iso,ate:diaAberto.iso,
+  nome:"esteira-"+diaAberto.iso+".xlsx", formato:"xlsx"}); };
+$("bExpCsv").onclick=function(){ if(diaAberto) GANCHOS.exportar({desde:diaAberto.iso,ate:diaAberto.iso,
+  nome:"esteira-"+diaAberto.iso+".csv", formato:"csv"}); };
+$("bExpPer").onclick=function(){
+  var vis=DIAS.filter(noPeriodo);
+  if(!vis.length) return avisar("Nada para exportar","Não há rodadas neste período.");
+  var ate=vis[0].iso, desde=vis[vis.length-1].iso;
+  GANCHOS.exportar({desde:desde, ate:ate, nome:"esteira-"+desde+"-a-"+ate+".xlsx", formato:"xlsx"});
+};
 
 /* ── AdsPower ── */
 var ICO_OK='<path d="M20 6L9 17l-5-5"/>';
@@ -1967,23 +2074,39 @@ GANCHOS.testarAds=function(){   // o de verdade troca isto por uma chamada à po
   setTimeout(function(){ pintaDiag(DIAGS[qualDiag]); qualDiag=(qualDiag+1)%DIAGS.length; },
     rapido?0:700);
 };
-// A chave fica escondida por padrão: esta tela é a que mais aparece em
-// print e em chamada de tela compartilhada, e quem tiver a chave abre os
-// navegadores com as contas da Shopee dentro.
-$("bOlho").onclick=function(){
-  var v=this.getAttribute("aria-pressed")!=="true";
-  this.setAttribute("aria-pressed",String(v));
-  this.setAttribute("aria-label",v?"Esconder a chave":"Mostrar a chave");
-  $("adsChave").type=v?"text":"password";
-};
-$("bOlhoSenha").onclick=olho("shSenha");
-$("bOlhoCodigo").onclick=olho("shCodigo");
-function olho(campo){ return function(){
-  var v=this.getAttribute("aria-pressed")!=="true";
-  this.setAttribute("aria-pressed",String(v));
-  this.setAttribute("aria-label",v?"Esconder":"Mostrar");
-  $(campo).type=v?"text":"password";
-}; }
+/* ── Os três segredos ──
+   Nada de pontinhos falsos no lugar do valor: eles são iguais a um campo
+   vazio, e a pessoa fica sem saber se tem alguma coisa guardada. O estado
+   é dito com todas as letras, e trocar é um ato deliberado. */
+function pintaSegredo(cx, guardada){
+  cx.dataset.guardada = guardada ? "1" : "";
+  cx.querySelector(".guardado").hidden = !guardada;
+  cx.querySelector(".digitar").hidden = guardada;
+  cx.querySelector("[data-desistir]").hidden = !guardada;
+  var campo = cx.querySelector("input");
+  campo.value = "";
+  campo.type = "password";
+}
+document.querySelectorAll(".segredo").forEach(function(cx){
+  pintaSegredo(cx, false);
+  cx.addEventListener("click", function(e){
+    if(e.target.closest("[data-trocar]")){
+      cx.querySelector(".guardado").hidden = true;
+      cx.querySelector(".digitar").hidden = false;
+      cx.querySelector("input").focus();
+      return;
+    }
+    if(e.target.closest("[data-desistir]")) return pintaSegredo(cx, true);
+    if(e.target.closest("[data-salvar]")){
+      var v = cx.querySelector("input").value.trim();
+      if(!v) return;
+      GANCHOS.salvarSegredo(cx.dataset.segredo, v, function(){ pintaSegredo(cx, true); });
+    }
+  });
+  cx.querySelector("input").addEventListener("keydown", function(e){
+    if(e.key === "Enter"){ e.preventDefault(); cx.querySelector("[data-salvar]").click(); }
+  });
+});
 
 // O cliente não deve ter que adivinhar se acertou o padrão: mostramos o
 // e-mail que SERÁ usado, com números de conta de verdade.
@@ -2049,7 +2172,13 @@ function pintaShopify(){
     '<p class="nota">O nome acima veio da própria Shopify, não do que foi digitado. '+
     'O acesso ficou <b>só nesta máquina</b>: nunca passou pelo nosso servidor.</p>'+
     '<button class="btn" id="bTrocarShop" style="margin-top:12px">Trocar de loja</button>';
-  $("bTrocarShop").onclick=function(){ shopEstado="desconectada"; pintaShopify(); };
+  // Antes só mudava a tela: o robô continuava conectado na loja antiga e
+  // escreveria nela. Agora desconecta de verdade, e só então redesenha.
+  $("bTrocarShop").onclick=function(){
+    Promise.resolve(GANCHOS.desconectarShopify()).then(function(){
+      shopEstado="desconectada"; pintaShopify();
+    }).catch(function(e){ avisar("Não consegui desconectar", e&&e.message?e.message:""); });
+  };
 }
 
 $("escopos").innerHTML=["read_orders","write_orders","read_fulfillments","write_fulfillments",
@@ -2072,8 +2201,67 @@ window.TELA = {
   planilha: somar,
   avisar: avisar,
   erroNaRodada: erroNaRodada,
+
+  // ── o arranque honesto ──
+  // A tela nasce com dados de exemplo para rodar sozinha num navegador. No
+  // app, NADA disso pode aparecer: a pessoa não tem como distinguir um
+  // pedido inventado de um de verdade, nem um "Conectado ao AdsPower" que
+  // ninguém testou de um que foi testado. Tudo vai a zero aqui, e cada área
+  // se enche só com o que o robô mandar.
+  limparExemplos: function(){
+    SOZINHO=[]; ATRASADOS=[]; CONTAS_RODADA=[]; estadoConta={};
+    A_ESCREVER=[]; prontos=0; CONTAS_INV=[]; DIAS=[]; CANDIDATOS=[];
+    TOTAL=0; coletou=false; escrito=false;
+    Array.prototype.forEach.call(document.querySelectorAll("#cxPrecisa .item[data-rev]"),
+      function(i){ i.remove(); });
+    $("adsResultado").innerHTML='<p class="nota" style="margin:0">Ainda não testado nesta '+
+      'abertura. Clique em <b>Testar conexão</b> para conferir.</p>';
+    pintaAtrasados(); pintaColeta(); pintaRevisao(); pintaEscrita();
+    pintaContasInv(); pintaDias(); pintaTrilha();
+  },
+
+  // Os pedidos que atravessaram de dias anteriores, da carteira de verdade.
+  atrasados: function(lista){
+    ATRASADOS=(lista||[]).map(function(x){
+      return { p:x.pedido, c:x.nome||"—", ct:x.conta, d:x.dias||1,
+               m: x.grupo==="sozinho" ? "Shopee ainda não despachou"
+                 : (x.motivo||"").replace(/-/g," ") };
+    });
+    SOZINHO=ATRASADOS.filter(function(x){ return /despachou/.test(x.m); })
+      .map(function(x){ return {p:x.p,c:x.c,ct:x.ct,h:"—",s:"aguardando a Shopee",d:x.d}; });
+    pintaAtrasados(); pintaRevisao();
+  },
+
+  historico: function(dias){ DIAS=dias||[]; pintaDias(); },
+
+  contas: function(r){
+    // a ponte manda { contas, duplicadas }; um array solto é o formato antigo
+    var lista = Array.isArray(r) ? r : (r && r.contas) || [];
+    var dup = (r && r.duplicadas) || [];
+    $("blDuplicadas").hidden = !dup.length;
+    $("txDuplicadas").textContent = dup.map(function(d){
+      return "A conta " + d.conta + " aparece em " + d.perfis.length + " perfis (" + d.perfis.join(", ") + ").";
+    }).join(" ");
+    CONTAS_INV=(lista||[]).map(function(c){
+      var d=new Date(c.quando), hoje=new Date();
+      var mesmoDia=d.toDateString()===hoje.toDateString();
+      var hm=("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+      return { n:c.n, email:c.email, perfil:c.perfil, lidos:c.lidos, sessao:c.sessao,
+               quando: isNaN(d) ? null : (mesmoDia?"hoje, ":
+                 ("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+", ")+hm };
+    });
+    pintaContasInv();
+  },
   // Os ajustes guardados chegam aqui quando o app abre.
   ajustes: function(a){
+    var liga=function(id,v,set){ if(v==null) return;
+      $(id).setAttribute("aria-pressed",String(!!v)); set(!!v); };
+    liga("chSom", a.som, function(v){ som=v; });
+    liga("chNot", a.notificacao, function(v){ notif=v; });
+    liga("chDireto", a.escreverDireto, function(v){ direto=v; pintaEscrita(); });
+    document.querySelectorAll(".segredo").forEach(function(cx){
+      pintaSegredo(cx, a[cx.dataset.segredo] === "guardada");
+    });
     if(a.emailPrefixo!=null) $("shPrefixo").value=a.emailPrefixo;
     if(a.emailPrefixoAlto!=null) $("shPrefixoAlto").value=a.emailPrefixoAlto;
     if(a.emailDominio!=null) $("shDominio").value=a.emailDominio;

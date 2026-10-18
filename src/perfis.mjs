@@ -95,6 +95,19 @@ export async function mapaDeContas({ forcar = false, aoLog = () => {} } = {}) {
   return cache;
 }
 
+/**
+ * As contas com mais de um perfil, SE a varredura já aconteceu nesta
+ * abertura. Não dispara a varredura: ela custa ~1 req/s por página de 100
+ * perfis. Sem varredura feita, a resposta honesta é "não sei" (null), não
+ * "nenhuma".
+ */
+export function duplicadasConhecidas() {
+  if (!cache) return null;
+  return [...(cache.duplicadas ?? new Map())].map(([conta, perfis]) => ({
+    conta, perfis: perfis.map((p) => p.serial ?? p.userId),
+  }));
+}
+
 /** Junta as contas-alvo da planilha com o perfil correspondente. */
 export async function resolverContas(alvos, { aoLog = () => {} } = {}) {
   const mapa = await mapaDeContas({ aoLog });

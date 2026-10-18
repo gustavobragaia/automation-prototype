@@ -36,8 +36,14 @@ app.whenReady().then(async () => {
     const p = (id, v) => { const e = document.getElementById(id);
       e.value = v; e.dispatchEvent(new Event("input", {bubbles:true}));
       e.dispatchEvent(new Event("change", {bubbles:true})); };
-    p("shSenha", "senha-que-eu-digitei");
-    p("shCodigo", "chave-que-eu-digitei");
+    // os segredos são salvos um a um, pelo botão Salvar do próprio campo
+    const segredo = (qual, v) => {
+      const cx = document.querySelector('.segredo[data-segredo="' + qual + '"]');
+      cx.querySelector("input").value = v;
+      cx.querySelector("[data-salvar]").click();
+    };
+    segredo("shopeeSenha", "senha-que-eu-digitei");
+    segredo("codigoChave", "chave-que-eu-digitei");
     p("shPrefixo", "minhaloja");
     p("shPrefixoAlto", "");
     p("shDominio", "meudominio.com");
@@ -47,6 +53,12 @@ app.whenReady().then(async () => {
   await new Promise((r) => setTimeout(r, 900));
 
   // a tela nunca pode ter o segredo de volta
+  const estadoSegredo = await w.webContents.executeJavaScript(`(() => {
+    const cx = document.querySelector('.segredo[data-segredo="shopeeSenha"]');
+    return { guardada: !cx.querySelector(".guardado").hidden &&
+                       /Guardada neste computador/.test(cx.querySelector(".guardado").innerText),
+             campoVazio: cx.querySelector("input").value === "" };
+  })()`);
   const naTela = await w.webContents.executeJavaScript(`(async () => {
     const r = await window.esteira.pedir("ajustes:ler", {});
     const a = r.dado && r.dado.dado ? r.dado.dado : r.dado;
@@ -57,6 +69,8 @@ app.whenReady().then(async () => {
   tudo &= ok(/minhaloja124@meudominio\.com/.test(digitado.exemplo),
     `a tela mostra o e-mail que será usado (${digitado.exemplo.trim()})`);
   tudo &= ok(naTela.senha === "guardada", "a senha NUNCA volta inteira para a tela");
+  tudo &= ok(estadoSegredo.guardada, "e o campo diz, com todas as letras, 'Guardada neste computador'");
+  tudo &= ok(estadoSegredo.campoVazio, "sem pontinhos falsos no lugar do valor");
   tudo &= ok(naTela.prefixo === "minhaloja", "mas o que não é segredo, sim");
 
   // ── fecha o app: a partir daqui, só o que está em disco vale ──

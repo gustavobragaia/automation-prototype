@@ -14,6 +14,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { carregar } from "./estado.mjs";
 import { emTrabalho } from "./caminhos.mjs";
+import { diaLocal } from "./datas.mjs";
 
 const COLUNAS = [
   { cab: "DATA", campo: "data", larg: 12 },
@@ -49,11 +50,7 @@ export function linhasDoEstado(estado = carregar(), { tudo = false } = {}) {
 // Data local, não toISOString: no Brasil o UTC joga o nome do arquivo para
 // o dia anterior durante a noite inteira, e o cliente abre "ontem" achando
 // que a rodada de hoje não saiu.
-function hojeLocal(d = new Date()) {
-  return d.getFullYear() + "-" +
-    String(d.getMonth() + 1).padStart(2, "0") + "-" +
-    String(d.getDate()).padStart(2, "0");
-}
+const hojeLocal = (d = new Date()) => diaLocal(d);
 
 /**
  * Escreve a planilha e devolve { arquivo, linhas }, ou null se não havia

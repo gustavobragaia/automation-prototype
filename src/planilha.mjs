@@ -9,6 +9,7 @@
 
 import ExcelJS from "exceljs";
 import { parseTracking, parseConta } from "./tracking.mjs";
+import { diaLocal } from "./datas.mjs";
 
 // Cabeçalhos aceitos por coluna. A planilha é editada por pessoas; o
 // cabeçalho muda de acento e de maiúscula com o tempo.
@@ -43,7 +44,9 @@ export function normalizarData(v) {
 function limiteDeDias(dias) {
   const d = new Date();
   d.setDate(d.getDate() - Number(dias));
-  return d.toISOString().slice(0, 10);
+  // dia local, como as datas da planilha — em UTC o corte andava um dia
+  // para a frente toda noite depois das 21h
+  return diaLocal(d);
 }
 
 const normaliza = (s) =>

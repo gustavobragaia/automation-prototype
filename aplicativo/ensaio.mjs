@@ -32,6 +32,9 @@ const { montarCenario, fingirShopify } = await import(`${raiz}/scripts/cenario-c
 const { planilha } = await montarCenario(dir);
 const escritas = fingirShopify({ pedidos: {
   "#1001": { nome: "Sônia Aparecida Pinto", valor: 88.30, cep: "80000000" },
+  // o destinatário que a Shopify devolve para o #1004 — é este nome que a
+  // pessoa tem que ver antes de colar um rastreio nele
+  "#1004": { nome: "Maria Aparecida Santos", valor: 13.00, cep: "13485020" },
 } });
 
 await import("./principal.mjs");
@@ -74,6 +77,30 @@ app.whenReady().then(async () => {
   const noDisco = (await import(`${raiz}/src/estado.mjs`))
     .pendentesAbertos().find((p) => p.pedido === "#1003");
 
+  // ── "Colei o rastreio" → "Conferir": tem que mostrar QUEM está na Shopify ──
+  await w.webContents.executeJavaScript(`(() => {
+    const it = document.querySelector('[data-pedido="#1004"]');
+    it.querySelector('.saidas button[data-saida="colar"]').click();
+    it.querySelector('.painelito input').value = "segue o rastreio BR261528918393K";
+    it.querySelector('[data-conferir]').click();
+  })()`);
+  await new Promise((r) => setTimeout(r, 1500));
+  const conferido = await w.webContents.executeJavaScript(`(() => {
+    const c = document.querySelector('[data-pedido="#1004"] .confere');
+    return c ? c.innerText : "";
+  })()`);
+  const escritasAntesDeConfirmar = escritas.length;
+
+  // ── "Escrever sem me perguntar" tem que sobreviver a fechar o app ──
+  await w.webContents.executeJavaScript(`document.getElementById("chDireto").click()`);
+  await new Promise((r) => setTimeout(r, 800));
+  const { readFileSync: lerArq } = await import("node:fs");
+  let direto = null;
+  try { direto = JSON.parse(lerArq(join(dir, "estado", "ajustes.json"), "utf8")).escreverDireto; } catch {}
+  // desliga de volta: a etapa 4 abaixo testa a aprovação manual
+  await w.webContents.executeJavaScript(`document.getElementById("chDireto").click()`);
+  await new Promise((r) => setTimeout(r, 500));
+
   // ── etapa 4: a lista do lote e o clique que escreve ──
   const lote = await w.webContents.executeJavaScript(`(async () => {
     const r = await window.esteira.pedir("escrita:listar", {});
@@ -103,6 +130,13 @@ app.whenReady().then(async () => {
     rodarLigado: /rodada:iniciar/.test(String(window.GANCHOS.rodar)),
     escreverLigado: /escrita:executar/.test(String(window.GANCHOS.escrever)),
     decidirLigado: /conferencia:decidir/.test(String(window.GANCHOS.decidir)),
+    conferirLigado: /manual:conferir/.test(String(window.GANCHOS.conferirColado)),
+    modeloLigado: /planilha:modelo/.test(String(window.GANCHOS.baixarModelo)),
+    exportarLigado: /historico:exportar/.test(String(window.GANCHOS.exportar)),
+    trocarLojaLigado: /shopify:desconectar/.test(String(window.GANCHOS.desconectarShopify)),
+    preferenciaLigada: /ajustes:salvar/.test(String(window.GANCHOS.guardarPreferencia)),
+    proximaLigada: /planilha:esquecer/.test(String(window.GANCHOS.proximaRodada)),
+    segredoLigado: /ajustes:salvar/.test(String(window.GANCHOS.salvarSegredo)),
     temCaminhoDoArquivo: typeof window.esteira.caminhoDoArquivo === "function",
   })`);
 
@@ -128,6 +162,19 @@ app.whenReady().then(async () => {
   tudo &= ok(ligacoes.rodarLigado, "'Iniciar coleta' chama a rodada de verdade");
   tudo &= ok(ligacoes.escreverLigado, "'Escrever na Shopify' chama a escrita de verdade");
   tudo &= ok(ligacoes.decidirLigado, "e as decisões da conferência vão para a ponte");
+  tudo &= ok(ligacoes.conferirLigado,
+    "'Conferir' pergunta à Shopify quem está no pedido, antes de deixar escrever");
+  tudo &= ok(ligacoes.modeloLigado, "'Baixar modelo' gera o arquivo de verdade");
+  tudo &= ok(ligacoes.exportarLigado, "exportar o histórico gera o arquivo de verdade");
+  tudo &= ok(ligacoes.trocarLojaLigado, "'Trocar de loja' desconecta de verdade, não só na tela");
+  tudo &= ok(ligacoes.preferenciaLigada, "som, notificação e escrita direta são guardados");
+  tudo &= ok(ligacoes.proximaLigada, "'Começar próxima rodada' limpa as planilhas no robô");
+  tudo &= ok(ligacoes.segredoLigado, "e as senhas e chaves são guardadas pelo robô");
+  tudo &= ok(/Na Shopify/.test(conferido) && /Maria Aparecida Santos/.test(conferido),
+    "'Conferir' mostra o destinatário que está NA SHOPIFY, não 'o cliente deste pedido'");
+  tudo &= ok(escritasAntesDeConfirmar === 0, "e conferir não escreve nada — só mostra");
+  tudo &= ok(direto === true,
+    "'escrever sem me perguntar' foi guardado em disco — sobrevive a fechar o app");
   tudo &= ok(lote.linhas === 1, `a etapa 4 listou 1 pedido (listou ${lote.linhas})`);
   tudo &= ok(/^Escrever (1|os \d+) na Shopify$/.test(lote.botao),
     `o botão diz quantos vão (diz "${lote.botao}")`);

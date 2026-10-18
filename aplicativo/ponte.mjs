@@ -15,7 +15,7 @@ import { lerPendentes } from "../src/planilha.mjs";
 import { escreverRastreios } from "../src/escrita.mjs";
 import { transportadoraDe } from "../src/shopify.mjs";
 import { guardarPendentes, baixarPendentes } from "../src/estado.mjs";
-import { pendentesAbertos, historico, adiarPendente, encerrarPendente,
+import { pendentesAbertos, historico, adiarPendente, encerrarPendente, motivosDaRodada,
          reabrirPendente } from "../src/estado.mjs";
 import { lerColetas, conciliar, MOTIVOS } from "../src/conciliar.mjs";
 import { lerDetalhe } from "../src/armazenamento/detalhe.mjs";
@@ -27,6 +27,16 @@ import { lerAjustes, salvarAjustes, aplicarNoAmbiente, SEGREDOS,
 import { aoEvento, emitir } from "../src/eventos.mjs";
 import { pedirParada } from "../src/fila.mjs";
 import net from "node:net";
+import { diaLocal } from "../src/datas.mjs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { montarDias } from "../src/historico-dias.mjs";
+import { contasVistas } from "../src/contas-vistas.mjs";
+import { duplicadasConhecidas } from "../src/perfis.mjs";
+import { emailDaConta } from "../src/tracking.mjs";
+import { lerRegistro } from "../src/escrita.mjs";
+import { emEstado } from "../src/caminhos.mjs";
+import { apagarConexao } from "../src/shopify-conexao.mjs";
+import { escreverModelo, exportarDias } from "../src/arquivos.mjs";
 
 /** Erro que atravessa a ponte vira dado, não exceção perdida. */
 const tentar = async (fn) => {
@@ -43,6 +53,21 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
   // sai daqui e não de PLANILHA no ambiente: quem instala o app não tem .env.
   let planilhas = [];
   let escritaEmCurso = false;
+
+  const ARQ_PERFIS = () => emEstado("perfis-da-rodada.json");
+  const guardarPerfis = (porConta) => {
+    try {
+      const o = {};
+      for (const [n, c] of porConta) o[n] = { serial: c.serial ?? null, userId: c.userId ?? null };
+      writeFileSync(ARQ_PERFIS(), JSON.stringify(o));
+    } catch { /* a aba Contas mostra "—" no perfil; a rodada não para por isto */ }
+  };
+  const lerPerfis = () => {
+    try {
+      return new Map(Object.entries(JSON.parse(readFileSync(ARQ_PERFIS(), "utf8")))
+        .map(([n, p]) => [Number(n), p]));
+    } catch { return new Map(); }
+  };
 
   const semSegredos = (a) => {
     const fora = { ...a };
@@ -110,11 +135,7 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
 
   // Data local: toISOString joga para ontem durante a noite inteira no Brasil,
   // e "deixar para amanhã" viraria "deixar para hoje".
-  const amanha = () => {
-    const d = new Date(); d.setDate(d.getDate() + 1);
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
-           "-" + String(d.getDate()).padStart(2, "0");
-  };
+  const amanha = () => { const d = new Date(); d.setDate(d.getDate() + 1); return diaLocal(d); };
 
   return {
     // ── ajustes que o cliente escolhe uma vez ─────────────────────────
@@ -226,6 +247,47 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
     }),
     "motivos:vocabulario": async () => MOTIVOS,
 
+    // ── as abas que eram inventadas ───────────────────────────────────
+    "historico:dias": async () => montarDias({
+      rodadas: historico(200),
+      escritas: lerRegistro(),
+      motivosDaRodada,
+    }),
+    "contas:listar": async () => ({
+      contas: contasVistas({
+        perfis: lerPerfis(),
+        // sem padrão configurado, o e-mail sai como "não sei", não como o
+        // da Chomps
+        email: (n) => emailDaConta(n),
+      }),
+      // O alerta de perfil repetido era FIXO na tela, falando de duas contas
+      // que não existiam. Agora só aparece se a varredura achou de verdade.
+      duplicadas: duplicadasConhecidas(),
+    }),
+    // Os pedidos que atravessaram de dias anteriores, para a etapa 1.
+    "pendentes:atrasados": async () => pendentesAbertos().map((p) => ({
+      pedido: p.pedido, nome: p.nome, conta: p.conta, dias: p.dias ?? 1,
+      motivo: p.motivo, grupo: p.grupo,
+    })),
+
+    // ── arquivos que a pessoa baixa ───────────────────────────────────
+    "planilha:modelo": ({ caminho }) => tentar(async () => {
+      if (!caminho) throw new Error("nenhum lugar escolhido para salvar");
+      await escreverModelo(caminho);
+      return { caminho };
+    }),
+    "historico:exportar": ({ caminho, desde, ate, formato = "xlsx" }) => tentar(async () => {
+      if (!caminho) throw new Error("nenhum lugar escolhido para salvar");
+      const dias = montarDias({ rodadas: historico(200), escritas: lerRegistro(), motivosDaRodada })
+        .filter((d) => (!desde || d.iso >= desde) && (!ate || d.iso <= ate));
+      const linhas = await exportarDias(dias, caminho, formato);
+      return { caminho, linhas };
+    }),
+
+    // Trocar de loja apaga a conexão de verdade. Antes só mudava a tela: o
+    // robô continuava escrevendo na loja antiga.
+    "shopify:desconectar": async () => { apagarConexao(); return true; },
+
     // Uma decisão da conferência, qualquer que seja. Porta única para a tela
     // não precisar saber qual ação do robô corresponde a cada botão, e para
     // toda decisão passar pelo mesmo lugar.
@@ -290,6 +352,9 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
         for (const c of await descobrirContas([],
                { aoLog, planilha, ignorarRecorte: true, aba: abaDe(planilha) }))
           if (!porConta.has(c.conta)) porConta.set(c.conta, c);
+      // A aba Contas mostra o perfil de cada conta; o mapa custa uma
+      // varredura de 972 perfis, então guarda o que esta rodada resolveu.
+      guardarPerfis(porConta);
       return [...porConta.values()];
     }),
     "rodada:emCurso": async () => Boolean(rodadaEmCurso),

@@ -334,13 +334,69 @@ process.env.AJUSTES_ARQUIVO = join(dir, "ajustes-cheios.json");
 const { salvarAjustes: salvar19 } = await import("../src/ajustes.mjs?19");
 salvar19({ shopeeSenha: "x", codigoChave: "y",
            emailPrefixo: "loja", emailDominio: "ex.com" });
+// Numa porta que ninguém usa: a 3000 pode ter o Esteira do dia a dia
+// aberto, e aí o teste passaria sem nunca exercitar a recusa.
+const ponteSemColetor = construir({ aoLog: () => {}, porta: 39777 });
 let semColetor = null;
 try {
-  await chamar("rodada:iniciar", { contas: [{ conta: 124, serial: 1 }] });
+  const r = await ponteSemColetor["rodada:iniciar"]({ contas: [{ conta: 124, serial: 1 }] });
+  if (r?.ok === false) throw new Error(r.erro);
 } catch (e) { semColetor = e.message; }
 tudo &= ok(!!semColetor, "a rodada foi recusada");
 tudo &= ok(/coletor/.test(semColetor ?? ""), `e diz que é o coletor (${semColetor})`);
 tudo &= ok(/127\.0\.0\.1/.test(semColetor ?? ""), "dizendo em qual porta ele deveria estar");
+
+/* ───────── 20. as abas que eram inventadas, com dado de verdade ───────── */
+sec("20 · Histórico, Contas e 'vindos de ontem' saem do que aconteceu");
+const dias20 = await chamar("historico:dias");
+tudo &= ok(Array.isArray(dias20), "o histórico vem do robô");
+const comEscrita = dias20.find((d) => d.escritos > 0);
+tudo &= ok(!!comEscrita, "e tem o dia em que este teste escreveu na Shopify");
+tudo &= ok(comEscrita?.pedidos.some((p) => p.p === "#1001" && p.s === "escrito"),
+  "com o #1001 marcado como escrito — o que aconteceu de fato");
+
+const contas20 = await chamar("contas:listar");
+tudo &= ok(Array.isArray(contas20.contas), "as contas vêm do robô");
+tudo &= ok(contas20.contas.some((c) => c.n === 124 && c.lidos === 2),
+  `a 124 aparece com os 2 pedidos que o coletor gravou`);
+tudo &= ok(contas20.contas.every((c) => c.email === null || /@/.test(c.email)),
+  "o e-mail sai montado pelo robô, ou vazio — nunca o da Chomps escrito na tela");
+
+const atr20 = await chamar("pendentes:atrasados");
+tudo &= ok(Array.isArray(atr20) && atr20.every((p) => p.pedido),
+  `os 'vindos de dias anteriores' vêm da carteira (${atr20.length})`);
+
+sec("21 · os arquivos que a pessoa baixa existem e abrem");
+const { existsSync: existe21, readFileSync: ler21 } = await import("node:fs");
+const modelo21 = join(dir, "modelo.xlsx");
+await chamar("planilha:modelo", { caminho: modelo21 });
+tudo &= ok(existe21(modelo21), "'Baixar modelo' cria o arquivo");
+const { lerPendentes: ler21p } = await import("../src/planilha.mjs");
+const lido21 = await ler21p(modelo21);
+tudo &= ok(lido21.aba === "PEDIDOS" && lido21.total === 1,
+  "e o PRÓPRIO robô consegue ler o modelo que gerou");
+
+const xlsx21 = join(dir, "export.xlsx"), csv21 = join(dir, "export.csv");
+const ex21 = await chamar("historico:exportar", { caminho: xlsx21, formato: "xlsx" });
+tudo &= ok(existe21(xlsx21) && ex21.linhas >= 1, `exportar em planilha funciona (${ex21.linhas} linhas)`);
+await chamar("historico:exportar", { caminho: csv21, formato: "csv" });
+const csvTexto = ler21(csv21, "utf8");
+tudo &= ok(csvTexto.charCodeAt(0) === 0xFEFF, "o CSV tem BOM — o Excel em português abre com acento");
+tudo &= ok(csvTexto.split("\r\n")[0].includes(";"), "e separa por ponto-e-vírgula, como o Excel daqui espera");
+
+sec("22 · 'Trocar de loja' desconecta de verdade");
+const { writeFileSync: w22 } = await import("node:fs");
+w22(process.env.SHOPIFY_CONEXAO_ARQUIVO, JSON.stringify({
+  modo: "token-fixo", loja: "lojateste.myshopify.com", token: "x" }));
+await chamar("shopify:desconectar");
+// O que importa não é o arquivo existir ou não: é o TOKEN deixar de estar
+// em disco, e o robô parar de se achar conectado. (apagarConexao grava
+// "null" no lugar.)
+const conteudo22 = ler21(process.env.SHOPIFY_CONEXAO_ARQUIVO, "utf8");
+tudo &= ok(!/shpat|"token"/.test(conteudo22), "o token da loja não está mais em disco");
+const est22 = await chamar("shopify:estado");
+tudo &= ok(est22.conectada === false,
+  "e o robô se diz desconectado — não é só a tela que muda");
 
 rmSync(dir, { recursive: true, force: true });
 console.log(tudo ? "\n\x1b[32m\x1b[1m  o fluxo fecha de ponta a ponta\x1b[0m\n"

@@ -36,6 +36,13 @@ if (!app.isPackaged) {
     process.loadEnvFile(join(AQUI, "..", ".env"));
     console.log("[esteira] .env do projeto carregado (modo desenvolvimento)");
   } catch { /* não existe, e tudo bem */ }
+  // A conexão com a Shopify, no app, é SEMPRE a do botão "Conectar". Estas
+  // variáveis são do modo terminal, e deixá-las vivas fazia a loja do .env
+  // aparecer conectada em desenvolvimento — e "Trocar de loja" nunca
+  // funcionar, porque apagar a conexão devolvia a do .env na hora. O app em
+  // desenvolvimento tem que se comportar igual ao que o cliente instala.
+  for (const v of ["SHOPIFY_LOJA", "SHOPIFY_TOKEN", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"])
+    delete process.env[v];
 }
 
 // Onde guardar o que precisa sobreviver a fechar o app: carteira, mapeamento,
@@ -176,6 +183,20 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle("logs", async () => logs.slice(-300));
+
+  // Onde salvar um arquivo que a pessoa vai baixar. O diálogo mora aqui: a
+  // tela nunca vê o disco, só recebe o caminho escolhido — ou null, se a
+  // pessoa desistiu.
+  ipcMain.handle("salvar-como", async (_e, { nome, tipo } = {}) => {
+    const filtros = tipo === "csv"
+      ? [{ name: "CSV", extensions: ["csv"] }]
+      : [{ name: "Planilha", extensions: ["xlsx"] }];
+    const r = await dialog.showSaveDialog(janela, {
+      defaultPath: join(app.getPath("downloads"), String(nome ?? "esteira.xlsx")),
+      filters: filtros,
+    });
+    return r.canceled ? null : r.filePath;
+  });
 
   ipcMain.handle("avisar", async (_e, { titulo, corpo }) => {
     if (!Notification.isSupported()) return false;

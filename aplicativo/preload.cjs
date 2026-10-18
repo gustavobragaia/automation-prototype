@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld("esteira", {
   logs: () => ipcRenderer.invoke("logs"),
   avisar: (titulo, corpo) => ipcRenderer.invoke("avisar", { titulo, corpo }),
   escolherPlanilha: () => ipcRenderer.invoke("escolher-planilha"),
+  /** Pergunta onde salvar. Devolve o caminho, ou null se a pessoa desistiu. */
+  salvarComo: (nome, tipo) => ipcRenderer.invoke("salvar-como", { nome, tipo }),
   /**
    * O caminho em disco de um arquivo que a pessoa arrastou para a janela.
    *

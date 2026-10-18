@@ -4,6 +4,7 @@
 
 import { abrir } from "./sqlite-db.mjs";
 import { detalheDoMotivo } from "./detalhe.mjs";
+import { diaLocal } from "../datas.mjs";
 
 let _db = null;
 export function db({ aoLog } = {}) {
@@ -201,7 +202,9 @@ export const nome = "sqlite";
 // ── pendentes ─────────────────────────────────────────────────────────────
 // O que atravessa o dia. Ver migracoes/003-pendentes.sql.
 
-const hojeISO = () => new Date().toISOString().slice(0, 10);
+// Dia LOCAL — ver src/datas.mjs. O adiadoAte é gravado em data local, e a
+// comparação em UTC fazia "deixar para amanhã" voltar às 21h de hoje.
+const hojeISO = () => diaLocal();
 
 export function guardarPendentes(pendencias, { em = new Date().toISOString() } = {}) {
   if (!pendencias?.length) return 0;
