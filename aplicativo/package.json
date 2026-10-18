@@ -9,7 +9,8 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "empacotar": "electron-builder"
+    "empacotar": "electron-builder",
+    "ensaio": "electron ensaio.mjs"
   },
   "devDependencies": {
     "electron": "^34.0.0",

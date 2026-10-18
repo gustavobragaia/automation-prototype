@@ -166,7 +166,12 @@ function rodada(){
   // e já emite por conta própria enquanto o cliente ainda está na etapa 1.
   window.esteira.aoEvento(function(e){
     if (e.tipo === "rodada:inicio") return TELA.rodada.montar(e.contas || []);
-    if (e.tipo === "rodada:fim") return TELA.rodada.terminar(e);
+    if (e.tipo === "rodada:fim") {
+      TELA.rodada.terminar(e);
+      // A conciliação já rodou junto com a coleta; agora a lista é real.
+      if (!e.erro) carregarConferencia();
+      return;
+    }
     var estado = ESTADO_DO_EVENTO[e.tipo];
     if (!estado) return;
     TELA.rodada.conta(e.conta, estado, e);
@@ -215,6 +220,29 @@ function paraleloEscolhido(){
   return b ? Number(b.dataset.n) : undefined;
 }
 
+/* ── A conferência ── */
+function conferencia(){
+  GANCHOS.decidir = async function(pedido, ordem){
+    return pedir("conferencia:decidir", {
+      pedido: pedido, decisao: ordem.decisao, texto: ordem.texto,
+      conta: ordem.conta, motivo: ordem.motivo, ate: ordem.ate,
+    });
+  };
+  GANCHOS.desfazer = async function(pedido){
+    return pedir("conferencia:desfazer", { pedido: pedido });
+  };
+}
+
+// Depois de uma rodada, a lista de quem precisa de você sai do robô.
+async function carregarConferencia(){
+  try {
+    TELA.conferencia(await pedir("conferencia:listar"));
+  } catch (e) {
+    console.error("[esteira] conferência:", e.message);
+    TELA.avisar("Não consegui montar a conferência", e.message);
+  }
+}
+
 /* ── Aviso pelo sistema operacional, não pelo navegador ── */
 function avisos(){
   var doNavegador = TELA.avisar;
@@ -223,7 +251,8 @@ function avisos(){
 
 (async function(){
   var partes = [["ajustes",ajustes],["máquina",maquina],["AdsPower",adspower],["Shopify",shopify],
-                ["planilha",planilha],["rodada",rodada],["avisos",avisos]];
+                ["planilha",planilha],["rodada",rodada],
+                ["conferência",conferencia],["avisos",avisos]];
   for (var i = 0; i < partes.length; i++) {
     try { await partes[i][1](); trocou.push(partes[i][0]); }
     catch (e) { falhou.push(partes[i][0] + ": " + e.message); }

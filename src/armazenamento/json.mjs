@@ -180,6 +180,24 @@ export function baixarPendentes(pedidos, { em = new Date().toISOString() } = {})
   return n;
 }
 
+/**
+ * Desfaz uma decisão da conferência: o pedido volta para a carteira de hoje.
+ *
+ * Só desfaz o que o robô consegue desfazer. Colar o rastreio criou um
+ * fulfillment na Shopify, e isso não se desfaz daqui — por isso quem escreve
+ * também marca `desfecho: "manual"`, e esse caso é recusado: um "Desfazer"
+ * que não desfaz nada do outro lado é pior que não ter botão nenhum.
+ */
+export function reabrirPendente(pedido) {
+  const atuais = ler(ARQ_PENDENTES, {});
+  const p = atuais[pedido];
+  if (!p) return false;
+  if (p.desfecho === "manual") return false;
+  p.baixadoEm = null; p.desfecho = null; p.desfechoNota = null; p.adiadoAte = null;
+  escrever(ARQ_PENDENTES, atuais);
+  return true;
+}
+
 /** Ver sqlite.mjs: as três saídas humanas de uma pendência. */
 export function encerrarPendente(pedido, { desfecho, nota = null, conta = null,
                                            em = new Date().toISOString() } = {}) {

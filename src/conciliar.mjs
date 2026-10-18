@@ -69,7 +69,10 @@ export function conciliarPedido(pedido, colhidos) {
       candidatos: iguais.length,
     };
 
-  return { estado: "ambiguo", achado: null, codigo: "", candidatos: iguais.length };
+  // `iguais` vai junto: sem a lista, a tela pede para a pessoa escolher
+  // entre dois pedidos sem conseguir mostrar quais são os dois.
+  return { estado: "ambiguo", achado: null, codigo: "",
+           candidatos: iguais.length, iguais };
 }
 
 /**
@@ -101,73 +104,90 @@ export function pedidoDividido(pedido, candidatos) {
  * O texto é escrito para o operador, não para quem programou: nada de código
  * de erro, e sempre com o que fazer.
  */
+// `rotulo` é o nome curto que aparece na tacha colorida da conferência.
+// Antes a tela mostrava o próprio código com os hífens trocados por espaço,
+// e saía "nao achado na conta" e "ambiguo" na cara do cliente.
 export const MOTIVOS = {
   "sem-rastreio-ainda": {
+    rotulo: "ainda sem rastreio",
     grupo: "sozinho",
     texto: "O pedido está na conta, mas a Shopee ainda não despachou.",
     acao: "Nada a fazer. Volta sozinho na próxima rodada.",
   },
   "nao-achado-na-conta": {
+    rotulo: "não achado na conta",
     grupo: "precisa",
     texto: "Nenhum pedido com esse cliente na conta indicada pela planilha.",
     acao: "Ou a compra foi feita em outra conta, ou a planilha aponta a conta errada.",
   },
   ambiguo: {
+    rotulo: "dois candidatos",
     grupo: "precisa",
     texto: "Mais de um pedido do mesmo cliente na conta, e o valor não desempatou.",
     acao: "Escolha qual é o pedido certo.",
   },
   "nome-nao-confere": {
+    rotulo: "nome não confere",
     grupo: "precisa",
     texto: "O número do pedido levou a um cliente diferente do que está na Shopee.",
     acao: "Costuma ser número digitado errado na planilha. Confira antes de escrever.",
   },
   "conta-nao-reconhecida": {
+    rotulo: "conta não existe",
     grupo: "precisa",
     texto: "A conta escrita na planilha não existe.",
     acao: "Corrija a linha na planilha e suba de novo.",
   },
   "conta-sem-perfil": {
+    rotulo: "conta sem perfil",
     grupo: "precisa",
     texto: "A conta não tem perfil vinculado no AdsPower.",
     acao: "Vincule o perfil na tela de Contas.",
   },
   "perfil-duplicado": {
+    rotulo: "perfil repetido",
     grupo: "precisa",
     texto: "Duas contas apontam para o mesmo perfil do AdsPower.",
     acao: "Os cookies de uma sobrescrevem os da outra. Separe os perfis antes de rodar.",
   },
   "sem-numero-de-pedido": {
+    rotulo: "sem número de pedido",
     grupo: "precisa",
     texto: "A linha tem rastreio, mas não tem número de pedido da Shopify.",
     acao: "Preencha a coluna NÚMERO DO PEDIDO e suba a planilha de novo.",
   },
   "nao-existe-na-loja": {
+    rotulo: "não existe na loja",
     grupo: "precisa",
     texto: "Esse número de pedido não existe na loja conectada.",
     acao: "Confira o número na planilha, ou se a loja conectada é a certa.",
   },
   "sem-fulfillment-order": {
+    rotulo: "sem entrega aberta",
     grupo: "precisa",
     texto: "O pedido existe mas não tem entrega aberta para receber o rastreio.",
     acao: "Costuma ser pedido já despachado ou cancelado na Shopify.",
   },
   "rastreio-nao-reconhecido": {
+    rotulo: "rastreio ilegível",
     grupo: "precisa",
     texto: "O texto encontrado na Shopee não tem a cara de um código de rastreio.",
     acao: "Confira na Shopee o que está no lugar do código.",
   },
   "rastreio-simulado": {
+    rotulo: "rastreio de teste",
     grupo: "precisa",
     texto: "O código veio marcado como simulado e foi recusado.",
     acao: "É proteção contra teste ligado por engano. Rode a coleta de novo.",
   },
   "falha-ao-escrever": {
+    rotulo: "a Shopify recusou",
     grupo: "precisa",
     texto: "A Shopify recusou a escrita.",
     acao: "Nada foi gravado. Tente de novo; se repetir, veja a mensagem da Shopify.",
   },
   "verificacao-humana": {
+    rotulo: "a Shopee pediu você",
     grupo: "precisa",
     texto: "A Shopee pediu confirmação de que é uma pessoa.",
     acao: "Abra o navegador dessa conta e passe a verificação.",
@@ -225,7 +245,14 @@ export function conciliar(contas, coletas) {
         // onde mais esse cliente aparece, para o caso de conta errada
         const onde = codigo === "nao-achado-na-conta"
           ? sugerirContas(p.nome, coletas, conta) : [];
-        linha.motivo = motivoDe(codigo, onde.length ? { sugestoes: onde } : {});
+        const extra = {};
+        if (onde.length) extra.sugestoes = onde;
+        // Os dois candidatos do empate, para a tela poder mostrá-los.
+        if (r.estado === "ambiguo" && r.iguais?.length)
+          extra.candidatos = r.iguais.map((c) => ({
+            codigos: c.codigos ?? [], valor: c.valor ?? null,
+            cep: c.cep ?? null, orderId: c.orderId ?? null }));
+        linha.motivo = motivoDe(codigo, extra);
       }
       linhas.push(linha);
     }

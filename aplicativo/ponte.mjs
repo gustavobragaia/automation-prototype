@@ -12,7 +12,8 @@ import { diagnosticar, apiAbertaSemChave } from "../src/adspower.mjs";
 import { conexaoAtiva, ESCOPOS } from "../src/shopify-conexao.mjs";
 import { identidadeDaLoja, escoposConcedidos } from "../src/shopify.mjs";
 import { lerPendentes } from "../src/planilha.mjs";
-import { pendentesAbertos, historico, adiarPendente, encerrarPendente } from "../src/estado.mjs";
+import { pendentesAbertos, historico, adiarPendente, encerrarPendente,
+         reabrirPendente } from "../src/estado.mjs";
 import { lerColetas, conciliar, MOTIVOS } from "../src/conciliar.mjs";
 import { rodarCiclo, descobrirContas } from "../src/ciclo.mjs";
 import { iniciarConexao, conexaoEmAndamento, cancelarConexao } from "../src/shopify-oauth.mjs";
@@ -35,6 +36,38 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
   // As planilhas que o cliente escolheu nesta sessão, na ordem. A rodada
   // sai daqui e não de PLANILHA no ambiente: quem instala o app não tem .env.
   let planilhas = [];
+
+  // A linha da conciliação é interna. A tela recebe só o que desenha — e os
+  // dois lados da comparação quando o motivo for divergência de nome, que é
+  // o único em que a pessoa precisa ver Shopee e Shopify um ao lado do outro.
+  const montarPendencia = (l) => ({
+    pedido: l.p.pedido, conta: l.conta, nome: l.p.nome, valor: l.p.valor ?? null,
+    dias: l.p.dias ?? 1,
+    motivo: { codigo: l.motivo.codigo, grupo: l.motivo.grupo,
+              rotulo: l.motivo.rotulo ?? l.motivo.codigo,
+              texto: l.motivo.texto, acao: l.motivo.acao },
+    // sugerirContas devolve { conta, pedido } — o rastreio está dentro do
+    // pedido. Sem ele a tela diz "esse cliente aparece na conta 128" e não
+    // mostra o código, que é metade do motivo de a sugestão existir.
+    sugestoes: (l.motivo.sugestoes ?? []).map((x) => ({
+      conta: x.conta, codigos: x.pedido?.codigos ?? [],
+      valor: x.pedido?.valor ?? null, cep: x.pedido?.cep ?? null })),
+    candidatos: l.estado === "ambiguo"
+      ? (l.motivo.candidatos ?? []).map((c) => ({
+          codigos: c.codigos ?? [], valor: c.valor ?? null, cep: c.cep ?? null }))
+      : [],
+    lados: l.motivo.codigo === "nome-nao-confere"
+      ? { shopee: l.motivo.shopee ?? null, shopify: l.motivo.shopify ?? null }
+      : null,
+  });
+
+  // Data local: toISOString joga para ontem durante a noite inteira no Brasil,
+  // e "deixar para amanhã" viraria "deixar para hoje".
+  const amanha = () => {
+    const d = new Date(); d.setDate(d.getDate() + 1);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+           "-" + String(d.getDate()).padStart(2, "0");
+  };
 
   return {
     // ── ajustes que o cliente escolhe uma vez ─────────────────────────
@@ -99,18 +132,87 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
     "pendentes:encerrar": async (opts) => encerrarPendente(opts.pedido, opts),
 
     // ── conciliação, sem tocar na Shopify ─────────────────────────────
-    "conferencia:listar": ({ caminho, aba }) => tentar(async () => {
-      const r = await lerPendentes(caminho, { aba });
-      const { linhas, resumo } = conciliar(r.contas, lerColetas());
+    "conferencia:listar": ({ caminho, aba } = {}) => tentar(async () => {
+      // Sem caminho, vale o que o cliente escolheu na etapa 1 — o mesmo
+      // conjunto que a rodada abriu. Pedir o arquivo de novo aqui faria a
+      // conferência olhar uma planilha e a rodada, outra.
+      const fontes = caminho ? [caminho] : planilhas;
+      if (!fontes.length) throw new Error("nenhuma planilha escolhida ainda");
+
+      const contas = [];
+      for (const f of fontes) contas.push(...(await lerPendentes(f, { aba })).contas);
+      const { linhas, resumo } = conciliar(contas, lerColetas());
+
+      // A conciliação relê a planilha, que não sabe das decisões de hoje.
+      // Sem este filtro, um pedido resolvido à mão reapareceria na lista um
+      // segundo depois, como se nada tivesse acontecido.
+      const abertos = new Map(pendentesAbertos().map((p) => [p.pedido, p]));
+      // Some da lista quem já foi tratado hoje. São três casos:
+      //   · fora da carteira  -> resolvido ou adiado
+      //   · conta trocada     -> a pessoa já decidiu; volta na próxima
+      //                          RODADA, na conta nova, não aqui agora
+      // Sem o segundo caso, corrigir a conta deixa o item na tela com o
+      // mesmo motivo de antes, e a pessoa decide duas vezes a mesma coisa.
+      const naCarteira = (l) => {
+        const p = abertos.get(l.p.pedido);
+        return Boolean(p) && Number(p.conta) === Number(l.conta);
+      };
+
       return {
         resumo,
-        pendencias: linhas.filter((l) => l.motivo).map((l) => ({
-          pedido: l.p.pedido, conta: l.conta, nome: l.p.nome, valor: l.p.valor,
-          motivo: l.motivo, dias: 1,
-        })),
+        pendencias: linhas.filter((l) => l.motivo?.grupo === "precisa")
+                          .filter(naCarteira).map(montarPendencia),
+        sozinhos: linhas.filter((l) => l.motivo?.grupo === "sozinho")
+                        .filter(naCarteira).map(montarPendencia),
       };
     }),
     "motivos:vocabulario": async () => MOTIVOS,
+
+    // Uma decisão da conferência, qualquer que seja. Porta única para a tela
+    // não precisar saber qual ação do robô corresponde a cada botão, e para
+    // toda decisão passar pelo mesmo lugar.
+    //
+    // `reversivel` diz se o "Desfazer" da tela pode existir: colar o
+    // rastreio criou um fulfillment na Shopify, e isso não se desfaz daqui.
+    "conferencia:decidir": ({ pedido, decisao, texto, conta, motivo, ate }) => tentar(async () => {
+      if (!pedido) throw new Error("sem número de pedido");
+      switch (decisao) {
+        case "colar": {
+          // O olho humano já aconteceu: `manual:conferir` mostrou o lado da
+          // Shopify e a pessoa clicou em escrever.
+          const r = await resolverManual(pedido, texto, { confirmado: true });
+          if (!r.ok) throw new Error(r.erro ?? "não deu para escrever");
+          return { reversivel: false, volta: false, escrito: r.escrito };
+        }
+        case "conta": {
+          const n = Number(conta);
+          if (!Number.isInteger(n) || n <= 0) throw new Error("número de conta inválido");
+          if (!encerrarPendente(pedido, { desfecho: "conta", conta: n,
+                nota: `conta corrigida à mão para ${n}` }))
+            throw new Error("esse pedido não está na carteira");
+          return { reversivel: true, volta: true, conta: n };
+        }
+        case "encerrar": {
+          if (!encerrarPendente(pedido, { desfecho: motivo ?? "encerrado", nota: texto ?? null }))
+            throw new Error("esse pedido já saiu da carteira");
+          return { reversivel: true, volta: false };
+        }
+        case "adiar": {
+          const quando = ate ?? amanha();
+          if (!adiarPendente(pedido, quando))
+            throw new Error("esse pedido não está na carteira");
+          return { reversivel: true, volta: true, ate: quando };
+        }
+        default:
+          throw new Error(`decisão desconhecida: ${decisao}`);
+      }
+    }),
+
+    // Desfazer o que dá para desfazer: devolve o pedido à carteira de hoje.
+    "conferencia:desfazer": ({ pedido }) => tentar(async () => {
+      if (!reabrirPendente(pedido)) throw new Error("esse pedido não dá mais para desfazer");
+      return true;
+    }),
 
     // ── a rodada ──────────────────────────────────────────────────────
     "planilha:esquecer": async ({ caminho }) => {

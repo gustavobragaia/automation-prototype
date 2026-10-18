@@ -937,6 +937,8 @@ var GANCHOS = window.GANCHOS = {
   },
   cancelarShopify: function(){},
   esquecerPlanilha: function(){},
+  decidir: function(){ return Promise.resolve({reversivel:true}); },
+  desfazer: function(){ return Promise.resolve(true); },
   testarAds: function(){},                                // redefinido mais abaixo
 };
 var rapido=matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1239,6 +1241,71 @@ GANCHOS.rodar=function(){
 /* ── Etapa 3 ── */
 function pendencias(){ return document.querySelectorAll("#cxPrecisa .item[data-rev]").length; }
 
+function esc(t){ return String(t==null?"":t)
+  .replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+function dinheiro(v){ return v==null?"—":"R$ "+Number(v).toFixed(2).replace(".",","); }
+
+// Um item da conferência, desenhado a partir do que o robô mandou.
+// Cada pedaço só aparece quando há dado para ele: sugestão de outra conta,
+// os dois candidatos do empate, os dois lados quando o nome diverge.
+function itemDaConferencia(x){
+  var m=x.motivo||{}, grave=/nao-achado|nao-existe|nome-nao-confere/.test(m.codigo||"");
+  var el=document.createElement("div");
+  el.className="item"; el.setAttribute("data-rev","");
+  el.dataset.pedido=x.pedido; el.dataset.motivo=m.codigo||"";
+
+  var cab='<div class="item-cab">'+
+    '<span class="est '+(grave?"er":"at")+'"><span class="pt"></span>'+
+      esc(m.rotulo||(m.codigo||"").replace(/-/g," "))+'</span>'+
+    '<span class="t mono">'+esc(x.pedido)+'</span>'+
+    '<span class="ter" style="font-size:12.5px">conta '+esc(x.conta)+
+      (x.nome?" · "+esc(x.nome):"")+'</span>'+
+    (x.dias>1?'<span class="dias'+(x.dias>=5?" velho":"")+'">pena há '+x.dias+' dias</span>':"")+
+    '</div>';
+
+  var corpo='<p class="motivo"><b>'+esc(m.texto)+'</b> '+esc(m.acao)+'</p>';
+
+  // Outra conta onde esse cliente aparece, já com o rastreio de lá.
+  (x.sugestoes||[]).forEach(function(s){
+    corpo+='<div class="esperando" style="margin-top:11px">'+
+      '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>'+
+      '<span class="texto">Esse cliente aparece na <b>conta '+esc(s.conta)+'</b>'+
+      (s.codigos&&s.codigos.length?', com rastreio <span class="mono">'+
+        esc(s.codigos.join(" · "))+'</span>':"")+'.</span>'+
+      '<button class="btn pri" data-usar-conta="'+esc(s.conta)+'">Usar essa conta</button></div>';
+  });
+
+  // Os dois lados, quando o nome não confere.
+  if(x.lados&&(x.lados.shopee||x.lados.shopify)){
+    corpo+='<div class="lado">'+
+      caixinha("Na Shopee · conta "+esc(x.conta), x.lados.shopee)+
+      caixinha("Na Shopify · "+esc(x.pedido), x.lados.shopify)+'</div>';
+  }
+
+  // Os candidatos do empate, para dar para escolher.
+  if((x.candidatos||[]).length){
+    corpo+='<div class="cands">'+x.candidatos.map(function(c){
+      return '<div class="cand"><span class="mono">'+esc((c.codigos||[]).join(" · "))+
+        '</span><span class="ter">'+dinheiro(c.valor)+
+        (c.cep?' · CEP '+esc(c.cep):"")+'</span>'+
+        '<button class="btn" data-usar-codigo="'+esc((c.codigos||[]).join(" "))+
+        '">Usar este</button></div>';
+    }).join("")+'</div>';
+  }
+
+  el.innerHTML=cab+corpo;
+  return el;
+}
+function caixinha(titulo, lado){
+  if(!lado) return "";
+  return '<div class="caixinha"><h4>'+titulo+'</h4><dl>'+
+    (lado.nome!=null?'<div class="par"><dt>Cliente</dt><dd class="difere">'+esc(lado.nome)+'</dd></div>':"")+
+    (lado.cep!=null?'<div class="par"><dt>CEP</dt><dd class="mono">'+esc(lado.cep)+'</dd></div>':"")+
+    (lado.valor!=null?'<div class="par"><dt>Valor</dt><dd class="num">'+dinheiro(lado.valor)+'</dd></div>':"")+
+    (lado.codigos?'<div class="par"><dt>Rastreio</dt><dd class="mono">'+esc([].concat(lado.codigos).join(" · "))+'</dd></div>':"")+
+    '</dl></div>';
+}
+
 var SAIDAS=[["colar","Colei o rastreio"],["conta","Era outra conta"],
             ["encerrar","Não vai ter rastreio"],["adiar","Deixar para amanhã"]];
 var FIM=[["cancelado","Pedido cancelado"],["reembolsado","Reembolsado"],
@@ -1300,11 +1367,35 @@ function erroNoPainel(p,msg){
 var TRATADOS=[];
 function agora(){var d=new Date();
   return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);}
-function resolver(it,decisao){
-  TRATADOS.unshift({titulo:(it.querySelector(".item-cab .t")||{}).textContent||"—",
-    decisao:decisao, hora:agora(), html:it.outerHTML});
-  it.classList.add("sumindo");
-  setTimeout(function(){ it.remove(); pintaRevisao(); }, rapido?0:200);
+// Toda decisão da conferência passa por aqui — e só sai da tela depois que
+// o robô confirmou que gravou. Sumir antes e falhar depois seria o pior dos
+// mundos: a pessoa acha que resolveu e o pedido volta amanhã.
+function resolver(it,rotulo,ordem){
+  var pedido=it.dataset.pedido||(it.querySelector(".item-cab .t")||{}).textContent||"—";
+  travar(it,true);
+  Promise.resolve(GANCHOS.decidir(pedido,ordem||{decisao:"encerrar"}))
+    .then(function(r){
+      TRATADOS.unshift({titulo:pedido, decisao:rotulo, hora:agora(),
+        html:it.outerHTML, reversivel:!r||r.reversivel!==false});
+      it.classList.add("sumindo");
+      setTimeout(function(){ it.remove(); pintaRevisao(); }, rapido?0:200);
+    })
+    .catch(function(e){
+      travar(it,false);
+      erroNoItem(it,e&&e.message?e.message:"não deu para gravar essa decisão");
+    });
+}
+function travar(it,sim){
+  Array.prototype.forEach.call(it.querySelectorAll("button"),function(b){
+    if(sim){ if(!b.disabled) b.dataset.travado="1"; b.disabled=true; }
+    else if(b.dataset.travado){ b.disabled=false; delete b.dataset.travado; }
+  });
+  it.style.opacity=sim?".55":"";
+}
+function erroNoItem(it,msg){
+  var e=it.querySelector(".erro-item");
+  if(!e){ e=document.createElement("p"); e.className="erro-item erro"; it.appendChild(e); }
+  e.textContent=msg; aproximar(e);
 }
 function pintaTratados(){
   var n=TRATADOS.length;
@@ -1317,7 +1408,14 @@ function pintaTratados(){
     return '<div class="trat"><span class="est ok"><span class="pt"></span>tratado</span>'+
       '<span class="forte mono">'+t.titulo+'</span><span class="sec">'+t.decisao+'</span>'+
       '<span class="hr">'+t.hora+'</span>'+
-      '<button class="btn peq" data-desfazer="'+i+'">Desfazer</button></div>';
+      // Colar o rastreio criou um fulfillment na Shopify, e isso não se
+      // desfaz daqui. Um botão que não desfaz nada do outro lado é pior
+      // que não ter botão: a pessoa clica e segue achando que voltou.
+      (t.reversivel
+        ? '<button class="btn peq" data-desfazer="'+i+'">Desfazer</button>'
+        : '<span class="ter" style="font-size:11.5px" '+
+          'title="Já foi escrito na Shopify">não dá para desfazer</span>')+
+      '</div>';
   }).join("");
 }
 $("bRecTrat").onclick=function(){
@@ -1328,10 +1426,25 @@ $("bRecTrat").onclick=function(){
 };
 $("listaTratados").addEventListener("click",function(e){
   var b=e.target.closest("[data-desfazer]"); if(!b) return;
-  var t=TRATADOS.splice(Number(b.dataset.desfazer),1)[0];
-  var d=document.createElement("div"); d.innerHTML=t.html;
-  $("cxPrecisa").appendChild(d.firstElementChild);
-  pintaRevisao();
+  var i=Number(b.dataset.desfazer), t=TRATADOS[i];
+  if(!t||!t.reversivel) return;
+  b.disabled=true; b.textContent="Desfazendo…";
+  // Só volta para a lista depois que o robô confirmou. Devolver na tela e
+  // falhar no disco deixaria os dois lados discordando em silêncio.
+  Promise.resolve(GANCHOS.desfazer(t.titulo)).then(function(){
+    TRATADOS.splice(i,1);
+    var d=document.createElement("div"); d.innerHTML=t.html;
+    var el=d.firstElementChild;
+    el.style.opacity=""; el.classList.remove("sumindo");
+    Array.prototype.forEach.call(el.querySelectorAll("button"),function(x){
+      x.disabled=false; delete x.dataset.travado; });
+    var err=el.querySelector(".erro-item"); if(err) err.remove();
+    $("cxPrecisa").appendChild(el);
+    pintaRevisao();
+  }).catch(function(e){
+    b.disabled=false; b.textContent="Desfazer";
+    avisar("Não deu para desfazer", e&&e.message?e.message:"");
+  });
 });
 
 var CANDIDATOS=[
@@ -1346,7 +1459,7 @@ $("cxPrecisa").addEventListener("click",function(e){
     if(saida.dataset.saida==="adiar"){
       var am=new Date(); am.setDate(am.getDate()+1);
       return resolver(it,"volta sozinho em "+("0"+am.getDate()).slice(-2)+"/"+
-        ("0"+(am.getMonth()+1)).slice(-2));
+        ("0"+(am.getMonth()+1)).slice(-2), {decisao:"adiar"});
     }
     return abrirPainel(it,saida.dataset.saida,saida);
   }
@@ -1373,19 +1486,29 @@ $("cxPrecisa").addEventListener("click",function(e){
   }
   if(e.target.closest("[data-cancelar]")) return fecharPaineis(it);
 
-  var esc=e.target.closest("[data-escrever]");
-  if(esc) return resolver(it,"rastreio "+esc.dataset.escrever.split(",").join(" · ")+" escrito na mão");
+  var escB=e.target.closest("[data-escrever]");
+  if(escB) return resolver(it,"rastreio "+escB.dataset.escrever.split(",").join(" · ")+
+    " escrito na mão", {decisao:"colar", texto:escB.dataset.escrever.split(",").join(" ")});
 
   var mov=e.target.closest("[data-mover]");
   if(mov){
     var pc=mov.closest(".painelito"), n=Number(pc.querySelector("input").value);
     if(!Number.isFinite(n)||n<=0) return erroNoPainel(pc,"Digite o número da conta, só os dígitos.");
-    return resolver(it,"passou a procurar na conta "+n);
+    return resolver(it,"passou a procurar na conta "+n,{decisao:"conta",conta:n});
   }
 
   var fim=e.target.closest("[data-fim]");
   if(fim) return resolver(it,{cancelado:"encerrado: pedido cancelado",
-    reembolsado:"encerrado: reembolsado","nao-comprado":"encerrado: nunca foi comprado"}[fim.dataset.fim]);
+    reembolsado:"encerrado: reembolsado","nao-comprado":"encerrado: nunca foi comprado"}[fim.dataset.fim],
+    {decisao:"encerrar", motivo:fim.dataset.fim});
+
+  var usarConta=e.target.closest("[data-usar-conta]");
+  if(usarConta) return resolver(it,"passou a usar a conta "+usarConta.dataset.usarConta,
+    {decisao:"conta", conta:Number(usarConta.dataset.usarConta)});
+
+  var usarCod=e.target.closest("[data-usar-codigo]");
+  if(usarCod) return resolver(it,"escolhido o rastreio "+usarCod.dataset.usarCodigo,
+    {decisao:"colar", texto:usarCod.dataset.usarCodigo});
 
   var b=e.target.closest(".btn[data-acao], .cand .btn, .esperando .btn");
   if(!b) return;
@@ -1822,6 +1945,24 @@ window.TELA = {
   },
   planilha: somar,
   avisar: avisar,
+
+  // ── a conferência de verdade ──
+  // Os itens que estavam escritos no HTML viram dados. A tela desenha o que
+  // o robô mandou e devolve a decisão pelo gancho; ela não sabe o que cada
+  // botão faz do outro lado, e não deve saber.
+  conferencia: function(dados){
+    var itens = (dados && dados.pendencias) || [];
+    SOZINHO = ((dados && dados.sozinhos) || []).map(function(x){
+      return { p:x.pedido, c:x.nome, ct:x.conta, h:"—",
+               s:(x.motivo&&x.motivo.codigo==="sem-rastreio-ainda")
+                 ?"a Shopee ainda não despachou":"aguardando", d:x.dias||1 };
+    });
+    var cx=$("cxPrecisa");
+    Array.prototype.forEach.call(cx.querySelectorAll(".item[data-rev]"),
+      function(i){ i.remove(); });
+    itens.forEach(function(x){ cx.appendChild(itemDaConferencia(x)); });
+    pintaRevisao();
+  },
 
   // ── a rodada de verdade ──
   // Quem manda na tabela passa a ser o robô. A tela só desenha o que chega.

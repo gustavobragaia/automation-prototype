@@ -264,6 +264,22 @@ export function baixarPendentes(pedidos, { em = new Date().toISOString() } = {})
 }
 
 /**
+ * Desfaz uma decisão da conferência: o pedido volta para a carteira de hoje.
+ *
+ * Só desfaz o que o robô consegue desfazer. Colar o rastreio criou um
+ * fulfillment na Shopify, e isso não se desfaz daqui — por isso o desfecho
+ * "manual" é recusado: um "Desfazer" que não desfaz nada do outro lado é
+ * pior que não ter botão nenhum.
+ */
+export function reabrirPendente(pedido) {
+  return db().prepare(`UPDATE pendentes SET baixado_em = NULL, desfecho = NULL,
+                       desfecho_nota = NULL, adiado_ate = NULL
+                       WHERE pedido_shopify = @pedido
+                         AND (desfecho IS NULL OR desfecho <> 'manual')`)
+    .run({ pedido }).changes > 0;
+}
+
+/**
  * As três saídas humanas de uma pendência.
  *   "manual"    o operador tinha o código e colou
  *   "conta"     era outra conta: volta na próxima rodada, com a certa
