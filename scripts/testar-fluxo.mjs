@@ -274,6 +274,38 @@ tudo &= ok(sobrou?.motivo === "nome-nao-confere", "o motivo ficou guardado");
 tudo &= ok(sobrou?.det?.shopify === "Outra Pessoa Entrega",
   "e o detalhe que explica o motivo também — sem ele a tela não ajuda a decidir");
 
+/* ───────── 17. o ambiente não manda na planilha escolhida ───────── */
+sec("17 · a planilha que a pessoa escolheu vence o ambiente");
+// No app, o .env do projeto é carregado em desenvolvimento. Ele traz o
+// PLANILHA_ABA da planilha ANTIGA, e isso procurava uma aba que não existe
+// no arquivo novo: a rodada morria com "aba não encontrada" logo depois de
+// a etapa 1 mostrar os números certos.
+process.env.PLANILHA_ABA = "Página1";          // a aba do OUTRO arquivo
+process.env.PLANILHA = "/nao/existe.xlsx";
+await chamar("planilha:esquecer", {});
+const lida17 = await chamar("planilha:ler", { caminho: planilha });
+tudo &= ok(lida17.aba === "PEDIDOS", `a etapa 1 lê a aba do arquivo (${lida17.aba})`);
+
+let contas17 = null, erro17 = null;
+try { contas17 = await chamar("rodada:contas"); } catch (e) { erro17 = e.message; }
+tudo &= ok(!erro17, `e a rodada também, sem "aba não encontrada" (${erro17 ?? "sem erro"})`);
+tudo &= ok(contas17?.length === 2, `achou as 2 contas (achou ${contas17?.length})`);
+// E a camada de baixo também: quem chama descobrirContas com um arquivo
+// explícito não pode receber a aba do ambiente por tabela. Sem esta linha,
+// a ponte podia estar consertada e o ciclo continuar quebrado para quem o
+// chama direto — e foi por ali que a rodada morreu.
+const { descobrirContas: descobrir } = await import("../src/ciclo.mjs");
+let erroDireto = null, contasDireto = null;
+try {
+  contasDireto = await descobrir([], { planilha, ignorarRecorte: true });
+} catch (e) { erroDireto = e.message; }
+tudo &= ok(!erroDireto,
+  `chamando o ciclo direto, sem dizer a aba, também passa (${erroDireto ?? "sem erro"})`);
+tudo &= ok(contasDireto?.length === 2, `e acha as 2 contas (achou ${contasDireto?.length})`);
+
+delete process.env.PLANILHA_ABA;
+delete process.env.PLANILHA;
+
 rmSync(dir, { recursive: true, force: true });
 console.log(tudo ? "\n\x1b[32m\x1b[1m  o fluxo fecha de ponta a ponta\x1b[0m\n"
                  : "\n\x1b[31m\x1b[1m  o fluxo tem furo\x1b[0m\n");

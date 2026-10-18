@@ -41,6 +41,11 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
   // sai daqui e não de PLANILHA no ambiente: quem instala o app não tem .env.
   let planilhas = [];
   let escritaEmCurso = false;
+  // A aba que cada planilha usa de fato, descoberta ao lê-la. Guardar é o
+  // que impede a rodada de procurar a aba de OUTRO arquivo — foi assim que
+  // o .env do projeto derrubou uma rodada com "aba não encontrada".
+  const abas = new Map();
+  const abaDe = (caminho) => abas.get(caminho);
 
   // A etapa 4 olha o mesmo material da rodada: as planilhas que o cliente
   // escolheu, cruzadas com o que o coletor trouxe. Ler de outro lugar faria
@@ -48,7 +53,7 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
   const contasEColetas = async () => {
     if (!planilhas.length) throw new Error("nenhuma planilha escolhida ainda");
     const contas = [];
-    for (const f of planilhas) contas.push(...(await lerPendentes(f)).contas);
+    for (const f of planilhas) contas.push(...(await lerPendentes(f, { aba: abaDe(f) })).contas);
     return { contas, coletas: lerColetas() };
   };
 
@@ -138,6 +143,7 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
     "planilha:ler": ({ caminho, aba }) => tentar(async () => {
       const r = await lerPendentes(caminho, { aba });
       if (!planilhas.includes(caminho)) planilhas.push(caminho);
+      abas.set(caminho, r.aba);
       return {
         aba: r.aba, total: r.total, pendentes: r.pendentes.length,
         contas: r.contas.map((c) => ({ conta: c.conta, pedidos: c.pedidos.length })),
@@ -157,7 +163,7 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
       if (!fontes.length) throw new Error("nenhuma planilha escolhida ainda");
 
       const contas = [];
-      for (const f of fontes) contas.push(...(await lerPendentes(f, { aba })).contas);
+      for (const f of fontes) contas.push(...(await lerPendentes(f, { aba: aba ?? abaDe(f) })).contas);
       const { linhas, resumo } = conciliar(contas, lerColetas());
 
       // Quem manda na lista é a CARTEIRA, não a conciliação.
@@ -255,7 +261,8 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
       // mesma rodada é o caminho mais curto para a Shopee pedir verificação.
       const porConta = new Map();
       for (const planilha of planilhas)
-        for (const c of await descobrirContas([], { aoLog, planilha, ignorarRecorte: true }))
+        for (const c of await descobrirContas([],
+               { aoLog, planilha, ignorarRecorte: true, aba: abaDe(planilha) }))
           if (!porConta.has(c.conta)) porConta.set(c.conta, c);
       return [...porConta.values()];
     }),
@@ -269,7 +276,9 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
     "rodada:iniciar": ({ contas, escrever = false, concorrencia }) => tentar(async () => {
       if (rodadaEmCurso) throw new Error("já existe uma rodada em andamento");
       if (concorrencia) process.env.CONCORRENCIA = String(concorrencia);
-      rodadaEmCurso = rodarCiclo({ contas, escrever, aoLog })
+      // As planilhas que a pessoa escolheu vão junto: sem isto a rodada
+      // relê o PLANILHA do ambiente, que no app é o .env do projeto.
+      rodadaEmCurso = rodarCiclo({ contas, escrever, planilhas, aoLog })
         .finally(() => { rodadaEmCurso = null; });
       try {
         return await rodadaEmCurso;

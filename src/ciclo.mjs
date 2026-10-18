@@ -23,7 +23,10 @@ export { historico };
  * De onde sai a lista de contas a abrir, em ordem de preferência
  * (DECISOES.md §4): planilha → contas.json → todos os perfis do AdsPower.
  */
-export async function descobrirContas(args = [], { aoLog = () => {}, planilha: planilhaPedida, ignorarRecorte = false } = {}) {
+export async function descobrirContas(args = [], {
+  aoLog = () => {}, planilha: planilhaPedida, ignorarRecorte = false,
+  aba: abaPedida, desde: desdePedido, dias: diasPedidos,
+} = {}) {
   if (args.length) return args.map((a) => ({ serial: Number(a), conta: Number(a) }));
 
   // contas.json vem ANTES da planilha: é recorte manual, feito para limitar
@@ -50,10 +53,14 @@ export async function descobrirContas(args = [], { aoLog = () => {}, planilha: p
 
   const planilha = planilhaPedida ?? process.env.PLANILHA;
   if (planilha && existsSync(planilha)) {
+    // Quem escolheu o arquivo manda. As variáveis de ambiente são o modo
+    // terminal, e só valem quando ninguém disse nada: no app elas vinham do
+    // .env do projeto e procuravam a aba da planilha ANTIGA no arquivo novo,
+    // derrubando a rodada com "aba não encontrada".
     const r = await lerPendentes(planilha, {
-      aba: process.env.PLANILHA_ABA,
-      desde: process.env.PLANILHA_DESDE,          // AAAA-MM-DD
-      dias: process.env.PLANILHA_DIAS,            // ou "últimos N dias"
+      aba: abaPedida ?? (planilhaPedida ? undefined : process.env.PLANILHA_ABA),
+      desde: desdePedido ?? (planilhaPedida ? undefined : process.env.PLANILHA_DESDE),
+      dias: diasPedidos ?? (planilhaPedida ? undefined : process.env.PLANILHA_DIAS),
     });
     if (r.corte) aoLog(`filtrando pendências a partir de ${r.corte}`);
     aoLog(`planilha "${r.aba}": ${r.total} linhas · ${r.pendentes.length} sem rastreio · ${r.contas.length} contas a abrir`);
@@ -120,7 +127,9 @@ export function juntarPendentes(contasDaPlanilha, atrasados) {
  * @param opts.escrever   false = dry-run
  * @param opts.simular    injeta rastreio falso onde ainda não há (teste)
  */
-export async function rodarCiclo({ contas, escrever = true, simular = false, aoLog = () => {} } = {}) {
+export async function rodarCiclo({ contas, escrever = true, simular = false,
+                                  planilhas: planilhasPedidas, aba: abaPedida,
+                                  aoLog = () => {} } = {}) {
   const inicio = new Date();
   const t0 = Date.now();
   const SIMULADO = "BR269999999999S";
@@ -159,7 +168,17 @@ export async function rodarCiclo({ contas, escrever = true, simular = false, aoL
   let escritos = 0, falhasEscrita = 0, pulados = 0;
   let pendencias = [];
   try {
-    const r = await lerPendentes(process.env.PLANILHA, { aba: process.env.PLANILHA_ABA });
+    // Os arquivos que a pessoa escolheu, não o do .env — e podem ser mais
+    // de um: o cliente sobe outra planilha no mesmo dia, e as duas valem.
+    const arquivos = planilhasPedidas?.length ? planilhasPedidas : [process.env.PLANILHA];
+    const escolhidos = Boolean(planilhasPedidas?.length);
+    const daPlanilha = [];
+    for (const arq of arquivos) {
+      const lido = await lerPendentes(arq,
+        { aba: abaPedida ?? (escolhidos ? undefined : process.env.PLANILHA_ABA) });
+      daPlanilha.push(...lido.contas);
+    }
+    const r = { contas: daPlanilha };
 
     // A planilha do cliente traz só os pagos DO DIA. Quem não resolveu ontem
     // não está nela — e some, se a gente não trouxer de volta.
