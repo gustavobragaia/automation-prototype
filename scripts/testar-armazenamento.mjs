@@ -157,6 +157,32 @@ async function exercitar(nomeImpl, mod) {
          "e ele não volta mais");
   checar(mod.pendentesAbertos({ hoje: "2026-10-20" }).length === 1, "o outro continua lá");
 
+  // as três saídas humanas — sem elas a carteira só cresce
+  mod.guardarPendentes([
+    { pedido: "#200001", conta: 11, nome: "A", valor: 1, motivo: { codigo: "ambiguo", grupo: "precisa" } },
+    { pedido: "#200002", conta: 11, nome: "B", valor: 2, motivo: { codigo: "ambiguo", grupo: "precisa" } },
+    { pedido: "#200003", conta: 11, nome: "C", valor: 3, motivo: { codigo: "ambiguo", grupo: "precisa" } },
+  ], { em: d2 });
+
+  checar(mod.encerrarPendente("#200001", { desfecho: "encerrado", nota: "pedido cancelado" }) === true,
+         "encerrar tira da carteira");
+  checar(!mod.pendentesAbertos({ hoje: "2026-10-25" }).some((p) => p.pedido === "#200001"),
+         "e o encerrado não volta nunca mais");
+  checar(mod.encerrarPendente("#200001", { desfecho: "encerrado" }) === false,
+         "encerrar de novo não conta duas vezes");
+
+  checar(mod.encerrarPendente("#200002", { desfecho: "manual", nota: "código colado na mão" }) === true,
+         "resolvido na mão também sai");
+
+  checar(mod.encerrarPendente("#200003", { desfecho: "conta", conta: 161, nota: "era a 161" }) === true,
+         "corrigir a conta é aceito");
+  const corrigido = mod.pendentesAbertos({ hoje: "2026-10-25" }).find((p) => p.pedido === "#200003");
+  checar(!!corrigido, "corrigir a conta NÃO tira da carteira — o pedido ainda precisa ser achado");
+  checar(corrigido.conta === 161, "e ele passa a procurar na conta certa");
+
+  checar(mod.encerrarPendente("#999999", { desfecho: "encerrado" }) === false,
+         "encerrar pedido inexistente não inventa um");
+
   mod.fechar();
 }
 

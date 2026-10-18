@@ -177,3 +177,19 @@ export function baixarPendentes(pedidos, { em = new Date().toISOString() } = {})
   if (n) escrever(ARQ_PENDENTES, atuais);
   return n;
 }
+
+/** Ver sqlite.mjs: as três saídas humanas de uma pendência. */
+export function encerrarPendente(pedido, { desfecho, nota = null, conta = null,
+                                           em = new Date().toISOString() } = {}) {
+  const atuais = ler(ARQ_PENDENTES, {});
+  const p = atuais[pedido];
+  if (!p) return false;
+  if (desfecho === "conta") {
+    p.conta = conta; p.desfecho = null; p.desfechoNota = nota; p.adiadoAte = null;
+  } else {
+    if (p.baixadoEm) return false;
+    p.baixadoEm = em; p.desfecho = desfecho; p.desfechoNota = nota;
+  }
+  escrever(ARQ_PENDENTES, atuais);
+  return true;
+}

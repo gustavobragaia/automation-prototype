@@ -261,3 +261,22 @@ export function baixarPendentes(pedidos, { em = new Date().toISOString() } = {})
   db().transaction((lista) => { for (const p of lista) n += sql.run(em, p).changes; })(pedidos);
   return n;
 }
+
+/**
+ * As três saídas humanas de uma pendência.
+ *   "manual"    o operador tinha o código e colou
+ *   "conta"     era outra conta: volta na próxima rodada, com a certa
+ *   "encerrado" não vai receber rastreio nunca
+ */
+export function encerrarPendente(pedido, { desfecho, nota = null, conta = null,
+                                           em = new Date().toISOString() } = {}) {
+  if (desfecho === "conta") {
+    // não baixa: muda de conta e volta, que é o ponto
+    return db().prepare(`UPDATE pendentes SET conta = @conta, desfecho = NULL,
+                         desfecho_nota = @nota, adiado_ate = NULL WHERE pedido_shopify = @pedido`)
+      .run({ conta, nota, pedido }).changes > 0;
+  }
+  return db().prepare(`UPDATE pendentes SET baixado_em = @em, desfecho = @desfecho,
+                       desfecho_nota = @nota WHERE pedido_shopify = @pedido AND baixado_em IS NULL`)
+    .run({ em, desfecho, nota, pedido }).changes > 0;
+}

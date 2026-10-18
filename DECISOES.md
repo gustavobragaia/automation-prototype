@@ -469,3 +469,49 @@ regra do pedido dividido deixam de funcionar.
 Simulação de dois dias com o ciclo real: dia 1 com a planilha de 40 pedidos,
 dia 2 com uma planilha de **um** pedido. Os 38 pendentes voltaram sozinhos e
 37 foram conciliados de novo. Sem a carteira, os 38 teriam sumido.
+
+---
+
+## 11. Toda pendência precisa de uma saída (2026-10-18)
+
+A pergunta foi: *"ele aparece na tela; e aí, como ele resolve?"*. A resposta
+era: não resolvia. O `#165091` tinha "deixar para amanhã" e, quando o robô
+achava o cliente em outra conta, "usar esse" — que nos dados reais não
+existia. O único caminho era adiar para sempre.
+
+**Item sem saída é vazamento.** A carteira só cresce, o alerta de "pena há 6
+dias" vira ruído, e em duas semanas ninguém abre mais a etapa 3.
+
+### Os quatro desfechos
+
+| | Quem decide | O que acontece |
+|---|---|---|
+| **resolvido** | robô | achou o rastreio e escreveu |
+| **manual** | pessoa | tinha o código e colou |
+| **conta** | pessoa | era outra conta — volta na próxima, com a certa |
+| **encerrado** | pessoa | não vai receber rastreio: cancelado, reembolso, nunca comprado |
+
+`conta` é o único que **não** baixa a pendência, e isso é de propósito: o
+pedido ainda precisa ser achado, só que no lugar certo.
+
+### A saída manual
+
+É a mais importante, porque é universal: o robô não resolve tudo, e a pessoa
+com o código na mão resolve em cinco segundos. Compra numa conta que ninguém
+mapeou, rastreio que o fornecedor mandou no WhatsApp, Shopee fora do ar na
+hora da coleta.
+
+As proteções **mudam de dono, não somem**. Não existe lado Shopee para
+comparar o nome, então quem confere é a pessoa — e por isso `prepararManual`
+devolve o que está na Shopify (pedido, destinatário, CEP) para ela olhar
+antes de confirmar. Escrever é um segundo passo, nunca o mesmo clique.
+
+O resto continua valendo: número de pedido ilegível, texto sem código,
+pedido que não existe na loja, pedido já despachado e código de simulação
+são todos recusados — os três primeiros antes de tocar na rede.
+
+### Medido
+
+Contra a loja de teste: as cinco recusas com mensagem própria, e a escrita
+real de `#1007` a partir do texto solto *"peguei no app da shopee:
+BR268507789509M"*, confirmada como `FULFILLED` na Shopify.
