@@ -1,0 +1,73 @@
+ESTEIRA — como instalar e deixar pronto
+(leva uns 10 minutos, e só na primeira vez)
+
+
+ANTES DE COMEÇAR
+Deixe o AdsPower aberto. O Esteira conversa com ele.
+
+
+1. INSTALAR
+
+  1. Abra o arquivo Esteira-0.1.0-universal.dmg
+  2. Arraste o ícone do Esteira para a pasta Aplicativos
+  3. Feche a janela e ejete o "Esteira" que apareceu na barra lateral do Finder
+
+
+2. ABRIR PELA PRIMEIRA VEZ
+
+  O Mac vai bloquear na primeira vez. Isso é esperado: o Esteira ainda não
+  tem o selo da Apple. Para liberar:
+
+  1. Abra o Esteira em Aplicativos
+  2. Vai aparecer o aviso "Esteira não foi aberto". Clique em "Concluído"
+  3. Abra Ajustes do Sistema → Privacidade e Segurança
+  4. Role até o fim. Vai ter a frase "O Esteira foi bloqueado..."
+     Clique em "Abrir Mesmo Assim"
+  5. Digite a senha do Mac e confirme
+
+  Pronto. Das próximas vezes ele abre direto.
+
+
+3. PREENCHER OS AJUSTES (uma vez só)
+
+  No Esteira, clique em "Ajustes" no canto de cima, à direita.
+
+  AdsPower
+    Chave da API: no AdsPower, vá em Configurações → API local → copie a
+    chave e cole aqui. Clique em Salvar e depois em "Testar conexão".
+    Tem que aparecer "Conectado ao AdsPower".
+
+  Contas da Shopee
+    1 · Começo do e-mail ......... chompspee
+        Domínio .................. givmail.com
+        Outro começo a partir de . 200
+        Esse outro começo ........ Brushopee
+
+        Embaixo aparece como o e-mail vai ficar. Confira se está certo:
+        "A conta 124 vai entrar como chompspee124@givmail.com"
+
+    2 · A senha ................... a senha das contas da Shopee
+    3 · O código por e-mail ....... a chave que o Gustavo te passar
+
+    Cada um tem o seu botão Salvar. Depois de salvo, aparece
+    "Guardada neste computador" — a senha não fica visível de novo.
+
+  Shopify
+    Digite o endereço da sua loja (algo como minhaloja.myshopify.com) e
+    clique em "Conectar Shopify". O navegador abre a tela da Shopify:
+    aprove, e o Esteira mostra a loja conectada sozinho.
+
+  Enquanto faltar alguma coisa, aparece um aviso amarelo em Ajustes
+  dizendo o que falta. Sem isso preenchido, a rodada não começa.
+
+
+4. USAR NO DIA A DIA
+
+  Etapa 1 · arraste a planilha do dia para o quadro pontilhado
+  Etapa 2 · clique em "Iniciar coleta" e acompanhe as contas
+  Etapa 3 · decida o que o robô não conseguiu resolver sozinho
+  Etapa 4 · confira a lista e clique em "Escrever na Shopify"
+
+
+SE ALGO DER ERRADO
+  Tire um print da tela inteira e mande para o Gustavo.

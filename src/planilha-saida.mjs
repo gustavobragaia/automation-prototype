@@ -9,7 +9,7 @@
 //
 // O formato é o mesmo de antes, coluna por coluna, porque é a planilha que
 // a operação já usa: mudar a ordem quebraria quem lê do outro lado.
-import ExcelJS from "exceljs";
+import ExcelJS from "./excel.mjs";   // ver o porquê em src/excel.mjs
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { carregar } from "./estado.mjs";

@@ -35,6 +35,8 @@ const fonte = readFileSync(new URL("./tela/index.html", import.meta.url), "utf8"
 const SO_NO_EXEMPLO = [...new Set([
   ...fonte.match(/#16\d{4}/g) ?? [],                                  // pedidos
   ...fonte.match(/k1[a-z0-9]{6}/g) ?? [],                              // perfis
+  ...fonte.match(/[a-z0-9-]+\.myshopify\.com/g) ?? [],               // lojas
+  ...[...fonte.matchAll(/loja:"([a-z0-9-]{4,})"/g)].map((m) => m[1]),     // nome da loja
   ...fonte.match(/\bBR2\d{11}[A-Z0-9]\b|\bSPX[A-Z]{0,3}\d{6,}\b/g) ?? [], // rastreios
   ...[...fonte.matchAll(/c:"([A-ZÁÉÍÓÚÂÊÔÃÕ][^"]{4,})"/g)].map((m) => m[1]),   // pessoas
   ...[...fonte.matchAll(/"([A-ZÁÉÍÓÚ][a-záéíóúâêôãõç]+ [A-ZÁÉÍÓÚ][a-záéíóúâêôãõç]+(?: [A-ZÁÉÍÓÚ][a-záéíóúâêôãõç]+)?)"/g)]

@@ -38,3 +38,6 @@ shopee.md
 extensao/sessao.js
 extensao-rodada/
 extensao/sessao.js
+
+# exceljs montado num arquivo único na hora de empacotar — gerado, não versionado
+src/vendor/

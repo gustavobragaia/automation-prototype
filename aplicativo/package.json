@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "empacotar": "electron-builder",
+    "empacotar": "node empacotar/montar-vendor.mjs && electron-builder --mac --publish never",
     "ensaio": "electron ensaio.mjs",
     "ensaio:ajustes": "electron ensaio-ajustes.mjs",
     "ensaio:arranque": "electron ensaio-arranque.mjs",
@@ -17,7 +17,9 @@
   },
   "devDependencies": {
     "electron": "^34.0.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.0",
+    "exceljs": "^4.4.0"
   },
   "build": {
     "appId": "cloud.esteira.app",
@@ -27,19 +29,34 @@
       "buildResources": "marca"
     },
     "files": [
-      "principal.mjs",
-      "preload.cjs",
-      "ponte.mjs",
-      "tela/**",
-      "package.json",
+      {
+        "from": ".",
+        "to": "aplicativo",
+        "filter": [
+          "principal.mjs",
+          "preload.cjs",
+          "ponte.mjs",
+          "tela/**"
+        ]
+      },
       {
         "from": "../src",
         "to": "src",
         "filter": [
-          "**/*.mjs"
+          "**/*.mjs",
+          "vendor/*.cjs",
+          "!armazenamento/sqlite.mjs",
+          "!armazenamento/sqlite-db.mjs"
         ]
       },
-      "!**/*.map"
+      {
+        "from": "../servidor/lib",
+        "to": "servidor/lib",
+        "filter": [
+          "validar.js"
+        ]
+      },
+      "package.json"
     ],
     "extraResources": [
       {
@@ -61,12 +78,18 @@
     ],
     "mac": {
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
       ],
       "category": "public.app-category.productivity",
       "icon": "marca/icon.png",
-      "identity": null
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
     "win": {
       "target": [
@@ -81,9 +104,13 @@
         "repo": "automation-prototype"
       }
     ],
-    "artifactName": "${productName}-${version}-${arch}.${ext}"
-  },
-  "dependencies": {
-    "exceljs": "^4.4.0"
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "extraMetadata": {
+      "main": "aplicativo/principal.mjs"
+    },
+    "dmg": {
+      "title": "Esteira ${version}"
+    },
+    "afterPack": "empacotar/assinar-adhoc.cjs"
   }
 }

@@ -5,7 +5,7 @@
 // preenchida", "baixar em CSV", "exportar período" no Histórico. Um botão
 // que não responde é pior que botão nenhum: a pessoa clica, espera, clica
 // de novo, e acha que o programa travou.
-import ExcelJS from "exceljs";
+import ExcelJS from "./excel.mjs";   // ver o porquê em src/excel.mjs
 import { writeFileSync } from "node:fs";
 
 // As colunas que o leitor da planilha reconhece. É o mesmo vocabulário de

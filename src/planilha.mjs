@@ -7,7 +7,7 @@
 // Lida em JS puro (exceljs): exigir Python na máquina Windows do operador
 // seria uma dependência a mais para falhar.
 
-import ExcelJS from "exceljs";
+import ExcelJS from "./excel.mjs";   // ver o porquê em src/excel.mjs
 import { parseTracking, parseConta } from "./tracking.mjs";
 import { diaLocal } from "./datas.mjs";
 
