@@ -3,6 +3,7 @@
 // obrigar a mexer no resto; as funções por linha abaixo são o caminho novo.
 
 import { abrir } from "./sqlite-db.mjs";
+import { detalheDoMotivo } from "./detalhe.mjs";
 
 let _db = null;
 export function db({ aoLog } = {}) {
@@ -206,9 +207,9 @@ export function guardarPendentes(pendencias, { em = new Date().toISOString() } =
   if (!pendencias?.length) return 0;
   const sql = db().prepare(`
     INSERT INTO pendentes (pedido_shopify, conta, nome, valor, produto, unidades,
-                           motivo, grupo, visto_em, ultima_em, dias, adiado_ate)
+                           motivo, grupo, detalhe, visto_em, ultima_em, dias, adiado_ate)
     VALUES (@pedido, @conta, @nome, @valor, @produto, @unidades,
-            @motivo, @grupo, @em, @em, 1, @adiado_ate)
+            @motivo, @grupo, @detalhe, @em, @em, 1, @adiado_ate)
     ON CONFLICT (pedido_shopify) DO UPDATE SET
       conta      = COALESCE(excluded.conta, conta),
       nome       = COALESCE(excluded.nome, nome),
@@ -217,6 +218,7 @@ export function guardarPendentes(pendencias, { em = new Date().toISOString() } =
       unidades   = COALESCE(excluded.unidades, unidades),
       motivo     = excluded.motivo,
       grupo      = excluded.grupo,
+      detalhe    = excluded.detalhe,
       adiado_ate = COALESCE(excluded.adiado_ate, adiado_ate),
       baixado_em = NULL,
       -- conta DIAS distintos, não rodadas: rodar três vezes num dia não pode
@@ -230,7 +232,7 @@ export function guardarPendentes(pendencias, { em = new Date().toISOString() } =
       sql.run({ pedido: p.pedido, conta: p.conta ?? null, nome: p.nome ?? null,
                 valor: p.valor ?? null, produto: p.produto ?? null, unidades: p.unidades ?? null,
                 motivo: p.motivo?.codigo ?? null, grupo: p.motivo?.grupo ?? null,
-                em, adiado_ate: p.adiadoAte ?? null });
+                detalhe: detalheDoMotivo(p.motivo), em, adiado_ate: p.adiadoAte ?? null });
     }
   });
   tudo(pendencias);
@@ -244,6 +246,7 @@ export function pendentesAbertos({ hoje = hojeISO() } = {}) {
     ORDER BY dias DESC`).all({ hoje }).map((r) => ({
       pedido: r.pedido_shopify, conta: r.conta, nome: r.nome, valor: r.valor,
       produto: r.produto, unidades: r.unidades, motivo: r.motivo, grupo: r.grupo,
+      detalhe: r.detalhe,
       vistoEm: r.visto_em, ultimaEm: r.ultima_em, dias: r.dias,
       contaCorrigida: !!r.conta_corrigida,
       adiadoAte: r.adiado_ate, baixadoEm: r.baixado_em,

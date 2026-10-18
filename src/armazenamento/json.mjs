@@ -8,6 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { emEstado } from "../caminhos.mjs";
+import { detalheDoMotivo } from "./detalhe.mjs";
 
 const ARQ_PEDIDOS = process.env.ESTADO_PEDIDOS ?? emEstado("pedidos.json");
 const ARQ_RODADAS = process.env.ESTADO_RODADAS ?? emEstado("rodadas.json");
@@ -140,6 +141,8 @@ export function guardarPendentes(pendencias, { em = new Date().toISOString() } =
       unidades: p.unidades ?? velho?.unidades ?? null,
       motivo: p.motivo?.codigo ?? velho?.motivo ?? null,
       grupo: p.motivo?.grupo ?? velho?.grupo ?? null,
+      // Ver sqlite.mjs: o que torna o motivo acionável na tela.
+      detalhe: detalheDoMotivo(p.motivo) ?? velho?.detalhe ?? null,
       vistoEm: velho?.vistoEm ?? em,
       ultimaEm: em,
       // conta DIAS distintos, não rodadas: rodar três vezes num dia não

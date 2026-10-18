@@ -1,0 +1,14 @@
+-- O detalhe que explica o motivo, e não só o seu nome.
+--
+-- A carteira guardava `motivo = 'nome-nao-confere'` e jogava fora o que
+-- tornava esse motivo acionável: QUAL nome está na Shopee e qual está na
+-- Shopify. Na tela, a pessoa via "nome não confere" e não tinha como
+-- decidir — o que ela precisa é ver os dois lados.
+--
+-- Vale para os outros motivos também: a sugestão de outra conta, os
+-- candidatos de um empate, a mensagem de erro que a Shopify devolveu.
+-- Tudo isso nasce na rodada e morria junto com ela.
+--
+-- JSON de propósito: o formato do detalhe muda com o motivo, e criar uma
+-- coluna por motivo seria uma tabela larga e quase toda nula.
+ALTER TABLE pendentes ADD COLUMN detalhe TEXT;   -- JSON, pode ser nulo

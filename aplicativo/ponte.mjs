@@ -18,6 +18,7 @@ import { guardarPendentes, baixarPendentes } from "../src/estado.mjs";
 import { pendentesAbertos, historico, adiarPendente, encerrarPendente,
          reabrirPendente } from "../src/estado.mjs";
 import { lerColetas, conciliar, MOTIVOS } from "../src/conciliar.mjs";
+import { lerDetalhe } from "../src/armazenamento/detalhe.mjs";
 import { rodarCiclo, descobrirContas } from "../src/ciclo.mjs";
 import { iniciarConexao, conexaoEmAndamento, cancelarConexao } from "../src/shopify-oauth.mjs";
 import { resolverManual, prepararManual } from "../src/manual.mjs";
@@ -51,29 +52,31 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
     return { contas, coletas: lerColetas() };
   };
 
-  // A linha da conciliação é interna. A tela recebe só o que desenha — e os
-  // dois lados da comparação quando o motivo for divergência de nome, que é
-  // o único em que a pessoa precisa ver Shopee e Shopify um ao lado do outro.
-  const montarPendencia = (l) => ({
-    pedido: l.p.pedido, conta: l.conta, nome: l.p.nome, valor: l.p.valor ?? null,
-    dias: l.p.dias ?? 1,
-    motivo: { codigo: l.motivo.codigo, grupo: l.motivo.grupo,
-              rotulo: l.motivo.rotulo ?? l.motivo.codigo,
-              texto: l.motivo.texto, acao: l.motivo.acao },
-    // sugerirContas devolve { conta, pedido } — o rastreio está dentro do
-    // pedido. Sem ele a tela diz "esse cliente aparece na conta 128" e não
-    // mostra o código, que é metade do motivo de a sugestão existir.
-    sugestoes: (l.motivo.sugestoes ?? []).map((x) => ({
-      conta: x.conta, codigos: x.pedido?.codigos ?? [],
-      valor: x.pedido?.valor ?? null, cep: x.pedido?.cep ?? null })),
-    candidatos: l.estado === "ambiguo"
-      ? (l.motivo.candidatos ?? []).map((c) => ({
-          codigos: c.codigos ?? [], valor: c.valor ?? null, cep: c.cep ?? null }))
-      : [],
-    lados: l.motivo.codigo === "nome-nao-confere"
-      ? { shopee: l.motivo.shopee ?? null, shopify: l.motivo.shopify ?? null }
-      : null,
-  });
+  // A pendência como ela está guardada, enriquecida com o que a conciliação
+  // de hoje souber a mais. Ela pode vir sem linha nenhuma: um pedido que
+  // atravessou de ontem não está na planilha de hoje, e nem por isso some.
+  const montarDaCarteira = (p, l) => {
+    const det = lerDetalhe(p.detalhe) ?? {};
+    const m = MOTIVOS[p.motivo] ?? {};
+    const doMotivo = l?.motivo;
+    return {
+      pedido: p.pedido, conta: p.conta, nome: p.nome, valor: p.valor ?? null,
+      dias: p.dias ?? 1,
+      motivo: {
+        codigo: p.motivo, grupo: p.grupo ?? m.grupo ?? "precisa",
+        rotulo: m.rotulo ?? p.motivo, texto: m.texto ?? "", acao: m.acao ?? "",
+      },
+      // O detalhe guardado vale mais que o recalculado: ele é o que a
+      // rodada viu no momento de decidir, inclusive o lado da Shopify.
+      sugestoes: (det.sugestoes ?? (doMotivo?.sugestoes ?? []).map((x) => ({
+        conta: x.conta, codigos: x.pedido?.codigos ?? [] }))),
+      candidatos: det.candidatos ?? doMotivo?.candidatos ?? [],
+      lados: (det.shopee != null || det.shopify != null)
+        ? { shopee: { nome: det.shopee }, shopify: { nome: det.shopify } }
+        : null,
+      erro: det.erro ?? null,
+    };
+  };
 
   // Data local: toISOString joga para ontem durante a noite inteira no Brasil,
   // e "deixar para amanhã" viraria "deixar para hoje".
@@ -157,27 +160,36 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
       for (const f of fontes) contas.push(...(await lerPendentes(f, { aba })).contas);
       const { linhas, resumo } = conciliar(contas, lerColetas());
 
-      // A conciliação relê a planilha, que não sabe das decisões de hoje.
-      // Sem este filtro, um pedido resolvido à mão reapareceria na lista um
-      // segundo depois, como se nada tivesse acontecido.
-      const abertos = new Map(pendentesAbertos().map((p) => [p.pedido, p]));
-      // Some da lista quem já foi tratado hoje. São três casos:
-      //   · fora da carteira  -> resolvido ou adiado
-      //   · conta trocada     -> a pessoa já decidiu; volta na próxima
-      //                          RODADA, na conta nova, não aqui agora
-      // Sem o segundo caso, corrigir a conta deixa o item na tela com o
-      // mesmo motivo de antes, e a pessoa decide duas vezes a mesma coisa.
-      const naCarteira = (l) => {
-        const p = abertos.get(l.p.pedido);
-        return Boolean(p) && Number(p.conta) === Number(l.conta);
-      };
+      // Quem manda na lista é a CARTEIRA, não a conciliação.
+      //
+      // A conciliação só enxerga o lado Shopee: ela nunca compara com a
+      // Shopify. Então tudo que a etapa de escrita barra — nome que não
+      // confere, pedido que não existe na loja, entrega já fechada, recusa
+      // da Shopify — ficava invisível na conferência, mesmo estando na
+      // carteira. A pessoa não via, e nunca saberia por que não foi escrito.
+      //
+      // A carteira também é o que sabe das decisões de hoje e dos pedidos
+      // que atravessaram de ontem, que a planilha de hoje não traz.
+      const deHoje = new Map();
+      for (const l of linhas) deHoje.set(l.p.pedido, l);
+
+      const itens = pendentesAbertos().filter((p) => {
+        const l = deHoje.get(p.pedido);
+        // A conta da carteira diferente da conciliação de hoje quer dizer
+        // que a pessoa acabou de corrigi-la. Ela já decidiu: o pedido volta
+        // na próxima RODADA, procurando na conta certa, e não agora com o
+        // mesmo motivo de antes — senão ela decide duas vezes a mesma coisa.
+        //
+        // Some só enquanto a planilha discordar. Na rodada seguinte a
+        // conciliação já roda sob a conta nova, e se ainda houver problema
+        // o pedido reaparece normalmente.
+        return !(l && Number(p.conta) !== Number(l.conta));
+      }).map((p) => montarDaCarteira(p, deHoje.get(p.pedido)));
 
       return {
         resumo,
-        pendencias: linhas.filter((l) => l.motivo?.grupo === "precisa")
-                          .filter(naCarteira).map(montarPendencia),
-        sozinhos: linhas.filter((l) => l.motivo?.grupo === "sozinho")
-                        .filter(naCarteira).map(montarPendencia),
+        pendencias: itens.filter((i) => i.motivo.grupo === "precisa"),
+        sozinhos: itens.filter((i) => i.motivo.grupo !== "precisa"),
       };
     }),
     "motivos:vocabulario": async () => MOTIVOS,

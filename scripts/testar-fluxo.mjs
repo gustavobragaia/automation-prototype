@@ -226,6 +226,54 @@ const registro = JSON.parse((await import("node:fs"))
 tudo &= ok(!!registro["1004"], "a escrita manual ficou registrada aqui também");
 tudo &= ok(registro["1004"]?.origem === "manual", "marcada como manual, para dar para auditar depois");
 
+/* ──────────── 15. o que a escrita barra tem que aparecer ──────────── */
+sec("15 · o que a ESCRITA barra aparece na conferência, com os dois lados");
+// A conciliação só enxerga o lado Shopee. Tudo que a escrita barra ao
+// comparar com a Shopify — nome divergente, pedido que não existe na loja,
+// entrega fechada — nasce depois dela. Se a conferência for montada só a
+// partir da conciliação, isso fica invisível: o pedido não é escrito e a
+// pessoa nunca descobre por quê.
+const { writeFileSync: wf2 } = await import("node:fs");
+const ExcelJS2 = (await import("exceljs")).default;
+const wb2 = new ExcelJS2.Workbook();
+const ws2 = wb2.addWorksheet("PEDIDOS");
+ws2.addRow(["DATA","NÚMERO DO PEDIDO","NOME DO CLIENTE","VALOR PAGO","CÓDIGO DE RASTREIO","ONDE FOI FEITO O PEDIDO"]);
+// a planilha diz Sônia; a loja vai responder com outro destinatário
+ws2.addRow(["2026-10-18", "#1099", "Sônia Aparecida Pinto", 88.30, "", "shopee 124"]);
+const planilha2 = join(dir, "divergente.xlsx");
+await wb2.xlsx.writeFile(planilha2);
+
+fingirShopify({ pedidos: {
+  "#1099": { nome: "Outra Pessoa Entrega", valor: 88.30, cep: "99999999" },
+} });
+await chamar("planilha:esquecer", {});
+await chamar("planilha:ler", { caminho: planilha2 });
+const r15 = await chamar("escrita:executar", {});
+tudo &= ok(r15.escritos === 0, `nada escrito: o nome não confere (escreveu ${r15.escritos})`);
+
+const conf15 = await chamar("conferencia:listar");
+const barrado = conf15.pendencias.find((p) => p.pedido === "#1099");
+tudo &= ok(!!barrado, "o pedido barrado APARECE na conferência");
+tudo &= ok(barrado?.motivo.codigo === "nome-nao-confere",
+  `com o motivo certo (${barrado?.motivo.codigo})`);
+tudo &= ok(barrado?.motivo.rotulo === "nome não confere", "e com rótulo legível, não o código cru");
+tudo &= ok(barrado?.lados?.shopee?.nome === "Sônia Aparecida Pinto",
+  `mostrando o nome da Shopee (${barrado?.lados?.shopee?.nome})`);
+tudo &= ok(barrado?.lados?.shopify?.nome === "Outra Pessoa Entrega",
+  `e o da Shopify ao lado (${barrado?.lados?.shopify?.nome})`);
+
+sec("16 · e sobrevive a fechar o app");
+const sobrou = JSON.parse((await import("node:child_process")).execFileSync(process.execPath,
+  ["--input-type=module", "-e", `
+    const { pendentesAbertos } = await import("${process.cwd()}/src/armazenamento/index.mjs");
+    const { lerDetalhe } = await import("${process.cwd()}/src/armazenamento/detalhe.mjs");
+    const p = pendentesAbertos().find((x) => x.pedido === "#1099");
+    console.log(JSON.stringify(p ? { motivo: p.motivo, det: lerDetalhe(p.detalhe) } : null));
+  `], { encoding: "utf8", env: { ...process.env } }).trim());
+tudo &= ok(sobrou?.motivo === "nome-nao-confere", "o motivo ficou guardado");
+tudo &= ok(sobrou?.det?.shopify === "Outra Pessoa Entrega",
+  "e o detalhe que explica o motivo também — sem ele a tela não ajuda a decidir");
+
 rmSync(dir, { recursive: true, force: true });
 console.log(tudo ? "\n\x1b[32m\x1b[1m  o fluxo fecha de ponta a ponta\x1b[0m\n"
                  : "\n\x1b[31m\x1b[1m  o fluxo tem furo\x1b[0m\n");
