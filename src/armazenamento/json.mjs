@@ -7,11 +7,12 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { emEstado } from "../caminhos.mjs";
 
-const ARQ_PEDIDOS = process.env.ESTADO_PEDIDOS ?? "estado/pedidos.json";
-const ARQ_RODADAS = process.env.ESTADO_RODADAS ?? "estado/rodadas.json";
-const ARQ_MOTIVOS = process.env.ESTADO_MOTIVOS ?? "estado/motivos.json";
-const ARQ_PENDENTES = process.env.ESTADO_PENDENTES ?? "estado/pendentes.json";
+const ARQ_PEDIDOS = process.env.ESTADO_PEDIDOS ?? emEstado("pedidos.json");
+const ARQ_RODADAS = process.env.ESTADO_RODADAS ?? emEstado("rodadas.json");
+const ARQ_MOTIVOS = process.env.ESTADO_MOTIVOS ?? emEstado("motivos.json");
+const ARQ_PENDENTES = process.env.ESTADO_PENDENTES ?? emEstado("pendentes.json");
 
 const ler = (arq, vazio) => {
   if (!existsSync(arq)) return vazio;
@@ -58,7 +59,7 @@ export const aEscrever = () =>
 
 // ── mapeamento pedido Shopify ↔ conta Shopee (DECISOES.md §4) ─────────────
 
-const ARQ_MAPA = process.env.ESTADO_MAPA ?? "estado/mapeamento.json";
+const ARQ_MAPA = process.env.ESTADO_MAPA ?? emEstado("mapeamento.json");
 
 export function anotarMapeamento(pedidoShopify, conta, origem = "coleta") {
   const m = ler(ARQ_MAPA, {});

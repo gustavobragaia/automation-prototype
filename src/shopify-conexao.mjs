@@ -18,9 +18,9 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { emEstado } from "./caminhos.mjs";
 
-const ARQUIVO = process.env.SHOPIFY_CONEXAO_ARQUIVO
-  ?? join(process.env.ESTADO_DIR ?? "estado", "conexao-shopify.json");
+const ARQUIVO = process.env.SHOPIFY_CONEXAO_ARQUIVO ?? emEstado("conexao-shopify.json");
 
 // Escopos mínimos para ler pedidos abertos e criar fulfillment com rastreio.
 export const ESCOPOS = [

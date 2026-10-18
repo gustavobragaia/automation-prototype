@@ -1,0 +1,1808 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- A tela não busca nada de fora. Fonte e estilo entram inline no empacotamento;
+     sem isso, a janela abriria sem fonte quando o cliente estiver sem internet. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+               font-src https://fonts.gstatic.com; img-src 'self' data:; script-src 'self' 'unsafe-inline'">
+<title>Esteira</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Uma superfície só. Seções separadas por linha de 1px, nunca cartão.
+   Profundidade vem de degrau de fundo, não de sombra.
+   Cor na tela significa ESTADO. A marca é o único roxo, e fica no canto. */
+:root{
+  --canvas:#ffffff; --sup-1:#f7f8f8; --sup-2:#f0f1f2; --sup-3:#e8eaec;
+  --linha:#e3e5e8; --linha-forte:#d2d5da;
+  --tinta:#16181c; --tinta-2:#5c6269; --tinta-3:#868c94;
+  --marca:#5b4bc4;
+  --ok:#1a7f37; --atencao:#9a6700; --erro:#cf222e;
+  --ok-fundo:#e8f3ec; --atencao-fundo:#f7efdb; --erro-fundo:#fbe9ea;
+  --inverso:#16181c; --inverso-tinta:#ffffff;
+  --ui:"Inter",-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --canvas:#010102; --sup-1:#0f1011; --sup-2:#141516; --sup-3:#18191a;
+  --linha:#23252a; --linha-forte:#34343a;
+  --tinta:#f7f8f8; --tinta-2:#8a8f98; --tinta-3:#62666d;
+  --marca:#8b7bf0;
+  --ok:#3fb950; --atencao:#d29922; --erro:#f85149;
+  --ok-fundo:#10251a; --atencao-fundo:#2b2111; --erro-fundo:#2d1416;
+  --inverso:#f7f8f8; --inverso-tinta:#010102;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --canvas:#010102; --sup-1:#0f1011; --sup-2:#141516; --sup-3:#18191a;
+  --linha:#23252a; --linha-forte:#34343a;
+  --tinta:#f7f8f8; --tinta-2:#8a8f98; --tinta-3:#62666d;
+  --marca:#8b7bf0;
+  --ok:#3fb950; --atencao:#d29922; --erro:#f85149;
+  --ok-fundo:#10251a; --atencao-fundo:#2b2111; --erro-fundo:#2d1416;
+  --inverso:#f7f8f8; --inverso-tinta:#010102;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--canvas);color:var(--tinta);
+  font:400 13px/1.5 var(--ui);letter-spacing:-.005em;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input{font:inherit}
+:focus-visible{outline:2px solid var(--tinta-2);outline-offset:2px;border-radius:5px}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-size:12px}
+.ter{color:var(--tinta-3)} .sec{color:var(--tinta-2)} .forte{font-weight:500}
+
+/* ══ Barra ══ */
+.barra{height:44px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--linha);
+  padding-left:max(18px,env(safe-area-inset-left,0px));
+  padding-right:max(18px,env(safe-area-inset-right,0px));
+  position:sticky;top:env(safe-area-inset-top,0px);background:var(--canvas);z-index:6}
+.marca{display:flex;align-items:center;gap:8px;flex:none}
+.marca svg{width:17px;height:17px;overflow:visible}
+.marca svg *{stroke:var(--marca);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.marca .caixa{fill:var(--marca);stroke-width:1.6}
+.marca b{font-size:13.5px;font-weight:600;letter-spacing:-.02em}
+.rodando .marca .caixa{animation:anda 1.5s linear infinite}
+.rodando .marca .lona{stroke-dasharray:3 3;animation:corre .5s linear infinite}
+@keyframes anda{0%{transform:translateX(-5px);opacity:0}18%,82%{opacity:1}
+  100%{transform:translateX(5px);opacity:0}}
+@keyframes corre{to{stroke-dashoffset:-6}}
+.selo-proto{font-size:11px;color:var(--atencao);border:1px solid var(--linha-forte);
+  padding:2px 7px;border-radius:20px;flex:none}
+.apoio{margin-left:auto;display:flex;gap:2px}
+.apoio button{padding:5px 9px;border-radius:6px;font-size:12.5px;color:var(--tinta-2)}
+.apoio button:hover{background:var(--sup-2);color:var(--tinta)}
+.apoio button[aria-current="page"]{background:var(--sup-3);color:var(--tinta)}
+
+/* ══ A esteira ══ */
+.esteira{border-bottom:1px solid var(--linha);background:var(--sup-1);overflow:hidden}
+.trilha{display:flex;align-items:center;height:50px;overflow-x:auto;max-width:1180px;margin:0 auto;
+  padding-left:max(18px,env(safe-area-inset-left,0px));
+  padding-right:max(18px,env(safe-area-inset-right,0px))}
+.etapa{display:flex;align-items:center;gap:8px;padding:0 14px 0 0;white-space:nowrap;
+  color:var(--tinta-3);font-size:12.5px;background:none}
+.etapa .n{position:relative;width:20px;height:20px;border-radius:50%;display:grid;
+  place-items:center;flex:none;font:500 10.5px/1 var(--ui);
+  border:1px solid var(--linha-forte);color:var(--tinta-3);background:var(--canvas)}
+/* a caixa pousa na etapa atual — o mesmo gesto da marca, em miniatura */
+.etapa[data-e="agora"] .n::before{content:"";position:absolute;top:-7px;left:50%;
+  transform:translateX(-50%);width:7px;height:6px;border-radius:1.5px;background:var(--tinta)}
+.rodando .etapa[data-e="agora"] .n::before{animation:pousa 1.5s ease-in-out infinite}
+@keyframes pousa{0%,100%{transform:translateX(-50%) translateY(0)}
+  50%{transform:translateX(-50%) translateY(-2px)}}
+.etapa .n svg{width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:3.4;
+  stroke-linecap:round;stroke-linejoin:round}
+.etapa:hover{color:var(--tinta-2)}
+.etapa[data-e="feita"]{color:var(--tinta-2)}
+.etapa[data-e="feita"] .n{border-color:var(--ok);background:var(--ok);color:var(--canvas)}
+.etapa[data-e="alerta"] .n{border-color:var(--atencao);background:var(--atencao);color:var(--canvas)}
+.etapa[data-e="agora"]{color:var(--tinta);font-weight:500}
+.etapa[data-e="agora"] .n{border-color:var(--tinta);border-width:1.5px;color:var(--tinta)}
+.etapa .sub{font-size:11px;color:var(--tinta-3);font-weight:400}
+.etapa[data-e="alerta"] .sub{color:var(--atencao)}
+.liga{position:relative;width:34px;height:7px;flex:none;margin-right:14px}
+.liga::before,.liga::after{content:"";position:absolute;left:0;right:0;height:1px;
+  background:var(--linha-forte)}
+.liga::before{top:0} .liga::after{bottom:0}
+.rodando .liga::before,.rodando .liga::after{
+  background:repeating-linear-gradient(90deg,var(--tinta-3) 0 3px,transparent 3px 6px);
+  animation:corre .5s linear infinite}
+@media(prefers-reduced-motion:reduce){
+  .rodando .liga::before,.rodando .liga::after,.rodando .etapa[data-e="agora"] .n::before{animation:none}}
+
+/* ══ Conteúdo ══ */
+.tela{max-width:1180px;margin:0 auto;padding-bottom:48px;
+  padding-left:max(18px,env(safe-area-inset-left,0px));
+  padding-right:max(18px,env(safe-area-inset-right,0px))}
+.topo{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;padding-block:26px 20px}
+.eyebrow{font:500 11px/1.3 var(--ui);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--tinta-3);display:block;margin-bottom:6px}
+h1{font:600 21px/1.2 var(--ui);letter-spacing:-.03em;margin:0}
+.topo p{margin:7px 0 0;color:var(--tinta-2);font-size:13px;max-width:62ch}
+.acoes{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;
+  font-size:12.5px;font-weight:500;border:1px solid var(--linha-forte);color:var(--tinta);
+  transition:background .1s}
+.btn:hover{background:var(--sup-2)}
+.btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+.btn svg.cheio{fill:currentColor;stroke:none}
+.btn.pri{background:var(--inverso);color:var(--inverso-tinta);border-color:var(--inverso)}
+.btn.pri:hover{opacity:.88;background:var(--inverso)}
+.btn.peq{padding:4px 9px;font-size:12px}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+
+.bloco{border-top:1px solid var(--linha);padding-block:18px}
+.bloco:first-of-type{border-top:none;padding-top:0}
+.rotulo{display:flex;align-items:baseline;gap:10px;margin-bottom:13px;flex-wrap:wrap}
+.rotulo h2{font:500 12.5px/1 var(--ui);margin:0;color:var(--tinta-2);
+  display:flex;align-items:center;gap:7px}
+.rotulo .dir{margin-left:auto;font-size:12px;color:var(--tinta-3)}
+
+.placar{display:flex;gap:40px;flex-wrap:wrap}
+.placar .v{font:600 30px/1 var(--ui);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.placar .r{font-size:12px;color:var(--tinta-2);margin-top:6px;line-height:1.4}
+.placar .ok .v{color:var(--ok)} .placar .at .v{color:var(--atencao)}
+.placar button.bloco-num{text-align:left;padding:0;border:none;background:none;cursor:pointer}
+.placar button.bloco-num:hover .r{color:var(--tinta)}
+
+/* ══ Tabelas ══ */
+.rolo{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:600px;font-size:12.5px}
+th{text-align:left;font:500 11px/1 var(--ui);color:var(--tinta-3);padding:0 12px 9px;
+  white-space:nowrap;border-bottom:1px solid var(--linha)}
+td{padding:9px 12px;border-bottom:1px solid var(--linha);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--sup-1)}
+tr.agora td{background:var(--sup-2)}
+tr.agora td:first-child{box-shadow:inset 2px 0 0 var(--tinta-2)}
+tr.clica{cursor:pointer}
+td.dir,th.dir{text-align:right;font-variant-numeric:tabular-nums}
+.conta-nome{font-weight:500}
+.conta-mail{font-family:var(--mono);font-size:11px;color:var(--tinta-3);margin-top:2px}
+
+/* estado: ponto + texto. Funciona em preto e branco. */
+.est{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.est .pt{width:6px;height:6px;border-radius:50%;background:var(--tinta-3);flex:none}
+.est.ok{color:var(--ok)} .est.ok .pt{background:var(--ok)}
+.est.at{color:var(--atencao)} .est.at .pt{background:var(--atencao)}
+.est.er{color:var(--erro)} .est.er .pt{background:var(--erro)}
+.est.andando{color:var(--tinta)}
+.est.andando .pt{background:var(--tinta-2);animation:pulsa 1.1s ease-in-out infinite}
+@keyframes pulsa{50%{opacity:.25}}
+@media(prefers-reduced-motion:reduce){
+  .est.andando .pt,.rodando .marca .caixa,.rodando .marca .lona{animation:none}}
+
+.nota{font-size:12px;color:var(--tinta-2);line-height:1.6;margin:11px 0 0;max-width:76ch}
+.nota b{color:var(--tinta);font-weight:500}
+.nota code{font-family:var(--mono);font-size:11.5px;color:var(--tinta)}
+.aviso{display:flex;gap:9px;align-items:flex-start;font-size:12px;color:var(--tinta-2);
+  line-height:1.6;max-width:78ch}
+.aviso svg{width:13px;height:13px;flex:none;margin-top:3px;stroke:var(--tinta-3);fill:none;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.aviso.grave{color:var(--erro)} .aviso.grave svg{stroke:var(--erro)}
+.aviso.grave b{color:var(--erro)}
+.aviso b{color:var(--tinta);font-weight:500}
+
+/* ══ Controles ══ */
+.seg{display:inline-flex;border:1px solid var(--linha-forte);border-radius:6px;overflow:hidden}
+.seg button{padding:5px 11px;font-size:12.5px;color:var(--tinta-2);
+  border-right:1px solid var(--linha);font-variant-numeric:tabular-nums}
+.seg button:last-child{border-right:none}
+.seg button:hover{background:var(--sup-2);color:var(--tinta)}
+.seg button[aria-pressed="true"]{background:var(--sup-3);color:var(--tinta);font-weight:500}
+.rec{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--tinta-3);margin-left:6px}
+.linha-ctrl{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.custo{font-size:12px;color:var(--tinta-2);font-variant-numeric:tabular-nums}
+
+.campo{display:block;margin-bottom:13px;max-width:460px}
+.campo span{display:block;font-size:12px;color:var(--tinta-2);margin-bottom:5px}
+.campo input{width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--linha-forte);
+  background:var(--canvas);color:var(--tinta);font:400 12.5px/1.4 var(--mono)}
+.campo em{display:block;font-style:normal;font-size:11.5px;color:var(--tinta-3);margin-top:5px}
+
+.chave{position:relative;width:32px;height:19px;border-radius:12px;background:var(--sup-3);
+  border:1px solid var(--linha-forte);transition:background .12s;flex:none}
+.chave::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;
+  background:var(--tinta-3);transition:transform .12s,background .12s}
+.chave[aria-pressed="true"]{background:var(--inverso);border-color:var(--inverso)}
+.chave[aria-pressed="true"]::after{transform:translateX(13px);background:var(--inverso-tinta)}
+.chave:disabled{opacity:.4}
+@media(prefers-reduced-motion:reduce){.chave,.chave::after{transition:none}}
+.op{display:flex;align-items:flex-start;gap:14px;padding-block:13px;border-top:1px solid var(--linha)}
+.op:first-child{border-top:none;padding-top:0}
+.op .t{font-size:13px;font-weight:500}
+.op .d{font-size:12px;color:var(--tinta-2);margin-top:3px;max-width:60ch;line-height:1.55}
+.op .chave,.op .btn{margin-left:auto;flex:none}
+
+/* ══ Entrada de planilha ══ */
+.comOlho{position:relative;display:block}
+.comOlho input{width:100%;padding-right:34px}
+.comOlho button{position:absolute;right:1px;top:1px;bottom:1px;width:32px;border:0;
+  background:none;cursor:pointer;display:grid;place-items:center;border-radius:0 6px 6px 0}
+.comOlho button svg{width:15px;height:15px;stroke:var(--tinta-3);fill:none;stroke-width:1.6}
+.comOlho button:hover svg{stroke:var(--tinta-1)}
+.comOlho button[aria-pressed="true"] svg{stroke:var(--tinta-1)}
+.solta{border:1px dashed var(--linha-forte);border-radius:8px;padding:28px 20px;text-align:center;
+  background:var(--sup-1);cursor:pointer;transition:border-color .12s,background .12s}
+.solta:hover,.solta.sobre{border-color:var(--tinta-2);background:var(--sup-2)}
+.solta svg{width:20px;height:20px;stroke:var(--tinta-3);fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round;margin-bottom:8px}
+.solta b{display:block;font-size:13px;font-weight:500}
+.solta small{display:block;font-size:12px;color:var(--tinta-3);margin-top:3px}
+/* Rodada encerrada: o resumo do que acabou, e a porta para a próxima.
+   Não vira sozinha à meia-noite — ele trabalha de madrugada, e limpar a
+   tela no meio do trabalho seria pior que deixar parada. */
+.fechada{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:14px 0;
+  border-top:1px solid var(--linha);border-bottom:1px solid var(--linha);margin-bottom:18px}
+.fechada .v{font:600 22px/1 var(--ui);letter-spacing:-.03em;font-variant-numeric:tabular-nums;
+  color:var(--ok)}
+.fechada .t{font-size:13px;font-weight:500}
+.fechada .d{font-size:12px;color:var(--tinta-2);margin-top:3px}
+.fechada .btn{margin-left:auto}
+.arq{display:flex;align-items:center;gap:10px;padding-block:10px;border-top:1px solid var(--linha)}
+.arq:first-child{border-top:none}
+.arq .nm{font-size:12.5px;font-weight:500}
+.arq .meta{font-size:11.5px;color:var(--tinta-3);margin-top:2px;font-variant-numeric:tabular-nums}
+.arq button{margin-left:auto;color:var(--tinta-3);padding:4px;border-radius:5px;flex:none}
+.arq button:hover{color:var(--erro)}
+.arq button svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+
+/* planilha de exemplo */
+.folha{border:1px solid var(--linha);border-radius:8px;overflow:hidden}
+.folha table{min-width:620px;font-size:12px}
+.folha td,.folha th{border-right:1px solid var(--linha);border-bottom:1px solid var(--linha);
+  padding:7px 11px}
+.folha tr>*:last-child{border-right:none}
+.folha tr:last-child>*{border-bottom:none}
+.folha .letra{background:var(--sup-1);color:var(--tinta-3);text-align:center;
+  font:400 10px/1 var(--mono);padding:5px}
+.folha .nlin{background:var(--sup-1);color:var(--tinta-3);text-align:center;width:30px;
+  font:400 10.5px/1 var(--mono)}
+.folha .cab{background:var(--sup-2);font:500 11px/1.3 var(--ui);color:var(--tinta)}
+.folha .vaga{color:var(--tinta-3);font-style:normal}
+.folha .dado{color:var(--tinta-2);font-family:var(--mono);font-size:11px}
+
+/* ══ Conferência ══ */
+.item{border-top:1px solid var(--linha);padding-block:16px}
+.item:first-child{border-top:none}
+.item-cab{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.item-cab .t{font-weight:500;font-size:13px}
+.item-cab .a{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap}
+.motivo{color:var(--tinta-2);font-size:12.5px;margin:8px 0 0;line-height:1.6;max-width:76ch}
+.motivo b{color:var(--tinta);font-weight:500}
+.lado{display:grid;gap:1px;margin-top:12px;background:var(--linha);border:1px solid var(--linha);
+  border-radius:8px;overflow:hidden}
+@media(min-width:700px){.lado{grid-template-columns:1fr 1fr}}
+.caixinha{background:var(--canvas);padding:11px 13px;min-width:0}
+.caixinha h4{margin:0 0 8px;font:500 11px/1 var(--ui);color:var(--tinta-3)}
+.par{display:flex;gap:10px;font-size:12.5px;padding:2px 0;min-width:0}
+.par dt{color:var(--tinta-3);width:98px;flex:none;text-wrap:balance}
+.par dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.difere{color:var(--erro)}
+.dias{font-size:11.5px;color:var(--tinta-3);font-variant-numeric:tabular-nums}
+.dias.velho{color:var(--erro)}
+.saidas{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:13px}
+.saidas .rot{font-size:11px;color:var(--tinta-3);text-transform:uppercase;letter-spacing:.06em;
+  margin-right:4px}
+.saidas button{padding:4px 10px;border-radius:6px;font-size:12px;color:var(--tinta-2);
+  border:1px solid var(--linha)}
+.saidas button:hover{background:var(--sup-2);color:var(--tinta);border-color:var(--linha-forte)}
+.saidas button[aria-expanded="true"]{background:var(--sup-3);color:var(--tinta)}
+.painelito{margin-top:11px;padding:13px;border:1px solid var(--linha);border-radius:8px;
+  background:var(--sup-1)}
+.painelito h5{margin:0 0 9px;font:500 11px/1 var(--ui);color:var(--tinta-3);
+  text-transform:uppercase;letter-spacing:.06em}
+.painelito .l{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.painelito input{flex:1;min-width:min(100%,180px);padding:7px 10px;border-radius:6px;
+  border:1px solid var(--linha-forte);background:var(--canvas);color:var(--tinta);
+  font:400 12.5px var(--mono)}
+.painelito input.curto{flex:none;width:100px}
+.painelito .erro{color:var(--erro);font-size:12px;margin:9px 0 0}
+.confere{margin-top:11px;padding:12px;border:1px solid var(--linha-forte);border-radius:8px;
+  background:var(--canvas)}
+.cand{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--linha);
+  flex-wrap:wrap}
+.cand:first-of-type{border-top:none}
+.cand .btn{margin-left:auto}
+.esperando{display:flex;gap:10px;align-items:center;margin-top:11px;padding:11px 13px;
+  border:1px solid var(--linha-forte);border-radius:8px;flex-wrap:wrap;font-size:12.5px}
+.esperando svg{width:13px;height:13px;flex:none;stroke:var(--tinta-2);fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+.esperando .texto{flex:1;min-width:0}
+.esperando small{display:block;color:var(--tinta-3);font-size:11.5px;margin-top:3px}
+.esperando .btn{margin-left:auto}
+.girar{animation:gira 1.1s linear infinite;transform-origin:center}
+@keyframes gira{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.girar{animation:none}}
+.vazio{text-align:center;padding:48px 20px}
+.vazio svg{width:36px;height:36px;margin-bottom:11px;overflow:visible}
+.vazio svg *{stroke:var(--tinta-3);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.vazio svg .caixa{fill:var(--ok);stroke:var(--ok)}
+.vazio b{display:block;font-size:14px;font-weight:500}
+.vazio p{margin:5px 0 0;font-size:12.5px;color:var(--tinta-2)}
+.trat{display:flex;gap:12px;align-items:center;padding-block:10px;border-top:1px solid var(--linha);
+  font-size:12.5px;flex-wrap:wrap}
+.trat:first-child{border-top:none}
+.trat .hr{margin-left:auto;color:var(--tinta-3);font-size:11.5px;font-variant-numeric:tabular-nums}
+.recolhe{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--tinta-2);
+  padding-block:4px}
+.recolhe:hover{color:var(--tinta)}
+.recolhe svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+.recolhe[aria-expanded="true"] svg{transform:rotate(90deg)}
+@media(prefers-reduced-motion:reduce){.recolhe svg{transition:none}}
+.sumindo{opacity:0;transform:translateX(12px);transition:opacity .2s,transform .2s}
+@media(prefers-reduced-motion:reduce){.sumindo{transition:none}}
+
+/* ══ Diagnóstico de conexão ══ */
+.diag{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;line-height:1.55}
+.diag svg{width:14px;height:14px;flex:none;margin-top:2px;fill:none;stroke:currentColor;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.diag.ok{color:var(--ok)} .diag.ruim{color:var(--erro)} .diag.espera{color:var(--tinta-2)}
+.diag b{display:block;font-weight:500;margin-bottom:3px}
+.diag ul{margin:7px 0 0;padding-left:16px;color:var(--tinta-2)}
+.diag li{margin-top:3px}
+.diag .prov{color:var(--tinta-2);margin-top:3px}
+.escopos{display:grid;gap:0;border:1px solid var(--linha);border-radius:8px;overflow:hidden}
+@media(min-width:560px){.escopos{grid-template-columns:1fr 1fr}}
+.escopo{padding:7px 12px;display:flex;align-items:center;gap:8px;font:400 11.5px var(--mono);
+  color:var(--tinta-2);border-bottom:1px solid var(--linha)}
+.escopo svg{width:11px;height:11px;stroke:var(--ok);fill:none;stroke-width:2.6;flex:none}
+.duplo{display:grid;gap:26px}
+@media(min-width:900px){.duplo{grid-template-columns:1fr 1fr;align-items:start}}
+
+/* ══ Histórico ══ */
+.filtros{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.busca{position:relative;flex:1;min-width:min(100%,200px)}
+.busca svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:13px;height:13px;
+  stroke:var(--tinta-3);fill:none;stroke-width:2;pointer-events:none}
+.busca input{width:100%;padding:6px 10px 6px 29px;border-radius:6px;
+  border:1px solid var(--linha-forte);background:var(--canvas);color:var(--tinta);font:400 12.5px var(--ui)}
+.datas{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tinta-3)}
+.datas input{padding:5px 8px;border-radius:6px;border:1px solid var(--linha-forte);
+  background:var(--canvas);color:var(--tinta);font:400 12px var(--ui);color-scheme:inherit}
+.voltar{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--tinta-2);
+  padding:5px 0;margin-bottom:10px}
+.voltar:hover{color:var(--tinta)}
+.voltar svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+
+.lg{flex:none}
+img.ads{width:14px;height:14px;border-radius:3px;flex:none}
+
+@media(max-width:720px){
+  .placar{gap:24px} .placar .v{font-size:25px}
+  .etapa .rot,.etapa .sub{display:none} .liga{width:14px;margin-right:8px}
+  .apoio button{padding:5px 7px}
+  h1{font-size:19px}
+}
+</style>
+</head>
+<body>
+
+<div class="barra">
+  <span class="marca">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect class="caixa" x="8" y="5.5" width="8" height="7" rx="1.3"/>
+      <circle cx="5.5" cy="17.5" r="2.6"/><circle cx="18.5" cy="17.5" r="2.6"/>
+      <path class="lona" d="M5.5 14.9h13"/><path class="lona" d="M5.5 20.1h13"/>
+    </svg><b>Esteira</b>
+  </span>
+  <span class="selo-proto" title="Nenhum dado real de cliente nesta página">protótipo · dados de exemplo</span>
+  <nav class="apoio" id="apoio">
+    <button data-tela="contas">Contas</button>
+    <button data-tela="historico">Histórico</button>
+    <button data-tela="ajustes">Ajustes</button>
+  </nav>
+</div>
+
+<div class="esteira">
+  <div class="trilha" id="trilha">
+    <button class="etapa" data-etapa="1"><span class="n">1</span>
+      <span class="rot">Planilha</span><span class="sub" id="s1"></span></button>
+    <span class="liga"></span>
+    <button class="etapa" data-etapa="2"><span class="n">2</span>
+      <span class="rot">Coleta na Shopee</span><span class="sub" id="s2"></span></button>
+    <span class="liga"></span>
+    <button class="etapa" data-etapa="3"><span class="n">3</span>
+      <span class="rot">Conferência</span><span class="sub" id="s3"></span></button>
+    <span class="liga"></span>
+    <button class="etapa" data-etapa="4"><span class="n">4</span>
+      <span class="rot">Escrita na Shopify</span><span class="sub" id="s4"></span></button>
+  </div>
+</div>
+
+<main class="tela">
+
+<!-- ═══ 1 ═══ -->
+<section id="t-1">
+  <div class="topo"><div>
+    <span class="eyebrow">Etapa 1 de 4</span>
+    <h1>A planilha do dia</h1>
+    <p>Os pedidos pagos de hoje, exportados da Shopify. É daqui que a esteira começa.</p>
+  </div></div>
+
+  <div class="bloco" id="blFechada" hidden>
+    <div class="fechada">
+      <span class="v num" id="fechNum">0</span>
+      <div><div class="t">rastreios escritos nesta rodada</div>
+        <div class="d" id="fechDet"></div></div>
+      <button class="btn pri" id="bProxima">Começar a próxima rodada</button>
+    </div>
+  </div>
+
+  <div class="bloco">
+    <div class="solta" id="solta" role="button" tabindex="0">
+      <svg viewBox="0 0 24 24"><path d="M12 16V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      <b>Arraste a planilha aqui</b>
+      <small>ou clique para escolher · .xlsx, .csv</small>
+    </div>
+    <input type="file" id="fArq" accept=".xlsx,.xls,.csv" multiple hidden>
+    <div id="listaArq" style="margin-top:4px"></div>
+  </div>
+
+  <div class="bloco" id="blLeitura" hidden>
+    <div class="rotulo"><h2>O que foi lido</h2></div>
+    <div class="placar">
+      <div><div class="v num" id="lePed">0</div><div class="r">pedidos para buscar<br><span class="ter">em <span id="leCont">0</span> contas</span></div></div>
+      <div><div class="v num ter" id="leJa">0</div><div class="r">já tinham rastreio<br><span class="ter">ignoradas</span></div></div>
+      <div><div class="v num ter">1</div><div class="r">linha sem conta<br><span class="ter">linha 31</span></div></div>
+    </div>
+    <div style="margin-top:20px"><button class="btn pri" data-ir="2">Seguir para a coleta
+      <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
+  </div>
+
+  <div class="bloco">
+    <div class="rotulo"><h2>Vindos de dias anteriores</h2>
+      <span class="dir"><button class="btn peq" id="bVerAtras" aria-expanded="false">Ver quais</button></span></div>
+    <div class="placar">
+      <div class="ok"><div class="v num" id="nAuto">0</div><div class="r">vão se resolver sozinhos<br><span class="ter">a Shopee ainda não despachou</span></div></div>
+      <div class="at"><button class="bloco-num" data-ir="3"><div class="v num" id="nManual">0</div><div class="r">não vão se resolver nunca<br><span class="ter">só saem com uma decisão sua</span></div></button></div>
+    </div>
+    <div id="listaAtras" hidden style="margin-top:16px"><div class="rolo"><table>
+      <thead><tr><th>Pedido</th><th>Cliente</th><th>Conta</th><th>Por quê</th><th class="dir">Pena há</th></tr></thead>
+      <tbody id="tbAtras"></tbody></table></div></div>
+    <p class="nota">Estes <b>não estão</b> na planilha de hoje — o cliente manda só os pagos do dia.
+      O robô guarda quem não resolveu e traz de volta sozinho, abrindo a conta deles nesta rodada.</p>
+  </div>
+
+  <div class="bloco">
+    <div class="rotulo"><h2>Como a planilha precisa estar</h2>
+      <span class="dir">4 colunas obrigatórias</span></div>
+    <div class="folha"><div class="rolo"><table>
+      <tr><td class="letra"></td><td class="letra">A</td><td class="letra">B</td><td class="letra">C</td><td class="letra">D</td></tr>
+      <tr><td class="nlin">1</td><th class="cab">Número do pedido</th><th class="cab">Nome do cliente</th>
+        <th class="cab">Código de rastreio</th><th class="cab">Onde foi feito o pedido</th></tr>
+      <tr><td class="nlin">2</td><td class="dado">#164891</td><td>Sônia Aparecida Pinto</td>
+        <td class="vaga">deixe vazio</td><td class="dado">shopee 124</td></tr>
+      <tr><td class="nlin">3</td><td class="dado">#164892</td><td>Antônio Paulo Borges</td>
+        <td></td><td class="dado">shopee 124</td></tr>
+      <tr><td class="nlin">4</td><td class="dado">#164895</td><td>Leonardo José de Freitas</td>
+        <td></td><td class="dado">shopee 128</td></tr>
+    </table></div></div>
+    <p class="nota">A coluna de rastreio é a que o robô preenche — linha que já vier preenchida é pulada.
+      O <b>nome do cliente</b> é o de quem recebe, igual ao do endereço de entrega: é esse que aparece
+      na Shopee. Colunas a mais não atrapalham, e o <b>valor pago</b> ajuda a desempatar cliente com
+      dois pedidos no mesmo dia.</p>
+    <button class="btn" style="margin-top:14px" id="bModelo">Baixar esta planilha em branco</button>
+  </div>
+</section>
+
+<!-- ═══ 2 ═══ -->
+<section id="t-2" hidden>
+  <div class="topo">
+    <div>
+      <span class="eyebrow">Etapa 2 de 4</span>
+      <h1>Coleta na Shopee</h1>
+      <p>O robô abre cada conta no perfil dela do AdsPower e lê os códigos de rastreio.
+        Nada é escrito nesta etapa.</p>
+    </div>
+    <div class="acoes">
+      <button class="btn" id="bParar" disabled>Parar</button>
+      <button class="btn pri" id="bRodar" disabled>
+        <svg viewBox="0 0 24 24" class="cheio"><path d="M5 3l14 9-14 9V3z"/></svg>Iniciar coleta</button>
+    </div>
+  </div>
+
+  <div class="bloco">
+    <div class="placar">
+      <div><div class="v num" id="vLidos">0</div><div class="r" id="rLidos">de 0 rastreios lidos</div></div>
+      <div><div class="v num" id="vContas">0/5</div><div class="r">contas visitadas</div></div>
+      <div class="ok"><div class="v num" id="vSemLogin">—</div><div class="r">já estavam conectadas<br><span class="ter">não precisaram de senha</span></div></div>
+      <div><div class="v num" id="vTempo">—</div><div class="r">previsão</div></div>
+    </div>
+  </div>
+
+  <div class="bloco">
+    <div class="rotulo"><h2>Navegadores ao mesmo tempo</h2><span class="dir" id="custo"></span></div>
+    <div class="linha-ctrl">
+      <div class="seg" id="seg" role="group" aria-label="Navegadores simultâneos">
+        <button data-n="1">1</button><button data-n="2">2</button>
+        <button data-n="3" aria-pressed="true">3</button><button data-n="5">5</button>
+        <button data-n="7">7</button><button data-n="10">10</button>
+      </div>
+      <span class="custo" id="estimativa"></span>
+    </div>
+    <div class="aviso" style="margin-top:13px">
+      <svg viewBox="0 0 24 24"><path d="M15 7a4 4 0 11-4 4l-7 7v3h3l7-7"/></svg>
+      <span>Os logins acontecem <b>um de cada vez</b>, mesmo com vários navegadores abertos.
+        Quatro logins simultâneos já fizeram a Shopee pedir verificação por imagem.</span>
+    </div>
+  </div>
+
+  <div class="bloco">
+    <div class="rotulo"><h2><svg class="lg" viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M15.9414 17.9633c.229-1.879-.981-3.077-4.1758-4.0969-1.548-.528-2.277-1.22-2.26-2.1719.065-1.056 1.048-1.825 2.352-1.85a5.2898 5.2898 0 0 1 2.8838.89c.116.072.197.06.263-.039.09-.145.315-.494.39-.62.051-.081.061-.187-.068-.281-.185-.1369-.704-.4149-.983-.5319a6.4697 6.4697 0 0 0-2.5118-.514c-1.909.008-3.4129 1.215-3.5389 2.826-.082 1.1629.494 2.1078 1.73 2.8278.262.152 1.6799.716 2.2438.892 1.774.552 2.695 1.5419 2.478 2.6969-.197 1.047-1.299 1.7239-2.818 1.7439-1.2039-.046-2.2878-.537-3.1278-1.19l-.141-.11c-.104-.08-.218-.075-.287.03-.05.077-.376.547-.458.67-.077.108-.035.168.045.234.35.293.817.613 1.134.775a6.7097 6.7097 0 0 0 2.8289.727 4.9048 4.9048 0 0 0 2.0759-.354c1.095-.465 1.8029-1.394 1.9449-2.554zM11.9986 1.4009c-2.068 0-3.7539 1.95-3.8329 4.3899h7.6657c-.08-2.44-1.765-4.3899-3.8328-4.3899zm7.8516 22.5981-.08.001-15.7843-.002c-1.074-.04-1.863-.91-1.971-1.991l-.01-.195L1.298 6.2858a.459.459 0 0 1 .45-.494h4.9748C6.8448 2.568 9.1607 0 11.9996 0c2.8388 0 5.1537 2.5689 5.2757 5.7898h4.9678a.459.459 0 0 1 .458.483l-.773 15.5883-.007.131c-.094 1.094-.979 1.9769-2.0709 2.0059z"/></svg>Contas desta rodada</h2>
+      <span class="dir" id="resumoContas"></span></div>
+    <div class="rolo"><table>
+      <thead><tr><th>Conta</th><th>Perfil (AdsPower)</th><th>Como entrou</th><th>Estado</th>
+        <th class="dir">Pedidos</th><th class="dir">Tempo</th></tr></thead>
+      <tbody id="corpo"></tbody></table></div>
+    <p class="nota"><b>Já conectada</b>: a sessão da Shopee ainda estava viva no perfil, o robô abriu e
+      entrou direto. <b>O robô logou</b>: a sessão tinha caído e ele digitou e-mail e senha sozinho —
+      funciona, mas é o momento em que a Shopee pede verificação.</p>
+  </div>
+</section>
+
+<!-- ═══ 3 ═══ -->
+<section id="t-3" hidden>
+  <div class="topo"><div>
+    <span class="eyebrow">Etapa 3 de 4</span>
+    <h1>Conferência</h1>
+    <p>O que o robô não resolveu sozinho porque teve dúvida. Nada aqui foi escrito na Shopify.</p>
+  </div></div>
+
+  <div class="bloco">
+    <div class="rotulo"><h2>Precisa de você</h2><span class="dir" id="ctPrecisa"></span></div>
+    <div id="cxPrecisa">
+      <div class="vazio" id="vzPrecisa" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect class="caixa" x="8" y="5.5" width="8" height="7" rx="1.3"/>
+          <circle cx="5.5" cy="17.5" r="2.6"/><circle cx="18.5" cy="17.5" r="2.6"/>
+          <path d="M5.5 14.9h13"/><path d="M5.5 20.1h13"/></svg>
+        <b>Nada esperando você</b>
+        <p>A esteira rodou inteira sem precisar de decisão nenhuma.</p>
+      </div>
+
+      <div class="item" data-rev>
+        <div class="item-cab">
+          <span class="est er"><span class="pt"></span>não achado na conta</span>
+          <span class="t mono">#165091</span>
+          <span class="ter" style="font-size:12.5px">conta 152 · José Alves Tolentino</span>
+          <span class="dias velho">pena há 6 dias</span>
+        </div>
+        <p class="motivo"><b>Nenhum pedido com esse cliente na conta indicada pela planilha.</b>
+          Ou a compra foi feita em outra conta, ou a planilha aponta a conta errada.</p>
+        <div class="esperando" style="margin-top:11px">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <span class="texto">Esse cliente aparece na <b>conta 161</b>, com rastreio
+            <span class="mono">BR264983069926O</span>.</span>
+          <button class="btn pri" data-acao="usar-sugestao" data-det="passou a usar a conta 161">Usar esse</button>
+        </div>
+      </div>
+
+      <div class="item" data-rev>
+        <div class="item-cab">
+          <span class="est er"><span class="pt"></span>nome não confere</span>
+          <span class="t mono">#164903</span><span class="ter" style="font-size:12.5px">conta 128</span>
+          <span class="a">
+            <button class="btn" data-acao="descartar" data-det="marcado como pedido errado na planilha">Não é esse pedido</button>
+            <button class="btn pri" data-acao="forcar" data-det="escrito mesmo com nome divergente">Escrever assim mesmo</button></span>
+        </div>
+        <p class="motivo"><b>O número do pedido levou a um cliente diferente do que está na Shopee.</b>
+          Costuma ser número digitado errado na planilha. Confira antes de escrever.</p>
+        <div class="lado">
+          <div class="caixinha"><h4>Na Shopee · conta 128</h4><dl>
+            <div class="par"><dt>Cliente</dt><dd class="difere">Juliana Carla de Souza Oliveira</dd></div>
+            <div class="par"><dt>CEP</dt><dd class="mono">35634040</dd></div>
+            <div class="par"><dt>Valor</dt><dd class="num">R$ 58,90</dd></div>
+            <div class="par"><dt>Rastreio</dt><dd class="mono">BR260810072086Y</dd></div></dl></div>
+          <div class="caixinha"><h4>Na Shopify · #164903</h4><dl>
+            <div class="par"><dt>Entrega</dt><dd class="difere">Charles Silva</dd></div>
+            <div class="par"><dt>CEP</dt><dd class="mono">66645020</dd></div>
+            <div class="par"><dt>Valor</dt><dd class="num">R$ 31,33</dd></div>
+            <div class="par"><dt>Situação</dt><dd>sem rastreio</dd></div></dl></div>
+        </div>
+      </div>
+
+      <div class="item" data-rev>
+        <div class="item-cab">
+          <span class="est at"><span class="pt"></span>dois candidatos</span>
+          <span class="t mono">#164915</span>
+          <span class="ter" style="font-size:12.5px">conta 130 · Maria Aparecida Santos</span>
+          <span class="a"><button class="btn" data-acao="ver-dois">Ver os dois</button></span>
+        </div>
+        <p class="motivo"><b>Dois pedidos do mesmo cliente na conta, e o valor não desempatou.</b>
+          Os dois são de R$ 13,00. Escolha qual é o pedido certo.</p>
+      </div>
+
+      <div class="item" data-rev>
+        <div class="item-cab">
+          <span class="est at"><span class="pt"></span>verificação humana</span>
+          <span class="t">Conta 207</span>
+          <span class="ter" style="font-size:12.5px">6 pedidos parados</span>
+          <span class="a"><button class="btn pri" data-acao="abrir-navegador">Abrir a conta 207</button></span>
+        </div>
+        <p class="motivo"><b>A Shopee pediu confirmação de que é uma pessoa.</b>
+          As outras contas seguiram rodando normalmente.</p>
+      </div>
+
+      <div class="item" data-rev>
+        <div class="item-cab">
+          <span class="est er"><span class="pt"></span>sem conta reconhecível</span>
+          <span class="t mono">linha 31</span>
+          <span class="ter" style="font-size:12.5px">“site terceiro”</span>
+        </div>
+        <p class="motivo"><b>Não há número de conta nessa linha.</b> Erro de digitação o robô corrige
+          sozinho — <code>shoppe 09</code> e <code>shope 9</code> viram conta 9. Aqui não existe
+          número para ler.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="bloco">
+    <div class="rotulo"><h2>Aguardando a Shopee</h2><span class="dir" id="ctSozinho"></span></div>
+    <button class="recolhe" id="bRecolhe" aria-expanded="false" aria-controls="listaSozinho">
+      <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span id="rotSozinho"></span></button>
+    <div id="listaSozinho" hidden style="margin-top:10px"><div class="rolo"><table>
+      <thead><tr><th>Pedido</th><th>Cliente</th><th>Conta</th><th>Comprado há</th>
+        <th>Situação na Shopee</th><th class="dir">Pena há</th></tr></thead>
+      <tbody id="tbSozinho"></tbody></table></div></div>
+    <p class="nota">A Shopee ainda não despachou, então não existe rastreio para buscar.
+      <b>O robô guarda estes pedidos e traz de volta sozinho</b> na próxima rodada, mesmo que não
+      estejam na planilha de amanhã.</p>
+  </div>
+
+  <div class="bloco">
+    <div class="rotulo"><h2>Já tratados nesta rodada</h2><span class="dir" id="ctTratados"></span></div>
+    <button class="recolhe" id="bRecTrat" aria-expanded="false" aria-controls="listaTratados">
+      <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span id="rotTratados"></span></button>
+    <div id="listaTratados" hidden style="margin-top:6px"></div>
+    <p class="nota">Toda decisão sua fica registrada, com o que era e o que você escolheu.
+      Vai junto para o histórico do dia.</p>
+  </div>
+
+  <div class="bloco"><button class="btn pri" data-ir="4">Seguir para a escrita
+    <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
+</section>
+
+<!-- ═══ 4 ═══ -->
+<section id="t-4" hidden>
+  <div class="topo">
+    <div>
+      <span class="eyebrow">Etapa 4 de 4</span>
+      <h1>Escrita na Shopify</h1>
+      <p>O último passo, e o único que não dá para desfazer com um clique.</p>
+    </div>
+    <div class="acoes"><button class="btn pri" id="bEscrever" disabled>
+      <svg class="lg" viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M15.337 23.979l7.216-1.561s-2.604-17.613-2.625-17.73c-.018-.116-.114-.192-.211-.192s-1.929-.136-1.929-.136-1.275-1.274-1.439-1.411c-.045-.037-.075-.057-.121-.074l-.914 21.104h.023zM11.71 11.305s-.81-.424-1.774-.424c-1.447 0-1.504.906-1.504 1.141 0 1.232 3.24 1.715 3.24 4.629 0 2.295-1.44 3.76-3.406 3.76-2.354 0-3.54-1.465-3.54-1.465l.646-2.086s1.245 1.066 2.28 1.066c.675 0 .975-.545.975-.932 0-1.619-2.654-1.694-2.654-4.359-.034-2.237 1.571-4.416 4.827-4.416 1.257 0 1.875.361 1.875.361l-.945 2.715-.02.01zM11.17.83c.136 0 .271.038.405.135-.984.465-2.064 1.639-2.508 3.992-.656.213-1.293.405-1.889.578C7.697 3.75 8.951.84 11.17.84V.83zm1.235 2.949v.135c-.754.232-1.583.484-2.394.736.466-1.777 1.333-2.645 2.085-2.971.193.501.309 1.176.309 2.1zm.539-2.234c.694.074 1.141.867 1.429 1.755-.349.114-.735.231-1.158.366v-.252c0-.752-.096-1.371-.271-1.871v.002zm2.992 1.289c-.02 0-.06.021-.078.021s-.289.075-.714.21c-.423-1.233-1.176-2.37-2.508-2.37h-.115C12.135.209 11.669 0 11.265 0 8.159 0 6.675 3.877 6.21 5.846c-1.194.365-2.063.636-2.16.674-.675.213-.694.232-.772.87-.075.462-1.83 14.063-1.83 14.063L15.009 24l.927-21.166z"/></svg>
+      <span id="eBotTexto">Escrever na Shopify</span></button></div>
+  </div>
+
+  <div class="bloco">
+    <div class="placar">
+      <div id="plEsc"><div class="v num" id="eNum">0</div><div class="r" id="eUn">prontos</div></div>
+      <div style="flex:1;min-width:min(100%,240px)">
+        <div class="forte" id="eTit" style="font-size:14px">Nada para escrever ainda</div>
+        <div class="nota" style="margin-top:5px" id="eSub">Rode a coleta na etapa 2.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bloco" id="blLista" hidden>
+    <div class="rotulo"><h2>O que vai ser escrito</h2><span class="dir" id="ctLista"></span></div>
+    <div class="rolo"><table>
+      <thead><tr><th>Pedido</th><th>Cliente</th><th>Conta</th><th>Rastreio</th><th>Transportadora</th></tr></thead>
+      <tbody id="tbEscrita"></tbody></table></div>
+    <p class="nota">Uma conferida na lista e um clique libera o lote inteiro.
+      Não precisa aprovar um por um.</p>
+  </div>
+
+  <div class="bloco">
+    <div class="rotulo"><h2><svg class="lg" viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M15.337 23.979l7.216-1.561s-2.604-17.613-2.625-17.73c-.018-.116-.114-.192-.211-.192s-1.929-.136-1.929-.136-1.275-1.274-1.439-1.411c-.045-.037-.075-.057-.121-.074l-.914 21.104h.023zM11.71 11.305s-.81-.424-1.774-.424c-1.447 0-1.504.906-1.504 1.141 0 1.232 3.24 1.715 3.24 4.629 0 2.295-1.44 3.76-3.406 3.76-2.354 0-3.54-1.465-3.54-1.465l.646-2.086s1.245 1.066 2.28 1.066c.675 0 .975-.545.975-.932 0-1.619-2.654-1.694-2.654-4.359-.034-2.237 1.571-4.416 4.827-4.416 1.257 0 1.875.361 1.875.361l-.945 2.715-.02.01zM11.17.83c.136 0 .271.038.405.135-.984.465-2.064 1.639-2.508 3.992-.656.213-1.293.405-1.889.578C7.697 3.75 8.951.84 11.17.84V.83zm1.235 2.949v.135c-.754.232-1.583.484-2.394.736.466-1.777 1.333-2.645 2.085-2.971.193.501.309 1.176.309 2.1zm.539-2.234c.694.074 1.141.867 1.429 1.755-.349.114-.735.231-1.158.366v-.252c0-.752-.096-1.371-.271-1.871v.002zm2.992 1.289c-.02 0-.06.021-.078.021s-.289.075-.714.21c-.423-1.233-1.176-2.37-2.508-2.37h-.115C12.135.209 11.669 0 11.265 0 8.159 0 6.675 3.877 6.21 5.846c-1.194.365-2.063.636-2.16.674-.675.213-.694.232-.772.87-.075.462-1.83 14.063-1.83 14.063L15.009 24l.927-21.166z"/></svg>Loja conectada</h2></div>
+    <dl style="margin:0">
+      <div class="par"><dt>Loja</dt><dd class="forte">testeloja</dd></div>
+      <div class="par"><dt>Domínio</dt><dd class="mono">testeloja-4ajtpkll.myshopify.com</dd></div>
+      <div class="par"><dt>Permissões</dt><dd>8 de 8 concedidas</dd></div>
+      <div class="par"><dt>Acesso</dt><dd>não expira</dd></div>
+    </dl>
+    <p class="nota">O nome acima veio da própria Shopify, não do que foi digitado.
+      O acesso ficou só nesta máquina.
+      <button class="btn peq" style="margin-left:6px" data-tela="ajustes">Trocar de loja</button></p>
+  </div>
+</section>
+
+<!-- ═══ CONTAS ═══ -->
+<section id="t-contas" hidden>
+  <div class="topo"><div>
+    <h1>Contas Shopee</h1>
+    <p>Cada conta usa sempre o mesmo perfil do AdsPower. É o perfil que guarda os cookies —
+      por isso a maioria entra já conectada.</p>
+  </div></div>
+
+  <div class="bloco">
+    <div class="aviso grave">
+      <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z"/></svg>
+      <span><b>Duas contas apontam para o mesmo perfil.</b> As contas <b>207</b> e <b>270</b> estão
+        as duas no perfil <span class="mono">k1cexbyh</span>. Os cookies de uma sobrescrevem os da
+        outra, e o robô pode entrar como a conta errada — e escrever o rastreio no pedido de outro
+        cliente. As duas ficam de fora da rodada até isso ser desfeito.</span>
+    </div>
+  </div>
+
+  <div class="bloco">
+    <div class="placar">
+      <div><div class="v num">80</div><div class="r">contas na planilha</div></div>
+      <div class="ok"><div class="v num">76</div><div class="r">com sessão viva</div></div>
+      <div class="at"><div class="v num">2</div><div class="r">vão precisar de senha</div></div>
+      <div><div class="v num" style="color:var(--erro)">2</div><div class="r">com perfil duplicado</div></div>
+    </div>
+  </div>
+
+  <div class="bloco">
+    <div class="rotulo"><h2><img class="ads" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAAEGElEQVRYCb2X229UZRTFV6cXKFIoBQsClXK/h6JgQowhxhLfDOH64KPhAeOfwwOPPKO8mfAgAdSEEoIFFNsosUVuStUCpYUWaMf1m83AtM75hpowO5nJnHO+b+211758Z2quXMvnjxyXun6Snj5TVaw2J21dK32+T6o7ekI684P05GlVfL9wQsBj9lnT8Wk+Pzj04n5Vf6BE7tl4VX1OcjY+YQKT7ky5yNVMuTHdy7wlroCRSYCNW9ZI69sDxFjTMvYvXyKtbvP+xM5MAuzZuEI6vFfa+Y40s17KvwIL1jR47bb10oFOaYVJpCxJgCgA+OwTad9H0vy5aRI4nztb2vWetHuntPjNyimoS7HjGaAtc6Q9H0pLDPjVaanvdvldbYukzu3S5lWhwoSLrJJVJAAAJGZY1g86pNYW6YRJXOx9OTvqjUK6Oh352yaBcuzJWd+6WgNQBL4uZ69EoLgRYIry0G7Lu0D65oJEK+3YHORaSlJUb8e1OMcynPNoWgQKWAZbaBUO7pJWLpX+eSCtbZcaGyJqSDYYleiZdJXmTJIAygFYzhbNj8K8+ps0/DiiRXbSgY09CXXiKvs7kwBg9x9KowZqnBHRAcP4bG6SFjRHDUCQgUVtwJWxPjrmH77gfBl+lMxAOgXfX5GaZkkf74hOoL9x3OxWI784gEC977Nu1sxw/Nc9ic+5H6XLv/pewhxPtg06v1+64o99HWrQhrRksbgK+bZzVBn3mULFUx+k4ZQLlM/QSDY+T5IEWEAqHlrGO38HGNdFgwC9Tr4nfJ+OuD0gXbsRZFCFNSnLrAE2MdVosW0bApzeX9cuLV8cUeK8+BIDid4+qac/ipI1pIQUQAqC5SxJgIn2/pZoK/Y/dnH9/me0VtvCl9ENON8371opy114yXDURE6nvLsu7t9zQZdTI5MAi2c3RqQ4ZxI2vRER9zjSgUGP5lZHfV06eU5a5gnIcCp1gvqNVoEizbJMAmzAMYBIyYf2GnHPIyfnwcku6axf54huqcmUHbmAJCxJgOqe46iZbMjLTMDoDlqs+xfp0WiodNeKtM4LpSr4DJDn30kCDCCGzP3hkJ7Ib/whfdvtSr8ZtYBCjNufPRGZC5tWxkyY5CVxkSRAxA/snNYDnLH73SWJaLHSfFN8hQ5wy3b4TYqBVVOxySscRkRG1EMmcf6qdKEnRmup46AS37TldSs04rRAgqO5UBeli6b8TipA5Lfcw0Td2x9pyHJeikuHdLlGOKTeciumLEmg71Y4ZpCYyyTJU6CQZHp2e3DRqsXiLbcnkwDR992JFBhv2gYJ6qLfGFiWcpkE2ASJ/+OcvUUDI2W5wjtbasVrfMZbU267D5riW8xr9PUfaIbcVndKHX886HH+rXKmV8OInH9dX+yX/gVFgFpEoEAJCwAAAABJRU5ErkJggg==" alt="">Inventário</h2>
+      <span class="dir">mostrando 8 de 80</span></div>
+    <div class="rolo"><table>
+      <thead><tr><th>Conta</th><th>E-mail de acesso</th><th>Perfil (AdsPower)</th>
+        <th>Última entrada</th><th>Sessão</th><th class="dir">Pedidos lidos</th></tr></thead>
+      <tbody id="tbContas"></tbody></table></div>
+    <p class="nota">O e-mail é derivado do número: abaixo de 200 usa <code>chompspee</code>,
+      de 200 para cima usa <code>Brushopee</code>. Sem zero à esquerda — a conta 76 é
+      <code>chompspee76</code>.</p>
+  </div>
+</section>
+
+<!-- ═══ HISTÓRICO ═══ -->
+<section id="t-historico" hidden>
+  <div id="histLista">
+    <div class="topo"><div>
+      <h1>Histórico</h1>
+      <p>Toda rodada fica guardada. Quando alguém perguntar por que um pedido ficou sem rastreio,
+        a resposta está aqui.</p>
+    </div></div>
+
+    <div class="bloco">
+      <div class="filtros">
+        <div class="seg" id="segPer" role="group" aria-label="Período">
+          <button data-d="7" aria-pressed="true">7 dias</button>
+          <button data-d="30">30 dias</button><button data-d="0">Tudo</button>
+        </div>
+        <div class="datas"><input type="date" id="dDe" aria-label="De"><span>até</span>
+          <input type="date" id="dAte" aria-label="Até"></div>
+        <div class="busca">
+          <svg viewBox="0 0 24 24" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="qBusca" placeholder="Buscar pedido, cliente ou rastreio" spellcheck="false"></div>
+        <button class="btn" id="bExpPer">Exportar período</button>
+      </div>
+
+      <div id="cxBusca" hidden>
+        <div class="rotulo"><h2>Resultado da busca</h2><span class="dir" id="ctBusca"></span></div>
+        <div class="rolo"><table>
+          <thead><tr><th>Dia</th><th>Pedido</th><th>Cliente</th><th>Conta</th><th>Rastreio</th><th>Situação</th></tr></thead>
+          <tbody id="tbBusca"></tbody></table></div>
+      </div>
+
+      <div id="cxDias">
+        <div class="rolo"><table>
+          <thead><tr><th>Dia</th><th class="dir">Pedidos</th><th class="dir">Escritos</th>
+            <th class="dir">Conferência</th><th>Já conectadas</th><th class="dir">Duração</th></tr></thead>
+          <tbody id="tbHist"></tbody></table></div>
+        <p class="nota">Clique em um dia para ver pedido por pedido. A coluna <b>já conectadas</b> é o
+          termômetro: se despencar, alguma coisa está derrubando as sessões da Shopee.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="histDia" hidden>
+    <div class="topo"><div>
+      <button class="voltar" id="bVoltar"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Todos os dias</button>
+      <h1 id="diaTit">—</h1><p id="diaSub">—</p>
+    </div></div>
+
+    <div class="bloco"><div class="placar" id="diaResumo"></div>
+      <div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
+        <button class="btn" id="bExpDia">Baixar a planilha preenchida</button>
+        <button class="btn" id="bExpCsv">Baixar em CSV</button></div>
+    </div>
+
+    <div class="bloco">
+      <div class="rotulo"><h2>Pedidos do dia</h2><span class="dir" id="ctDia"></span></div>
+      <div class="seg" id="segSit" role="group" aria-label="Situação" style="margin-bottom:13px">
+        <button data-s="" aria-pressed="true">Tudo</button><button data-s="escrito">Escritos</button>
+        <button data-s="revisao">Conferência</button><button data-s="semcod">Sem rastreio</button>
+      </div>
+      <div class="rolo"><table>
+        <thead><tr><th>Pedido</th><th>Cliente</th><th>Conta</th><th>Rastreio</th>
+          <th>Situação</th><th class="dir">Hora</th></tr></thead>
+        <tbody id="tbDia"></tbody></table></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ AJUSTES ═══ -->
+<section id="t-ajustes" hidden>
+  <div class="topo"><div><h1>Ajustes</h1><p>Mexe-se uma vez e esquece.</p></div></div>
+
+  <div class="duplo">
+    <div>
+      <div class="bloco">
+        <div class="rotulo"><h2>Avisos</h2></div>
+        <div class="op"><div><div class="t">Tocar um som</div>
+          <div class="d">Quando uma conta pedir verificação humana e quando a coleta terminar.</div></div>
+          <button class="chave" id="chSom" aria-pressed="true" aria-label="Som"></button></div>
+        <div class="op"><div><div class="t">Avisar pelo sistema</div>
+          <div class="d">Notificação do computador, pra quando a janela estiver atrás de outra.</div></div>
+          <button class="chave" id="chNot" aria-pressed="true" aria-label="Notificação"></button></div>
+        <div class="op"><div><div class="t">Escrever sem me perguntar</div>
+          <div class="d">Desligado, a escrita espera sua aprovação na etapa 4. Ligue quando confiar
+            no resultado — dá para voltar atrás a qualquer momento.</div></div>
+          <button class="chave" id="chDireto" aria-pressed="false" aria-label="Escrita direta"></button></div>
+        <div class="op" style="opacity:.5"><div><div class="t">Avisar o cliente final
+          <span class="ter" style="font-weight:400">· ainda não</span></div>
+          <div class="d">Deixaria a Shopify mandar o e-mail de “pedido enviado”. Fora do escopo
+            por enquanto.</div></div>
+          <button class="chave" id="chCliente" aria-pressed="false" disabled></button></div>
+        <div class="op"><div><div class="t">Testar o aviso</div>
+          <div class="d">Toca o som e dispara a notificação, pra conferir que funciona antes de precisar.</div></div>
+          <button class="btn" id="bTestar">Testar</button></div>
+      </div>
+
+      <div class="bloco">
+        <div class="rotulo"><h2>Aparência</h2></div>
+        <div class="op"><div><div class="t">Tema</div>
+          <div class="d">Segue o sistema se você não escolher.</div></div>
+          <div class="seg" style="margin-left:auto" role="group" aria-label="Tema">
+            <button id="tSis" aria-pressed="true">Sistema</button>
+            <button id="tLuz" aria-pressed="false">Claro</button>
+            <button id="tEsc" aria-pressed="false">Escuro</button></div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="bloco">
+        <div class="rotulo"><h2><img class="ads" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAAEGElEQVRYCb2X229UZRTFV6cXKFIoBQsClXK/h6JgQowhxhLfDOH64KPhAeOfwwOPPKO8mfAgAdSEEoIFFNsosUVuStUCpYUWaMf1m83AtM75hpowO5nJnHO+b+211758Z2quXMvnjxyXun6Snj5TVaw2J21dK32+T6o7ekI684P05GlVfL9wQsBj9lnT8Wk+Pzj04n5Vf6BE7tl4VX1OcjY+YQKT7ky5yNVMuTHdy7wlroCRSYCNW9ZI69sDxFjTMvYvXyKtbvP+xM5MAuzZuEI6vFfa+Y40s17KvwIL1jR47bb10oFOaYVJpCxJgCgA+OwTad9H0vy5aRI4nztb2vWetHuntPjNyimoS7HjGaAtc6Q9H0pLDPjVaanvdvldbYukzu3S5lWhwoSLrJJVJAAAJGZY1g86pNYW6YRJXOx9OTvqjUK6Oh352yaBcuzJWd+6WgNQBL4uZ69EoLgRYIry0G7Lu0D65oJEK+3YHORaSlJUb8e1OMcynPNoWgQKWAZbaBUO7pJWLpX+eSCtbZcaGyJqSDYYleiZdJXmTJIAygFYzhbNj8K8+ps0/DiiRXbSgY09CXXiKvs7kwBg9x9KowZqnBHRAcP4bG6SFjRHDUCQgUVtwJWxPjrmH77gfBl+lMxAOgXfX5GaZkkf74hOoL9x3OxWI784gEC977Nu1sxw/Nc9ic+5H6XLv/pewhxPtg06v1+64o99HWrQhrRksbgK+bZzVBn3mULFUx+k4ZQLlM/QSDY+T5IEWEAqHlrGO38HGNdFgwC9Tr4nfJ+OuD0gXbsRZFCFNSnLrAE2MdVosW0bApzeX9cuLV8cUeK8+BIDid4+qac/ipI1pIQUQAqC5SxJgIn2/pZoK/Y/dnH9/me0VtvCl9ENON8371opy114yXDURE6nvLsu7t9zQZdTI5MAi2c3RqQ4ZxI2vRER9zjSgUGP5lZHfV06eU5a5gnIcCp1gvqNVoEizbJMAmzAMYBIyYf2GnHPIyfnwcku6axf54huqcmUHbmAJCxJgOqe46iZbMjLTMDoDlqs+xfp0WiodNeKtM4LpSr4DJDn30kCDCCGzP3hkJ7Ib/whfdvtSr8ZtYBCjNufPRGZC5tWxkyY5CVxkSRAxA/snNYDnLH73SWJaLHSfFN8hQ5wy3b4TYqBVVOxySscRkRG1EMmcf6qdKEnRmup46AS37TldSs04rRAgqO5UBeli6b8TipA5Lfcw0Td2x9pyHJeikuHdLlGOKTeciumLEmg71Y4ZpCYyyTJU6CQZHp2e3DRqsXiLbcnkwDR992JFBhv2gYJ6qLfGFiWcpkE2ASJ/+OcvUUDI2W5wjtbasVrfMZbU267D5riW8xr9PUfaIbcVndKHX886HH+rXKmV8OInH9dX+yX/gVFgFpEoEAJCwAAAABJRU5ErkJggg==" alt="">AdsPower</h2></div>
+        <label class="campo"><span>Chave da API</span>
+          <span class="comOlho">
+            <input id="adsChave" type="password" value="" spellcheck="false"
+                   autocomplete="off" placeholder="cole aqui a chave do AdsPower">
+            <button type="button" id="bOlho" aria-label="Mostrar a chave" aria-pressed="false">
+              <svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/>
+                <circle cx="12" cy="12" r="3"/></svg></button></span>
+          <em>No AdsPower: Configurações → API local → copiar a chave.</em></label>
+        <label class="campo"><span>Endereço</span>
+          <input id="adsBase" value="http://local.adspower.net:50325" spellcheck="false">
+          <em>A porta padrão é 50325. Só mude se você mudou lá.</em></label>
+        <button class="btn pri" id="bTestarAds">Testar conexão</button>
+        <div id="adsResultado" style="margin-top:14px"></div>
+        <p class="nota">O AdsPower precisa estar <b>aberto</b> para a conexão existir —
+          ela some quando você fecha o programa.</p>
+      </div>
+
+      <div class="bloco">
+        <div class="rotulo"><h2><svg class="lg" viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M15.337 23.979l7.216-1.561s-2.604-17.613-2.625-17.73c-.018-.116-.114-.192-.211-.192s-1.929-.136-1.929-.136-1.275-1.274-1.439-1.411c-.045-.037-.075-.057-.121-.074l-.914 21.104h.023zM11.71 11.305s-.81-.424-1.774-.424c-1.447 0-1.504.906-1.504 1.141 0 1.232 3.24 1.715 3.24 4.629 0 2.295-1.44 3.76-3.406 3.76-2.354 0-3.54-1.465-3.54-1.465l.646-2.086s1.245 1.066 2.28 1.066c.675 0 .975-.545.975-.932 0-1.619-2.654-1.694-2.654-4.359-.034-2.237 1.571-4.416 4.827-4.416 1.257 0 1.875.361 1.875.361l-.945 2.715-.02.01zM11.17.83c.136 0 .271.038.405.135-.984.465-2.064 1.639-2.508 3.992-.656.213-1.293.405-1.889.578C7.697 3.75 8.951.84 11.17.84V.83zm1.235 2.949v.135c-.754.232-1.583.484-2.394.736.466-1.777 1.333-2.645 2.085-2.971.193.501.309 1.176.309 2.1zm.539-2.234c.694.074 1.141.867 1.429 1.755-.349.114-.735.231-1.158.366v-.252c0-.752-.096-1.371-.271-1.871v.002zm2.992 1.289c-.02 0-.06.021-.078.021s-.289.075-.714.21c-.423-1.233-1.176-2.37-2.508-2.37h-.115C12.135.209 11.669 0 11.265 0 8.159 0 6.675 3.877 6.21 5.846c-1.194.365-2.063.636-2.16.674-.675.213-.694.232-.772.87-.075.462-1.83 14.063-1.83 14.063L15.009 24l.927-21.166z"/></svg>Shopify</h2></div>
+        <div id="shopCorpo"></div>
+      </div>
+
+      <div class="bloco">
+        <div class="rotulo"><h2>Permissões concedidas</h2><span class="dir">8 de 8</span></div>
+        <div class="escopos" id="escopos"></div>
+        <p class="nota">Mudar permissão no app não basta: a loja precisa aprovar de novo.</p>
+      </div>
+
+      <div class="bloco">
+        <div class="rotulo"><h2>Esta máquina</h2></div>
+        <dl style="margin:0">
+          <div class="par"><dt>Memória</dt><dd class="num" id="maqRam">16 GB</dd></div>
+          <div class="par"><dt>Núcleos</dt><dd class="num" id="maqNucleos">16</dd></div>
+          <div class="par"><dt>Recomendado</dt><dd><b id="recAj">8</b> navegadores ao mesmo tempo
+            <div class="ter" style="font-size:12px">limitado pelos <span id="limPor">núcleos</span> ·
+            na etapa 2 fica em <b id="recLista">7</b>, a maior opção que cabe</div></dd></div>
+        </dl>
+        <p class="nota">Lido do computador ao abrir. Cada navegador pesa cerca de meio giga,
+          e ficam 4 GB reservados para o sistema e o próprio AdsPower.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+<script>(function(){
+"use strict";
+var raiz=document.documentElement, $=function(i){return document.getElementById(i);};
+
+// Tudo que vem de fora da tela entra por aqui. Cada gancho já nasce com o
+// comportamento de exemplo, então a tela roda sozinha num navegador; o
+// Electron troca um por um pelo de verdade. Trocar é opcional: o que não for
+// trocado continua simulando em vez de deixar a tela em branco.
+var GANCHOS = window.GANCHOS = {
+  escolherPlanilha: function(){ $("fArq").click(); },     // exemplo: o seletor do navegador
+  conectarShopify: function(){                            // exemplo: aprova sozinho
+    setTimeout(function(){ window.TELA.shopify("conectada"); }, rapido?0:2400);
+  },
+  cancelarShopify: function(){},
+  testarAds: function(){},                                // redefinido mais abaixo
+};
+var rapido=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ── Tema ── */
+function tema(v){
+  try{ v?raiz.setAttribute("data-theme",v):raiz.removeAttribute("data-theme");
+       localStorage.setItem("tema",v||""); }catch(e){}
+  var d=raiz.getAttribute("data-theme");
+  $("tSis").setAttribute("aria-pressed",String(!d));
+  $("tLuz").setAttribute("aria-pressed",String(d==="light"));
+  $("tEsc").setAttribute("aria-pressed",String(d==="dark"));
+}
+try{ var g=localStorage.getItem("tema"); if(g) raiz.setAttribute("data-theme",g); }catch(e){}
+tema(raiz.getAttribute("data-theme"));
+$("tSis").onclick=function(){tema("");};
+$("tLuz").onclick=function(){tema("light");};
+$("tEsc").onclick=function(){tema("dark");};
+
+/* ── Navegação ── */
+var TELAS=["1","2","3","4","contas","historico","ajustes"];
+var atual=1;
+function ir(t){
+  TELAS.forEach(function(x){ $("t-"+x).hidden=(x!==t); });
+  Array.prototype.forEach.call(document.querySelectorAll("#apoio button"),function(b){
+    if(b.dataset.tela===t) b.setAttribute("aria-current","page");
+    else b.removeAttribute("aria-current"); });
+  if(/^[1-4]$/.test(t)) atual=Number(t);
+  pintaTrilha(); window.scrollTo(0,0);
+  try{ history.replaceState(null,"","#"+t); }catch(e){}
+}
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-etapa],[data-tela],[data-ir]");
+  if(b) ir(b.dataset.etapa||b.dataset.tela||b.dataset.ir);
+});
+
+var TOTAL=0, prontos=0, escritos=0, rodando=false, coletou=false, escrito=false;
+
+function pintaTrilha(){
+  var feita=[arquivos.length>0, coletou, coletou&&pendencias()===0, escrito];
+  for(var i=1;i<=4;i++){
+    var el=document.querySelector('[data-etapa="'+i+'"]');
+    var e = i===atual ? "agora"
+          : (i===3 && pendencias()>0 && coletou) ? "alerta"
+          : feita[i-1] ? "feita" : "";
+    el.dataset.e=e;
+    var n=el.querySelector(".n");
+    n.innerHTML = (e==="feita" && i!==atual)
+      ? '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>' : i;
+  }
+  $("s1").textContent = arquivos.length ? TOTAL+" pedidos" : "";
+  $("s2").textContent = rodando ? "rodando" : (coletou ? prontos+" lidos" : "");
+  $("s3").textContent = coletou ? (pendencias() ? pendencias()+" para decidir" : "sem pendência") : "";
+  $("s4").textContent = escrito ? escritos+" escritos" : (coletou ? prontos+" prontos" : "");
+}
+
+/* ── Avisos ── */
+var som=true, notif=true, direto=false, audio=null;
+function tocar(){
+  if(!som) return;
+  try{
+    var C=window.AudioContext||window.webkitAudioContext; if(!C) return;
+    audio=audio||new C(); if(audio.state==="suspended") audio.resume();
+    [[660,0],[880,.16]].forEach(function(p){
+      var o=audio.createOscillator(), gn=audio.createGain(), t=audio.currentTime+p[1];
+      o.type="sine"; o.frequency.value=p[0];
+      gn.gain.setValueAtTime(0,t); gn.gain.linearRampToValueAtTime(.16,t+.02);
+      gn.gain.exponentialRampToValueAtTime(.0001,t+.22);
+      o.connect(gn); gn.connect(audio.destination); o.start(t); o.stop(t+.24);
+    });
+  }catch(e){}
+}
+function avisar(tit,txt){
+  tocar(); if(!notif) return;
+  try{
+    if(typeof Notification==="undefined") return;
+    if(Notification.permission==="granted") new Notification(tit,{body:txt});
+    else if(Notification.permission!=="denied") Notification.requestPermission();
+  }catch(e){}
+}
+function chave(id,set){
+  var b=$(id);
+  b.onclick=function(){ var v=b.getAttribute("aria-pressed")!=="true";
+    b.setAttribute("aria-pressed",String(v)); set(v); };
+}
+chave("chSom",function(v){som=v;});
+chave("chNot",function(v){notif=v;});
+chave("chDireto",function(v){direto=v; pintaEscrita();});
+$("bTestar").onclick=function(){ avisar("Conta 207 precisa de você","A Shopee pediu verificação humana."); };
+
+/* ── Etapa 1: planilhas ── */
+var arquivos=[];
+var exemplos=[{linhas:43,pedidos:40,contas:5,ja:2},{linhas:14,pedidos:12,contas:3,ja:1},
+               {linhas:9,pedidos:8,contas:2,ja:0}];
+function hora(){var d=new Date();return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);}
+
+function pintaArquivos(){
+  $("listaArq").innerHTML=arquivos.map(function(a,i){
+    return '<div class="arq"><div><div class="nm">'+a.nome+'</div><div class="meta">'+
+      a.linhas+' linhas · '+a.pedidos+' pedidos · '+a.contas+' contas · '+a.hora+'</div></div>'+
+      '<button data-tirar="'+i+'" aria-label="Remover"><svg viewBox="0 0 24 24">'+
+      '<path d="M18 6L6 18M6 6l12 12"/></svg></button></div>';
+  }).join("");
+  var t=arquivos.reduce(function(a,x){a.l+=x.linhas;a.p+=x.pedidos;a.j+=x.ja;
+    x.lista.forEach(function(c){a.c[c]=1;});return a;},{l:0,p:0,j:0,c:{}});
+  TOTAL=t.p;
+  $("blLeitura").hidden=!arquivos.length;
+  $("lePed").textContent=t.p; $("leCont").textContent=Object.keys(t.c).length; $("leJa").textContent=t.j;
+  $("bRodar").disabled=rodando||!arquivos.length;
+  $("rLidos").textContent="de "+(TOTAL||0)+" rastreios lidos";
+  pintaCtrl(); if(!rodando&&!coletou) pintaColeta();
+  pintaFechada(); pintaTrilha();
+}
+function somar(nome,real){
+  if(escrito) comecarProxima();   // planilha nova = rodada nova
+  if(real){
+    arquivos.push({nome:nome,linhas:real.linhas,pedidos:real.pedidos,contas:real.contas,
+      ja:real.ja,hora:hora(),lista:real.lista});
+    pintaArquivos(); return;
+  }
+  var e=exemplos[Math.min(arquivos.length,exemplos.length-1)];
+  var base=[124,128,130,133,152,161,173], ini=arquivos.length?(arquivos.length===1?5:3):0;
+  arquivos.push({nome:nome,linhas:e.linhas,pedidos:e.pedidos,contas:e.contas,ja:e.ja,
+    hora:hora(),lista:base.slice(ini,ini+e.contas)});
+  pintaArquivos();
+}
+var solta=$("solta"), fArq=$("fArq");
+solta.onclick=function(){ GANCHOS.escolherPlanilha(); };
+solta.onkeydown=function(e){if(e.key==="Enter"||e.key===" "){
+  e.preventDefault(); GANCHOS.escolherPlanilha();}};
+fArq.onchange=function(){Array.prototype.forEach.call(fArq.files,function(f){somar(f.name);});fArq.value="";};
+["dragenter","dragover"].forEach(function(ev){solta.addEventListener(ev,function(e){
+  e.preventDefault();solta.classList.add("sobre");});});
+["dragleave","drop"].forEach(function(ev){solta.addEventListener(ev,function(e){
+  e.preventDefault();solta.classList.remove("sobre");});});
+solta.addEventListener("drop",function(e){
+  var fs=e.dataTransfer&&e.dataTransfer.files;
+  if(fs&&fs.length) Array.prototype.forEach.call(fs,function(f){somar(f.name);});
+  else somar("pedidos-"+hora().replace(":","")+".xlsx");
+});
+$("listaArq").addEventListener("click",function(e){
+  var b=e.target.closest("[data-tirar]"); if(!b) return;
+  arquivos.splice(Number(b.dataset.tirar),1); pintaArquivos();
+});
+$("bModelo").onclick=function(){};
+
+/* ── Vindos de dias anteriores ── */
+var SOZINHO=[
+  {p:"#164904",c:"Everaldo Mamprim da Silva",ct:124,h:"3 h",s:"pagamento confirmado",d:1},
+  {p:"#164907",c:"Roseneri Prust",ct:124,h:"3 h",s:"pagamento confirmado",d:1},
+  {p:"#164911",c:"Odirlei Chempe",ct:128,h:"5 h",s:"preparando envio",d:1},
+  {p:"#164918",c:"Eber Rossi",ct:130,h:"1 d",s:"preparando envio",d:2},
+  {p:"#164921",c:"Célia de Fátima Teixeira",ct:130,h:"1 d",s:"preparando envio",d:2},
+  {p:"#164926",c:"Wedemar Marques",ct:133,h:"2 d",s:"preparando envio",d:3},
+  {p:"#164933",c:"Manoel Carlos Sousa Silva",ct:133,h:"4 d",s:"preparando envio",d:5},
+  {p:"#165094",c:"Alcídes Gomes",ct:152,h:"11 h",s:"preparando envio",d:1}];
+var ATRASADOS=SOZINHO.filter(function(x){return x.d>1;})
+  .map(function(x){return {p:x.p,c:x.c,ct:x.ct,d:x.d,m:"Shopee ainda não despachou"};})
+  .concat([{p:"#165091",c:"José Alves Tolentino",ct:152,d:6,m:"não achado na conta"}]);
+
+function diasTxt(d){ return (d===1?"1º dia":d+" dias"); }
+function pintaAtrasados(){
+  var auto=ATRASADOS.filter(function(x){return /despachou/.test(x.m);});
+  var manual=ATRASADOS.filter(function(x){return !/despachou/.test(x.m);});
+  $("nAuto").textContent=auto.length;
+  $("nManual").textContent=manual.length;
+  $("tbAtras").innerHTML=ATRASADOS.slice().sort(function(a,b){return b.d-a.d;}).map(function(x){
+    return '<tr><td class="mono forte">'+x.p+'</td><td>'+x.c+'</td><td class="ter num">'+x.ct+
+      '</td><td class="ter">'+x.m+'</td><td class="dir '+(x.d>=5?"dias velho":"dias")+'">'+
+      diasTxt(x.d)+'</td></tr>';
+  }).join("");
+}
+$("bVerAtras").onclick=function(){
+  var ab=this.getAttribute("aria-expanded")==="true";
+  this.setAttribute("aria-expanded",String(!ab));
+  $("listaAtras").hidden=ab; this.textContent=ab?"Ver quais":"Esconder";
+};
+
+/* ── Etapa 2 ── */
+var RAM=16, NUC=16, POR=.5, RESERVA=4, TETO=10, CONTAS_TIP=80, SEG=60;
+var recomendado=Math.max(1,Math.min(TETO,Math.floor((RAM-RESERVA)/POR),Math.floor(NUC/2)));
+var limitadoPor=Math.floor((RAM-RESERVA)/POR)<=Math.floor(NUC/2)?"memória":"núcleos";
+var OPCOES=[1,2,3,5,7,10];
+var naLista=OPCOES.filter(function(n){return n<=recomendado;}).pop()||1;
+var paralelo=3;
+$("recAj").textContent=recomendado;
+$("limPor").textContent=limitadoPor;
+$("recLista").textContent=naLista;
+
+function fmt(s){var m=Math.max(1,Math.round(s/60));
+  return m>=60?Math.floor(m/60)+" h "+(m%60)+" min":m+" min";}
+function contasDoDia(){
+  var c={}; arquivos.forEach(function(a){a.lista.forEach(function(x){c[x]=1;});});
+  return Object.keys(c).length||CONTAS_TIP;
+}
+function pintaCtrl(){
+  $("estimativa").textContent="~"+(paralelo*POR).toFixed(1).replace(".",",")+" GB · "+
+    fmt(CONTAS_TIP*SEG/paralelo)+" para 80 contas";
+  $("custo").textContent=paralelo>recomendado?"acima do que esta máquina aguenta":"16 GB · 16 núcleos";
+  $("custo").style.color=paralelo>recomendado?"var(--atencao)":"";
+}
+Array.prototype.forEach.call(document.querySelectorAll("#seg button"),function(b){
+  if(Number(b.dataset.n)===naLista) b.innerHTML=b.dataset.n+'<span class="rec">rec</span>';
+  b.onclick=function(){
+    paralelo=Number(b.dataset.n);
+    Array.prototype.forEach.call(document.querySelectorAll("#seg button"),function(o){
+      o.setAttribute("aria-pressed",String(o===b));});
+    pintaCtrl(); if(!rodando&&!coletou) pintaColeta();
+  };
+});
+
+var CONTAS_RODADA=[
+  {n:124,perfil:"k1boua9d",viva:true,pedidos:9,seg:48},
+  {n:128,perfil:"k1cexbyh",viva:true,pedidos:7,seg:52},
+  {n:130,perfil:"k1boua8l",viva:false,pedidos:7,seg:71},
+  {n:133,perfil:"k1boua8q",viva:true,pedidos:9,seg:44},
+  {n:152,perfil:"k1c92sna",viva:true,pedidos:8,seg:50}];
+var estadoConta={}; CONTAS_RODADA.forEach(function(c){estadoConta[c.n]="fila";});
+
+function est(cls,txt){ return '<span class="est '+cls+'"><span class="pt"></span>'+txt+'</span>'; }
+
+function linhaConta(c){
+  var e=estadoConta[c.n], entrada="—", pedidos="—", tempo="—", situacao;
+  var feita = c.viva ? est("ok","já conectada") : est("at","o robô logou");
+  if(e==="fila") situacao=est("","na fila");
+  else if(e==="abrindo") situacao=est("andando","abrindo perfil");
+  else if(e==="logando") situacao=est("andando","o robô está logando");
+  else if(e==="lendo"){ situacao=est("andando","lendo pedidos"); entrada=feita; }
+  else { situacao=est("ok","coletada"); entrada=feita;
+         pedidos='<span class="num">'+c.pedidos+'</span>';
+         tempo='<span class="num ter">'+c.seg+'s</span>'; }
+  return '<tr'+(/abrindo|logando|lendo/.test(e)?' class="agora"':'')+'>'+
+    '<td><div class="conta-nome">Shopee '+c.n+'</div>'+
+    '<div class="conta-mail">chompspee'+c.n+'@givmail.com</div></td>'+
+    '<td class="mono ter">'+c.perfil+'</td><td>'+entrada+'</td><td>'+situacao+'</td>'+
+    '<td class="dir">'+pedidos+'</td><td class="dir">'+tempo+'</td></tr>';
+}
+function pintaColeta(){
+  $("corpo").innerHTML=CONTAS_RODADA.map(linhaConta).join("");
+  var f=CONTAS_RODADA.filter(function(c){return estadoConta[c.n]==="feita";});
+  var sem=f.filter(function(c){return c.viva;}).length;
+  prontos=f.reduce(function(s,c){return s+c.pedidos;},0);
+  $("vContas").textContent=f.length+"/"+CONTAS_RODADA.length;
+  $("vLidos").textContent=prontos;
+  $("vSemLogin").textContent=f.length?sem+" de "+f.length:"—";
+  $("resumoContas").textContent=CONTAS_RODADA.length+" contas · "+(TOTAL||0)+" pedidos esperados";
+  if(!rodando&&!coletou) $("vTempo").textContent=arquivos.length
+    ? "~"+fmt(contasDoDia()*SEG/paralelo) : "—";
+}
+
+var timers=[];
+function marcar(n,e,ms){timers.push(setTimeout(function(){estadoConta[n]=e;pintaColeta();pintaTrilha();},rapido?0:ms));}
+function pararColeta(){
+  timers.forEach(clearTimeout); timers=[];
+  rodando=false; document.body.classList.remove("rodando");
+  $("bRodar").disabled=!arquivos.length; $("bParar").disabled=true;
+}
+$("bParar").onclick=function(){pararColeta();pintaColeta();pintaTrilha();};
+$("bRodar").onclick=function(){
+  if(rodando||!arquivos.length) return;
+  rodando=true; coletou=false; escrito=false; escritos=0;
+  document.body.classList.add("rodando");
+  $("bRodar").disabled=true; $("bParar").disabled=false;
+  CONTAS_RODADA.forEach(function(c){estadoConta[c.n]="fila";});
+  pintaColeta(); pintaTrilha();
+
+  var tLogin=0;
+  CONTAS_RODADA.forEach(function(c,i){
+    var ini=Math.floor(i/paralelo)*2600;
+    marcar(c.n,"abrindo",ini+150);
+    if(!c.viva){ tLogin=Math.max(tLogin,ini+900); marcar(c.n,"logando",tLogin);
+                 tLogin+=1400; marcar(c.n,"lendo",tLogin); }
+    else marcar(c.n,"lendo",ini+900);
+    marcar(c.n,"feita",ini+2400+(c.viva?0:1400));
+  });
+  timers.push(setTimeout(function(){
+    pararColeta(); coletou=true;
+    $("vTempo").textContent="4 min";
+    avisar("Coleta terminada", prontos+" rastreios lidos. "+pendencias()+" esperando você.");
+    pintaColeta(); pintaEscrita(); pintaTrilha();
+    if(direto) escreverTudo(); else ir("3");
+  },rapido?0:9200));
+};
+
+/* ── Etapa 3 ── */
+function pendencias(){ return document.querySelectorAll("#cxPrecisa .item[data-rev]").length; }
+
+var SAIDAS=[["colar","Colei o rastreio"],["conta","Era outra conta"],
+            ["encerrar","Não vai ter rastreio"],["adiar","Deixar para amanhã"]];
+var FIM=[["cancelado","Pedido cancelado"],["reembolsado","Reembolsado"],
+         ["nao-comprado","Nunca foi comprado"]];
+var PADROES=[/BR\d{12}[A-Z0-9]/g,/SPX[A-Z]{0,3}\d{6,}/g,/[A-Z]{2}\d{9}BR/g];
+function acharCodigos(t){
+  var a=String(t||"").toUpperCase(), o=[];
+  PADROES.forEach(function(re){var m;re.lastIndex=0;
+    while((m=re.exec(a))!==null) if(o.indexOf(m[0])<0) o.push(m[0]);});
+  return o;
+}
+function montarSaidas(){
+  Array.prototype.forEach.call(document.querySelectorAll("#cxPrecisa .item[data-rev]"),function(it){
+    if(it.querySelector(".saidas")) return;
+    var d=document.createElement("div"); d.className="saidas";
+    d.innerHTML='<span class="rot">resolver</span>'+SAIDAS.map(function(x){
+      return '<button data-saida="'+x[0]+'" aria-expanded="false">'+x[1]+'</button>';}).join("");
+    it.appendChild(d);
+  });
+}
+function aproximar(el){
+  try{ el.scrollIntoView({block:"nearest",behavior:rapido?"auto":"smooth"}); }catch(e){}
+}
+function fecharPaineis(it){
+  Array.prototype.forEach.call(it.querySelectorAll(".painelito"),function(p){p.remove();});
+  Array.prototype.forEach.call(it.querySelectorAll(".saidas button"),function(b){
+    b.setAttribute("aria-expanded","false");});
+}
+function abrirPainel(it,qual,botao){
+  if(it.querySelector('.painelito[data-saida="'+qual+'"]')){ fecharPaineis(it); return; }
+  fecharPaineis(it);
+  var p=document.createElement("div"); p.className="painelito"; p.dataset.saida=qual;
+  if(qual==="colar")
+    p.innerHTML='<h5>Cole o rastreio que você tem</h5><div class="l">'+
+      '<input placeholder="BR26… · pode colar a mensagem inteira" aria-label="Código de rastreio">'+
+      '<button class="btn pri" data-conferir>Conferir</button></div>'+
+      '<p class="nota" style="margin-top:9px">Antes de escrever, mostro o que está na Shopify '+
+      'para você conferir que é o pedido certo.</p>';
+  else if(qual==="conta")
+    p.innerHTML='<h5>Em qual conta a compra foi feita?</h5><div class="l">'+
+      '<input class="curto" inputmode="numeric" placeholder="ex.: 161" aria-label="Número da conta">'+
+      '<button class="btn pri" data-mover>Procurar nessa conta</button></div>'+
+      '<p class="nota" style="margin-top:9px">O pedido volta na próxima rodada, procurando na conta '+
+      'certa. A planilha do cliente não desfaz isso.</p>';
+  else
+    p.innerHTML='<h5>Por que não vai ter rastreio?</h5><div class="l">'+
+      FIM.map(function(f){return '<button class="btn" data-fim="'+f[0]+'">'+f[1]+'</button>';}).join("")+
+      '</div><p class="nota" style="margin-top:9px">Sai da lista e não volta. '+
+      'Fica no histórico do dia com o motivo.</p>';
+  it.appendChild(p); botao.setAttribute("aria-expanded","true"); aproximar(p);
+  var campo=p.querySelector("input"); if(campo) campo.focus();
+}
+function erroNoPainel(p,msg){
+  var e=p.querySelector(".erro");
+  if(!e){ e=document.createElement("p"); e.className="erro"; p.appendChild(e); }
+  e.textContent=msg;
+}
+
+var TRATADOS=[];
+function agora(){var d=new Date();
+  return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);}
+function resolver(it,decisao){
+  TRATADOS.unshift({titulo:(it.querySelector(".item-cab .t")||{}).textContent||"—",
+    decisao:decisao, hora:agora(), html:it.outerHTML});
+  it.classList.add("sumindo");
+  setTimeout(function(){ it.remove(); pintaRevisao(); }, rapido?0:200);
+}
+function pintaTratados(){
+  var n=TRATADOS.length;
+  $("ctTratados").textContent=n?n+(n>1?" decisões":" decisão"):"";
+  $("rotTratados").textContent=n
+    ?($("bRecTrat").getAttribute("aria-expanded")==="true"?"Esconder":"Ver as "+n+(n>1?" decisões":" decisão"))
+    :"Nada tratado ainda";
+  $("bRecTrat").disabled=n===0;
+  $("listaTratados").innerHTML=TRATADOS.map(function(t,i){
+    return '<div class="trat"><span class="est ok"><span class="pt"></span>tratado</span>'+
+      '<span class="forte mono">'+t.titulo+'</span><span class="sec">'+t.decisao+'</span>'+
+      '<span class="hr">'+t.hora+'</span>'+
+      '<button class="btn peq" data-desfazer="'+i+'">Desfazer</button></div>';
+  }).join("");
+}
+$("bRecTrat").onclick=function(){
+  if(!TRATADOS.length) return;
+  var ab=this.getAttribute("aria-expanded")==="true";
+  this.setAttribute("aria-expanded",String(!ab));
+  $("listaTratados").hidden=ab; pintaTratados();
+};
+$("listaTratados").addEventListener("click",function(e){
+  var b=e.target.closest("[data-desfazer]"); if(!b) return;
+  var t=TRATADOS.splice(Number(b.dataset.desfazer),1)[0];
+  var d=document.createElement("div"); d.innerHTML=t.html;
+  $("cxPrecisa").appendChild(d.firstElementChild);
+  pintaRevisao();
+});
+
+var CANDIDATOS=[
+  {r:"BR261528918393K",v:"R$ 13,00",cep:"13485020",q:"comprado em 14/10"},
+  {r:"BR260326966602Y",v:"R$ 13,00",cep:"13485020",q:"comprado em 16/10"}];
+
+$("cxPrecisa").addEventListener("click",function(e){
+  var it=e.target.closest(".item[data-rev]"); if(!it) return;
+
+  var saida=e.target.closest(".saidas button");
+  if(saida){
+    if(saida.dataset.saida==="adiar"){
+      var am=new Date(); am.setDate(am.getDate()+1);
+      return resolver(it,"volta sozinho em "+("0"+am.getDate()).slice(-2)+"/"+
+        ("0"+(am.getMonth()+1)).slice(-2));
+    }
+    return abrirPainel(it,saida.dataset.saida,saida);
+  }
+
+  var conf=e.target.closest("[data-conferir]");
+  if(conf){
+    var p=conf.closest(".painelito"), cods=acharCodigos(p.querySelector("input").value);
+    if(!cods.length) return erroNoPainel(p,"Não reconheci nenhum código de rastreio nesse texto.");
+    var cx=document.createElement("div"); cx.className="confere";
+    cx.innerHTML='<h5 style="margin:0 0 9px;font:500 11px/1 var(--ui);color:var(--tinta-3);'+
+      'text-transform:uppercase;letter-spacing:.06em">Confira antes de escrever</h5><dl>'+
+      '<div class="par"><dt>Pedido</dt><dd class="mono forte">'+
+      (it.querySelector(".item-cab .t")||{}).textContent+'</dd></div>'+
+      '<div class="par"><dt>Entrega</dt><dd>'+
+      ((it.querySelector(".caixinha dd")||{}).textContent||"o cliente deste pedido")+'</dd></div>'+
+      '<div class="par"><dt>Rastreio</dt><dd class="mono">'+cods.join(" · ")+'</dd></div></dl>'+
+      '<div class="l" style="margin-top:11px"><button class="btn" data-cancelar>Cancelar</button>'+
+      '<button class="btn pri" data-escrever="'+cods.join(",")+'">Escrever na Shopify</button></div>'+
+      '<p class="nota" style="margin-top:9px">Aqui não há lado Shopee para comparar o nome. '+
+      'Quem confere é você.</p>';
+    var velho=p.querySelector(".confere"); if(velho) velho.remove();
+    var err=p.querySelector(".erro"); if(err) err.remove();
+    p.appendChild(cx); aproximar(cx); return;
+  }
+  if(e.target.closest("[data-cancelar]")) return fecharPaineis(it);
+
+  var esc=e.target.closest("[data-escrever]");
+  if(esc) return resolver(it,"rastreio "+esc.dataset.escrever.split(",").join(" · ")+" escrito na mão");
+
+  var mov=e.target.closest("[data-mover]");
+  if(mov){
+    var pc=mov.closest(".painelito"), n=Number(pc.querySelector("input").value);
+    if(!Number.isFinite(n)||n<=0) return erroNoPainel(pc,"Digite o número da conta, só os dígitos.");
+    return resolver(it,"passou a procurar na conta "+n);
+  }
+
+  var fim=e.target.closest("[data-fim]");
+  if(fim) return resolver(it,{cancelado:"encerrado: pedido cancelado",
+    reembolsado:"encerrado: reembolsado","nao-comprado":"encerrado: nunca foi comprado"}[fim.dataset.fim]);
+
+  var b=e.target.closest(".btn[data-acao], .cand .btn, .esperando .btn");
+  if(!b) return;
+  var acao=b.dataset.acao;
+
+  if(!acao && b.dataset.escolha!=null)
+    return resolver(it,"escolhido o rastreio "+CANDIDATOS[Number(b.dataset.escolha)].r);
+  if(!acao && b.dataset.continuar!=null)
+    return resolver(it,"verificação passada, conta liberada para a próxima rodada");
+
+  if(acao==="ver-dois"){
+    if(it.querySelector(".candidatos")) return;
+    b.disabled=true; b.textContent="Escolha um abaixo";
+    var d=document.createElement("div"); d.className="candidatos";
+    d.style.cssText="margin-top:12px;border:1px solid var(--linha);border-radius:8px;padding:0 13px";
+    d.innerHTML=CANDIDATOS.map(function(c,i){
+      return '<div class="cand"><span class="mono forte">'+c.r+'</span>'+
+        '<span class="ter">'+c.v+' · CEP '+c.cep+' · '+c.q+'</span>'+
+        '<button class="btn pri" data-escolha="'+i+'">Usar este</button></div>';}).join("");
+    it.appendChild(d); aproximar(d); return;
+  }
+
+  if(acao==="abrir-navegador"){
+    if(it.querySelector(".esperando")) return;
+    b.disabled=true;
+    b.innerHTML='<svg viewBox="0 0 24 24" class="girar"><path d="M21 12a9 9 0 11-6.2-8.5"/></svg>Navegador aberto';
+    var w=document.createElement("div"); w.className="esperando";
+    w.innerHTML='<svg viewBox="0 0 24 24" class="girar"><path d="M21 12a9 9 0 11-6.2-8.5"/></svg>'+
+      '<span class="texto">Esperando você passar a verificação no perfil '+
+      '<span class="mono">k1cexbyh</span>.<small>No aplicativo, o navegador dessa conta abre aqui, '+
+      'já na tela onde a Shopee parou. Neste protótipo nada abre.</small></span>'+
+      '<button class="btn pri" data-continuar="1">Já passei</button>';
+    it.appendChild(w); aproximar(w); return;
+  }
+
+  var TEXTO={"usar-sugestao":b.dataset.det,descartar:b.dataset.det,
+             forcar:b.dataset.det};
+  resolver(it, TEXTO[acao]||"tratado");
+});
+
+function pintaRevisao(){
+  var nP=pendencias(), nS=SOZINHO.length;
+  $("vzPrecisa").hidden=nP>0;
+  $("ctPrecisa").textContent=nP?nP+(nP>1?" pedidos":" pedido"):"";
+  $("ctSozinho").textContent=nS+(nS>1?" pedidos":" pedido");
+  $("rotSozinho").textContent=$("bRecolhe").getAttribute("aria-expanded")==="true"
+    ?"Esconder os pedidos":"Ver os "+nS+" pedidos";
+  $("tbSozinho").innerHTML=SOZINHO.map(function(x){
+    return '<tr><td class="mono forte">'+x.p+'</td><td>'+x.c+'</td><td class="ter num">'+x.ct+
+      '</td><td class="ter">'+x.h+'</td><td>'+est("",x.s)+'</td>'+
+      '<td class="dir '+(x.d>=5?"dias velho":"dias")+'">'+diasTxt(x.d)+'</td></tr>';
+  }).join("");
+  montarSaidas(); pintaTratados(); pintaTrilha(); pintaEscrita();
+}
+$("bRecolhe").onclick=function(){
+  var ab=this.getAttribute("aria-expanded")==="true";
+  this.setAttribute("aria-expanded",String(!ab));
+  $("listaSozinho").hidden=ab; pintaRevisao();
+};
+
+/* ── Etapa 4 ── */
+var A_ESCREVER=[
+  {p:"#164891",c:"Sônia Aparecida Pinto",ct:124,r:"BR263500935831Z",tr:"Correios"},
+  {p:"#164892",c:"Antônio Paulo Borges",ct:124,r:"BR262357370052B",tr:"Correios"},
+  {p:"#164895",c:"Leonardo José de Freitas",ct:128,r:"BR2680955831364",tr:"Correios"},
+  {p:"#164896",c:"Rosemeire Morais",ct:130,r:"SPXLM17485496",tr:"Shopee Xpress"},
+  {p:"#164897",c:"Janice Maria Klein",ct:133,r:"BR262830792298I",tr:"Correios"},
+  {p:"#164899",c:"Juliana Carla Oliveira",ct:152,r:"BR260810072086Y",tr:"Correios"}];
+function pintaEscrita(){
+  var pl=$("plEsc");
+  if(escrito){
+    pl.className=""; $("eNum").style.color="var(--ok)";
+    $("eNum").textContent=escritos; $("eUn").textContent="escritos";
+    $("eTit").textContent="Escrito na Shopify";
+    $("eSub").textContent=pendencias()?pendencias()+" ainda esperando decisão na etapa 3."
+      :"A esteira rodou inteira. Pode fechar o computador.";
+    $("bEscrever").disabled=true; $("eBotTexto").textContent="Já escrito";
+    $("blLista").hidden=true;
+  } else if(coletou){
+    $("eNum").style.color=""; $("eNum").textContent=prontos; $("eUn").textContent="prontos";
+    $("eTit").textContent=direto?"Escrevendo direto":"Esperando sua aprovação";
+    $("eSub").textContent=direto
+      ?"A aprovação está desligada nos Ajustes. A escrita acontece logo depois da coleta."
+      :"Confira a lista e libere o lote inteiro de uma vez. Nada foi escrito ainda.";
+    $("bEscrever").disabled=false;
+    $("eBotTexto").textContent="Escrever os "+prontos+" na Shopify";
+    $("blLista").hidden=false;
+    $("ctLista").textContent=prontos+" pedidos";
+    $("tbEscrita").innerHTML=A_ESCREVER.map(function(x){
+      return '<tr><td class="mono forte">'+x.p+'</td><td>'+x.c+'</td><td class="ter num">'+x.ct+
+        '</td><td class="mono">'+x.r+'</td><td class="ter">'+x.tr+'</td></tr>';}).join("")+
+      '<tr><td colspan="5" class="ter" style="text-align:center">e mais '+
+      Math.max(0,prontos-A_ESCREVER.length)+' pedidos</td></tr>';
+  } else {
+    $("eNum").style.color=""; $("eNum").textContent="0"; $("eUn").textContent="prontos";
+    $("eTit").textContent="Nada para escrever ainda";
+    $("eSub").textContent="Rode a coleta na etapa 2.";
+    $("bEscrever").disabled=true; $("eBotTexto").textContent="Escrever na Shopify";
+    $("blLista").hidden=true;
+  }
+}
+/* A rodada NÃO vira sozinha à meia-noite: ele trabalha de madrugada, e
+   limpar a tela no meio do trabalho seria pior que deixar parada. Ela se
+   encerra quando a escrita acontece, e a próxima começa quando ele sobe
+   outra planilha — ou clica em começar. */
+function comecarProxima(){
+  // o que ficou pendente atravessa: vira "vindo de dias anteriores"
+  // leva nome, conta e motivo junto: a carteira precisa deles para conciliar
+  // amanhã, e eles não existem em lugar nenhum depois que a planilha sai.
+  Array.prototype.forEach.call(
+    document.querySelectorAll("#cxPrecisa .item[data-rev]"), function(it){
+      var pedido=(it.querySelector(".item-cab .t")||{}).textContent;
+      if(!pedido) return;
+      pedido=pedido.trim();
+      if(ATRASADOS.some(function(a){return a.p===pedido;})) return;
+      var det=(it.querySelector(".item-cab .ter")||{}).textContent||"";
+      var mConta=det.match(/conta (\d+)/);
+      var cliente=det.split("·").pop().trim();
+      ATRASADOS.push({
+        p:pedido,
+        c:(cliente && !/^conta/.test(cliente)) ? cliente : "—",
+        ct:mConta?Number(mConta[1]):0,
+        d:1,
+        m:((it.querySelector(".item-cab .est")||{}).textContent||"não resolvido").trim(),
+      });
+    });
+  arquivos=[]; coletou=false; escrito=false; escritos=0; prontos=0;
+  CONTAS_RODADA.forEach(function(c){estadoConta[c.n]="fila";});
+  TRATADOS.length=0;
+  $("vTempo").textContent="—";
+  pintaAtrasados(); pintaArquivos(); pintaColeta(); pintaRevisao(); pintaEscrita();
+  ir("1");
+}
+$("bProxima").onclick=comecarProxima;
+
+function escreverTudo(){
+  escritos=prontos; escrito=true;
+  avisar("Escrito na Shopify",escritos+" rastreios gravados."+
+    (pendencias()?" "+pendencias()+" esperando você.":""));
+  pintaEscrita(); pintaTrilha(); pintaFechada(); ir("4");
+}
+
+function pintaFechada(){
+  $("blFechada").hidden=!escrito;
+  if(!escrito) return;
+  $("fechNum").textContent=escritos;
+  var p=pendencias();
+  $("fechDet").textContent="Encerrada às "+agora()+" · "+
+    (p ? p+" pedido"+(p>1?"s":"")+" atravessam para a próxima" : "nada ficou pendente") +
+    ". Suba outra planilha para começar a próxima.";
+}
+$("bEscrever").onclick=escreverTudo;
+
+/* ── Contas ── */
+var CONTAS_INV=[
+  {n:76,perfil:"k1bou2za",quando:"hoje, 08:12",viva:true,lidos:4},
+  {n:124,perfil:"k1boua9d",quando:"hoje, 08:14",viva:true,lidos:9},
+  {n:128,perfil:"k1cexbyh",quando:"hoje, 08:15",viva:true,lidos:7},
+  {n:130,perfil:"k1boua8l",quando:"hoje, 08:17",viva:false,lidos:7},
+  {n:133,perfil:"k1boua8q",quando:"hoje, 08:18",viva:true,lidos:9},
+  {n:152,perfil:"k1c92sna",quando:"hoje, 08:20",viva:true,lidos:8},
+  {n:207,perfil:"k1cexbyh",quando:"ontem, 09:04",viva:false,lidos:0,dup:true},
+  {n:270,perfil:"k1cexbyh",quando:"—",viva:false,lidos:0,dup:true,sem:true}];
+$("tbContas").innerHTML=CONTAS_INV.map(function(c){
+  var email=(c.n>=200?"Brushopee":"chompspee")+c.n+"@givmail.com";
+  var s=c.dup?est("er","perfil duplicado"):(c.viva?est("ok","viva"):est("at","vai precisar de senha"));
+  return '<tr><td class="conta-nome">Shopee '+c.n+'</td><td class="mono ter">'+email+'</td>'+
+    '<td class="mono '+(c.dup?"difere":"ter")+'">'+c.perfil+'</td><td class="ter">'+c.quando+
+    '</td><td>'+s+'</td><td class="dir '+(c.lidos?"":"ter")+'">'+(c.sem?"—":c.lidos)+'</td></tr>';
+}).join("");
+
+/* ── Histórico ── */
+var semente=7;
+function rnd(){ semente=(semente+0x6d2b79f5)>>>0; var t=semente;
+  t=Math.imul(t^(t>>>15),t|1); t^=t+Math.imul(t^(t>>>7),t|61);
+  return ((t^(t>>>14))>>>0)/4294967296; }
+var pegue=function(a){return a[Math.floor(rnd()*a.length)];};
+var inteiro=function(a,b){return a+Math.floor(rnd()*(b-a+1));};
+var NOMES=["Ana Paula Ribeiro","Carlos Eduardo Nunes","Marcos Vinícius Dias","Fernanda Lopes",
+"Roberto Nunes Barreto","Juliana Carla Oliveira","Patrícia Gomes","Sérgio Tavares",
+"Luciana Moreira","Rafael Andrade","Beatriz Cardoso","Thiago Medeiros","Sandra Figueiredo",
+"Everton Machado","Camila Peixoto","Douglas Siqueira","Vanessa Duarte","Leandro Bastos"];
+var CONTAS_EX=[76,124,128,130,133,152,161,173,207,214,231,260];
+var SITS=["escrito","escrito","escrito","escrito","escrito","escrito","escrito","escrito",
+          "escrito","escrito","escrito","escrito","revisao","semcod"];
+function codigo(){
+  if(rnd()<.18) return "SPXLM"+inteiro(10000000,99999999);
+  var l="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[inteiro(0,35)];
+  return "BR26"+String(inteiro(0,99999999999)).padStart(11,"0")+l;
+}
+var HOJE=new Date(2026,9,18);
+function iso(d){return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);}
+function brt(d){return ("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+"/"+d.getFullYear();}
+var DIAS_SEM=["domingo","segunda","terça","quarta","quinta","sexta","sábado"];
+var DIAS=[];
+for(var k=0;k<40;k++){
+  var d=new Date(HOJE); d.setDate(d.getDate()-k);
+  var qtd = k===0?40:inteiro(260,330), nc = k===0?5:inteiro(74,80);
+  var pedidos=[], base=164891-k*300;
+  for(var i=0;i<qtd;i++){
+    var sit=pegue(SITS);
+    pedidos.push({p:"#"+(base+i),c:pegue(NOMES),ct:pegue(CONTAS_EX),
+      r:sit==="semcod"?"":codigo(),s:sit,
+      h:("0"+inteiro(8,9)).slice(-2)+":"+("0"+inteiro(0,59)).slice(-2)});
+  }
+  DIAS.push({iso:iso(d),br:brt(d),sem:DIAS_SEM[d.getDay()],hoje:k===0,pedidos:pedidos,total:qtd,
+    escritos:pedidos.filter(function(x){return x.s==="escrito";}).length,
+    revisao:pedidos.filter(function(x){return x.s==="revisao";}).length,
+    semLogin:inteiro(Math.round(nc*.9),nc),contas:nc,
+    dur:Math.max(4,Math.round(nc*60/3/60))+" min"});
+}
+function pinSit(s){
+  if(s==="escrito") return est("ok","escrito");
+  if(s==="revisao") return est("at","conferência");
+  return est("","sem rastreio");
+}
+var per=7, deISO="", ateISO="";
+function noPeriodo(x){
+  if(deISO&&x.iso<deISO) return false;
+  if(ateISO&&x.iso>ateISO) return false;
+  if(!deISO&&!ateISO&&per){ var l=new Date(HOJE); l.setDate(l.getDate()-per+1);
+    if(x.iso<iso(l)) return false; }
+  return true;
+}
+function pintaDias(){
+  $("tbHist").innerHTML=DIAS.filter(noPeriodo).map(function(h){
+    return '<tr class="clica" data-dia="'+h.iso+'"><td class="forte">'+h.br+
+      ' <span class="ter" style="font-weight:400">· '+(h.hoje?"hoje":h.sem)+'</span></td>'+
+      '<td class="dir">'+h.total+'</td><td class="dir" style="color:var(--ok)">'+h.escritos+'</td>'+
+      '<td class="dir"'+(h.revisao?' style="color:var(--atencao)"':'')+'>'+h.revisao+'</td>'+
+      '<td class="num">'+h.semLogin+'/'+h.contas+'</td>'+
+      '<td class="dir ter">'+h.dur+'</td></tr>';
+  }).join("")||'<tr><td colspan="6" class="ter" style="text-align:center;padding:24px">'+
+    'Nenhuma rodada neste período.</td></tr>';
+}
+Array.prototype.forEach.call(document.querySelectorAll("#segPer button"),function(b){
+  b.onclick=function(){
+    per=Number(b.dataset.d); deISO=ateISO=""; $("dDe").value=""; $("dAte").value="";
+    Array.prototype.forEach.call(document.querySelectorAll("#segPer button"),function(o){
+      o.setAttribute("aria-pressed",String(o===b));});
+    pintaDias();
+  };
+});
+$("dDe").onchange=$("dAte").onchange=function(){
+  deISO=$("dDe").value; ateISO=$("dAte").value;
+  if(deISO||ateISO){ per=0;
+    Array.prototype.forEach.call(document.querySelectorAll("#segPer button"),function(o){
+      o.setAttribute("aria-pressed","false");}); }
+  pintaDias();
+};
+$("qBusca").oninput=function(){
+  var q=this.value.trim().toLowerCase();
+  $("cxBusca").hidden=q.length<2; $("cxDias").hidden=q.length>=2;
+  if(q.length<2) return;
+  var achados=[];
+  for(var i=0;i<DIAS.length&&achados.length<60;i++){
+    var dia=DIAS[i];
+    for(var j=0;j<dia.pedidos.length;j++){
+      var x=dia.pedidos[j];
+      if(x.p.toLowerCase().indexOf(q)>=0||x.c.toLowerCase().indexOf(q)>=0||
+         (x.r&&x.r.toLowerCase().indexOf(q)>=0)){ achados.push({dia:dia,x:x});
+         if(achados.length>=60) break; }
+    }
+  }
+  $("ctBusca").textContent=achados.length+(achados.length===60?"+ pedidos":" pedidos");
+  $("tbBusca").innerHTML=achados.map(function(a){
+    return '<tr class="clica" data-dia="'+a.dia.iso+'"><td class="ter">'+a.dia.br+'</td>'+
+      '<td class="mono forte">'+a.x.p+'</td><td>'+a.x.c+'</td><td class="ter num">'+a.x.ct+'</td>'+
+      '<td class="mono'+(a.x.r?'':' ter')+'">'+(a.x.r||"—")+'</td><td>'+pinSit(a.x.s)+'</td></tr>';
+  }).join("")||'<tr><td colspan="6" class="ter" style="text-align:center;padding:24px">Nada encontrado.</td></tr>';
+};
+var diaAberto=null, filtroSit="";
+function abrirDia(isoDia){
+  diaAberto=DIAS.filter(function(d){return d.iso===isoDia;})[0]; if(!diaAberto) return;
+  $("histLista").hidden=true; $("histDia").hidden=false;
+  $("diaTit").textContent=diaAberto.br+(diaAberto.hoje?" · hoje":" · "+diaAberto.sem);
+  $("diaSub").textContent=diaAberto.contas+" contas visitadas em "+diaAberto.dur+", "+
+    diaAberto.semLogin+" já estavam conectadas.";
+  $("diaResumo").innerHTML=[
+    ["",diaAberto.total,"pedidos na planilha"],
+    ["ok",diaAberto.escritos,"escritos na Shopify"],
+    [diaAberto.revisao?"at":"",diaAberto.revisao,"foram para conferência"],
+    ["",diaAberto.total-diaAberto.escritos-diaAberto.revisao,"ficaram sem rastreio"]
+  ].map(function(m){ return '<div class="'+m[0]+'"><div class="v num">'+m[1]+
+    '</div><div class="r">'+m[2]+'</div></div>'; }).join("");
+  pintaPedidosDia(); window.scrollTo(0,0);
+}
+function pintaPedidosDia(){
+  var l=diaAberto.pedidos.filter(function(x){return !filtroSit||x.s===filtroSit;});
+  $("ctDia").textContent=l.length+" de "+diaAberto.total;
+  $("tbDia").innerHTML=l.slice(0,120).map(function(x){
+    return '<tr><td class="mono forte">'+x.p+'</td><td>'+x.c+'</td><td class="ter num">'+x.ct+'</td>'+
+      '<td class="mono'+(x.r?'':' ter')+'">'+(x.r||"—")+'</td><td>'+pinSit(x.s)+'</td>'+
+      '<td class="dir ter">'+x.h+'</td></tr>';
+  }).join("")+(l.length>120?'<tr><td colspan="6" class="ter" style="text-align:center">e mais '+
+    (l.length-120)+' pedidos</td></tr>':"")||
+    '<tr><td colspan="6" class="ter" style="text-align:center;padding:24px">Nenhum pedido nesta situação.</td></tr>';
+}
+Array.prototype.forEach.call(document.querySelectorAll("#segSit button"),function(b){
+  b.onclick=function(){
+    filtroSit=b.dataset.s;
+    Array.prototype.forEach.call(document.querySelectorAll("#segSit button"),function(o){
+      o.setAttribute("aria-pressed",String(o===b));});
+    pintaPedidosDia();
+  };
+});
+$("t-historico").addEventListener("click",function(e){
+  var tr=e.target.closest("tr.clica"); if(tr) abrirDia(tr.dataset.dia);
+});
+$("bVoltar").onclick=function(){ $("histDia").hidden=true; $("histLista").hidden=false;
+  window.scrollTo(0,0); };
+$("bExpDia").onclick=$("bExpCsv").onclick=$("bExpPer").onclick=function(){};
+
+/* ── AdsPower ── */
+var ICO_OK='<path d="M20 6L9 17l-5-5"/>';
+var ICO_RUIM='<path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/>';
+var ICO_GIRA='<path d="M21 12a9 9 0 11-6.2-8.5"/>';
+var DIAGS=[
+  {ok:true,titulo:"Conectado ao AdsPower",
+   abertaSemChave:true,
+   provado:["o AdsPower está aberto","a API local está ligada","a lista de perfis respondeu"]},
+  {ok:false,titulo:"O AdsPower não está respondendo nesta máquina",
+   passos:["Abra o AdsPower e deixe aberto — a conexão só existe com ele rodando.",
+           "No AdsPower: Configurações → API local, e ligue a opção.",
+           "Confira a porta: estamos tentando 50325."]},
+  {ok:false,titulo:"A chave da API não foi aceita",
+   passos:["No AdsPower: Configurações → API local → copiar a chave.",
+           "A chave muda se alguém clicar em gerar outra."]},
+  {ok:false,titulo:"O plano do AdsPower não libera listar perfis",
+   passos:["A listagem de perfis é recurso de plano pago no AdsPower.",
+           "Dá para abrir perfil pelo número, mas não descobrir quais existem."]},
+  {ok:false,titulo:"O AdsPower pediu para ir mais devagar",
+   passos:["A API local aceita cerca de uma chamada por segundo.",
+           "Espere alguns segundos e teste de novo."]}];
+var qualDiag=0;
+function pintaDiag(d,carregando){
+  var cx=$("adsResultado");
+  if(carregando){
+    cx.innerHTML='<div class="diag espera"><svg viewBox="0 0 24 24" class="girar">'+ICO_GIRA+
+      '</svg><div><b>Testando…</b>Falando com o AdsPower nesta máquina.</div></div>';
+    return;
+  }
+  cx.innerHTML='<div class="diag '+(d.ok?"ok":"ruim")+'"><svg viewBox="0 0 24 24">'+
+    (d.ok?ICO_OK:ICO_RUIM)+'</svg><div><b>'+d.titulo+'</b>'+
+    (d.provado?'<div class="prov">Verificado: '+d.provado.join(" · ")+'.</div>':"")+
+    (d.passos?'<ul>'+d.passos.map(function(p){return '<li>'+p+'</li>';}).join("")+'</ul>':"")+
+    '</div></div>'+
+    (d.abertaSemChave?'<div class="aviso" style="margin-top:12px"><svg viewBox="0 0 24 24">'+
+      '<path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg><span>A API local está '+
+      'respondendo <b>sem exigir a chave</b>. Ela só escuta neste computador, mas qualquer programa '+
+      'daqui pode abrir e dirigir os navegadores com as contas da Shopee.</span></div>':"");
+}
+GANCHOS.testarAds=function(){   // o de verdade troca isto por uma chamada à ponte
+  setTimeout(function(){ pintaDiag(DIAGS[qualDiag]); qualDiag=(qualDiag+1)%DIAGS.length; },
+    rapido?0:700);
+};
+// A chave fica escondida por padrão: esta tela é a que mais aparece em
+// print e em chamada de tela compartilhada, e quem tiver a chave abre os
+// navegadores com as contas da Shopee dentro.
+$("bOlho").onclick=function(){
+  var v=this.getAttribute("aria-pressed")!=="true";
+  this.setAttribute("aria-pressed",String(v));
+  this.setAttribute("aria-label",v?"Esconder a chave":"Mostrar a chave");
+  $("adsChave").type=v?"text":"password";
+};
+$("bTestarAds").onclick=function(){ pintaDiag(null,true); GANCHOS.testarAds(); };
+pintaDiag(DIAGS[0]); qualDiag=1;
+
+/* ── Shopify ── */
+var SHOPIFY_PATH=document.querySelector("#t-4 .lg path").getAttribute("d");
+var shopEstado="conectada";
+// dados de exemplo; a ponte sobrescreve com o que a Shopify devolveu de verdade
+var shopDados={loja:"testeloja",dominio:"testeloja-4ajtpkll.myshopify.com",
+  escopos:8,faltando:[],permanente:true,quando:"hoje, 03:01"};
+function pintaShopify(){
+  var c=$("shopCorpo");
+  if(shopEstado==="desconectada"){
+    c.innerHTML='<label class="campo"><span>Endereço da sua loja</span>'+
+      '<input id="shopLoja" placeholder="minhaloja.myshopify.com" spellcheck="false">'+
+      '<em>Pode colar o endereço inteiro do admin — o resto é descartado.</em></label>'+
+      '<button class="btn pri" id="bConectarShop"><svg class="lg" viewBox="0 0 24 24" '+
+      'width="13" height="13"><path fill="currentColor" d="'+SHOPIFY_PATH+'"/></svg>Conectar Shopify</button>'+
+      '<p class="nota">Abre a tela de permissões da Shopify no navegador. Você aprova lá e volta — '+
+      '<b>nenhuma chave para copiar</b>.</p>';
+    $("bConectarShop").onclick=function(){
+      shopEstado="conectando"; pintaShopify();
+      GANCHOS.conectarShopify(($("shopLoja")||{}).value||"");
+    };
+    return;
+  }
+  if(shopEstado==="conectando"){
+    c.innerHTML='<div class="diag espera"><svg viewBox="0 0 24 24" class="girar">'+ICO_GIRA+
+      '</svg><div><b>Esperando você aprovar</b>A tela de permissões da Shopify abriu no navegador. '+
+      'Aprove lá e esta tela se atualiza sozinha.</div></div>'+
+      '<button class="btn" id="bCancelarShop" style="margin-top:12px">Cancelar</button>';
+    $("bCancelarShop").onclick=function(){
+      shopEstado="desconectada"; pintaShopify(); GANCHOS.cancelarShopify();
+    };
+    return;
+  }
+  c.innerHTML='<div class="diag ok"><svg viewBox="0 0 24 24">'+ICO_OK+
+    '</svg><div><b>'+shopDados.loja+' está conectada</b><div class="prov">Verificado: a loja respondeu · '+
+    (shopDados.faltando.length
+      ? '<span style="color:var(--erro)">faltam '+shopDados.faltando.join(", ")+'</span>'
+      : 'os '+shopDados.escopos+' escopos foram concedidos · a leitura de pedidos funciona')+
+    '.</div></div></div>'+
+    '<dl style="margin:14px 0 0">'+
+    '<div class="par"><dt>Domínio</dt><dd class="mono">'+shopDados.dominio+'</dd></div>'+
+    '<div class="par"><dt>Acesso</dt><dd>'+(shopDados.permanente
+      ? 'não expira — a Shopify entregou um token permanente' : 'renova sozinho')+'</dd></div>'+
+    '<div class="par"><dt>Conectada em</dt><dd>'+shopDados.quando+'</dd></div></dl>'+
+    '<p class="nota">O nome acima veio da própria Shopify, não do que foi digitado. '+
+    'O acesso ficou <b>só nesta máquina</b>: nunca passou pelo nosso servidor.</p>'+
+    '<button class="btn" id="bTrocarShop" style="margin-top:12px">Trocar de loja</button>';
+  $("bTrocarShop").onclick=function(){ shopEstado="desconectada"; pintaShopify(); };
+}
+
+$("escopos").innerHTML=["read_orders","write_orders","read_fulfillments","write_fulfillments",
+  "read_assigned_fulfil…","write_assigned_fulfil…","read_merchant_man…","write_merchant_man…"]
+  .map(function(e){ return '<div class="escopo"><svg viewBox="0 0 24 24">'+ICO_OK+'</svg>'+e+'</div>'; }).join("");
+
+/* ── Início ── */
+pintaAtrasados(); pintaArquivos(); pintaColeta(); pintaRevisao(); pintaEscrita();
+pintaDias(); pintaShopify();
+// A ponte só mexe na tela por estas portas — nada de alcançar variável interna.
+window.TELA = {
+  maquina: function(m){
+    $("recAj").textContent=m.recomendado; $("limPor").textContent=m.limitadoPor;
+    $("maqRam").textContent=m.ramGB+" GB"; $("maqNucleos").textContent=m.nucleos;
+  },
+  diagnostico: function(d){ pintaDiag(d); },
+  shopify: function(estado,dados){
+    shopEstado=estado; if(dados) shopDados=dados; pintaShopify();
+  },
+  planilha: somar,
+  avisar: avisar,
+};
+
+var h=(location.hash||"").slice(1);
+ir(TELAS.indexOf(h)>=0?h:"1");
+})();
+</script>
+<script src="real.js"></script>
+</body>
+</html>

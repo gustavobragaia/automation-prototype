@@ -1,0 +1,26 @@
+{
+  "name": "esteira",
+  "productName": "Esteira",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Rastreios da Shopee para a Shopify, na máquina do operador",
+  "main": "principal.mjs",
+  "scripts": {
+    "dev": "electron .",
+    "empacotar": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "cloud.esteira.app",
+    "productName": "Esteira",
+    "directories": { "output": "dist" },
+    "files": ["principal.mjs", "preload.cjs", "ponte.mjs", "tela/**", "../src/**", "../migracoes/**"],
+    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.productivity" },
+    "win": { "target": ["nsis"] },
+    "publish": [{ "provider": "github", "owner": "gustavobragaia", "repo": "automation-prototype" }]
+  }
+}

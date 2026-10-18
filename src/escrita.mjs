@@ -16,12 +16,13 @@ import { conciliar, resolvido, motivoDe } from "./conciliar.mjs";
 import { parseTracking } from "./tracking.mjs";
 import { normNome } from "./match.mjs";
 import { pedidosPorNumero, normalizarNumero, montarEntrada, transportadoraDe, enviar } from "./shopify.mjs";
+import { emEstado } from "./caminhos.mjs";
 
 // A extensão roda dentro do navegador e pode voltar com a flag de teste
 // ligada por engano. Código simulado nunca chega na Shopify.
 const PARECE_SIMULADO = /^BR269999999999/;
 
-const ARQ_REGISTRO = process.env.REGISTRO_ESCRITAS ?? "estado/escritas-shopify.json";
+const ARQ_REGISTRO = process.env.REGISTRO_ESCRITAS ?? emEstado("escritas-shopify.json");
 
 /** Rodar duas vezes no mesmo dia não pode criar dois fulfillments. */
 export function lerRegistro(arq = ARQ_REGISTRO) {

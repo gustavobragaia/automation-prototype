@@ -7,7 +7,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-export const CAMINHO = resolve(process.env.DB_CAMINHO ?? "estado/dados.sqlite");
+export const CAMINHO = resolve(process.env.DB_CAMINHO ?? emEstado("dados.sqlite"));
 const DIR_MIGRACOES = resolve("migracoes");
 const MANTER_BACKUPS = 10;
 
@@ -61,6 +61,7 @@ export function carregarDriver() {
   return Database;
 }
 import { createRequire } from "node:module";
+import { emEstado } from "../caminhos.mjs";
 const require = createRequire(import.meta.url);
 
 export function abrir({ aoLog = ok, caminho = CAMINHO } = {}) {
