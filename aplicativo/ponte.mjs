@@ -12,6 +12,9 @@ import { diagnosticar, apiAbertaSemChave } from "../src/adspower.mjs";
 import { conexaoAtiva, ESCOPOS } from "../src/shopify-conexao.mjs";
 import { identidadeDaLoja, escoposConcedidos } from "../src/shopify.mjs";
 import { lerPendentes } from "../src/planilha.mjs";
+import { escreverRastreios } from "../src/escrita.mjs";
+import { transportadoraDe } from "../src/shopify.mjs";
+import { guardarPendentes, baixarPendentes } from "../src/estado.mjs";
 import { pendentesAbertos, historico, adiarPendente, encerrarPendente,
          reabrirPendente } from "../src/estado.mjs";
 import { lerColetas, conciliar, MOTIVOS } from "../src/conciliar.mjs";
@@ -36,6 +39,17 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
   // As planilhas que o cliente escolheu nesta sessão, na ordem. A rodada
   // sai daqui e não de PLANILHA no ambiente: quem instala o app não tem .env.
   let planilhas = [];
+  let escritaEmCurso = false;
+
+  // A etapa 4 olha o mesmo material da rodada: as planilhas que o cliente
+  // escolheu, cruzadas com o que o coletor trouxe. Ler de outro lugar faria
+  // a tela mostrar uma coisa e a escrita fazer outra.
+  const contasEColetas = async () => {
+    if (!planilhas.length) throw new Error("nenhuma planilha escolhida ainda");
+    const contas = [];
+    for (const f of planilhas) contas.push(...(await lerPendentes(f)).contas);
+    return { contas, coletas: lerColetas() };
+  };
 
   // A linha da conciliação é interna. A tela recebe só o que desenha — e os
   // dois lados da comparação quando o motivo for divergência de nome, que é
@@ -254,6 +268,48 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
                                coletadas: 0, falhas: (contas ?? []).length });
         throw e;
       }
+    }),
+
+    // ── escrita em lote (etapa 4) ─────────────────────────────────────
+    //
+    // A rodada corre com `escrever: false` quando o cliente não ligou o
+    // "escrever sem me perguntar". Então a etapa 4 é o momento em que ele
+    // olha o que vai sair e aprova — e é aqui que sai.
+    "escrita:listar": () => tentar(async () => {
+      const { planejado, resumo, pulados } = await contasEColetas()
+        .then(({ contas, coletas }) => escreverRastreios(contas, coletas,
+          { escrever: false, aoLog }));
+      return {
+        resumo, pulados,
+        itens: planejado.map((p) => ({
+          pedido: p.l.p.pedido, conta: p.l.conta,
+          nome: p.alvo?.nome ?? p.l.p.nome,
+          codigos: (p.codigos ?? []).map((c) => (typeof c === "string" ? c : c.code)),
+          transportadora: transportadoraDe(
+            (p.codigos ?? []).map((c) => (typeof c === "string" ? c : c.code))),
+        })),
+      };
+    }),
+
+    "escrita:executar": ({ notificar = false } = {}) => tentar(async () => {
+      if (escritaEmCurso) throw new Error("a escrita já está acontecendo");
+      escritaEmCurso = true;
+      try {
+        const { contas, coletas } = await contasEColetas();
+        const r = await escreverRastreios(contas, coletas,
+          { escrever: true, notificar, aoLog });
+
+        // A carteira anda nos dois sentidos, igual à rodada: entra quem
+        // ficou pendente, sai quem a Shopify aceitou. `gravados`, não
+        // `planejado` — o que ela recusou TEM que continuar na carteira,
+        // senão some amanhã.
+        guardarPendentes(r.pendencias);
+        const baixados = baixarPendentes(r.gravados ?? []);
+        aoLog(`${r.escritos} escrito(s) · ${r.falhas} falha(s) · ${r.pulados} pulado(s)` +
+              (baixados ? ` · ${baixados} saíram da carteira` : ""));
+        return { escritos: r.escritos, falhas: r.falhas, pulados: r.pulados,
+                 gravados: r.gravados ?? [] };
+      } finally { escritaEmCurso = false; }
     }),
 
     // ── escrita manual ────────────────────────────────────────────────

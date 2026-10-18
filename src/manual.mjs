@@ -13,6 +13,7 @@
 import { parseTracking } from "./tracking.mjs";
 import { pedidosPorNumero, normalizarNumero, montarEntrada, transportadoraDe, enviar } from "./shopify.mjs";
 import { encerrarPendente } from "./estado.mjs";
+import { lerRegistro, gravarRegistro } from "./escrita.mjs";
 
 const PARECE_SIMULADO = /^BR269999999999/;
 
@@ -44,7 +45,7 @@ export async function prepararManual(pedido, textoDoRastreio, { conexao } = {}) 
 }
 
 /** Escreve o que `prepararManual` devolveu. Só chame depois do olho humano. */
-export async function escreverManual(preparado, { conexao, notificar = false } = {}) {
+export async function escreverManual(preparado, { conexao, notificar = false, conta = null } = {}) {
   if (!preparado?.ok) throw new Error(preparado?.erro ?? "nada preparado");
   const f = await enviar(montarEntrada({
     fulfillmentOrderId: preparado.alvo.fulfillmentOrderId,
@@ -52,6 +53,20 @@ export async function escreverManual(preparado, { conexao, notificar = false } =
     transportadora: preparado.transportadora,
     notificar,
   }), { conexao });
+
+  // O mesmo registro que a escrita em lote consulta antes de escrever.
+  // Sem isto, a idempotência dependia só de a Shopify já aparecer como
+  // FULFILLED — uma ida à rede, e uma aposta no estado do outro lado.
+  // Agora o robô sabe por si que este pedido já foi escrito hoje.
+  const num = normalizarNumero(preparado.alvo.pedido) ?? preparado.alvo.pedido;
+  const registro = lerRegistro();
+  registro[num] = {
+    fulfillmentId: f.id, pedido: preparado.alvo.pedido, conta,
+    codigos: f.trackingInfo.map((x) => x.number),
+    em: new Date().toISOString(), origem: "manual",
+  };
+  gravarRegistro(registro);
+
   return { fulfillmentId: f.id, pedido: preparado.alvo.pedido,
            codigos: f.trackingInfo.map((x) => x.number) };
 }

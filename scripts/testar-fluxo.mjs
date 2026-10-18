@@ -189,6 +189,43 @@ try { await chamar("conferencia:decidir", { decisao: "adiar" }); }
 catch { semPedido = true; }
 tudo &= ok(semPedido, "e decisão sem número de pedido também");
 
+/* ───────────────────── 11. a etapa 4: o lote ───────────────────── */
+sec("11 · a etapa 4 mostra o que vai sair, antes de sair");
+const escritas3 = fingirShopify({ pedidos: {
+  "#1001": { nome: "Sônia Aparecida Pinto", valor: 88.30, cep: "80000000" },
+} });
+const lote = await chamar("escrita:listar");
+tudo &= ok(lote.itens.length === 1,
+  `1 pedido pronto para escrever (veio ${lote.itens.length}: ${lote.itens.map((i) => i.pedido).join(", ")})`);
+tudo &= ok(lote.itens[0]?.pedido === "#1001", "e é o que casou redondo, o #1001");
+tudo &= ok(lote.itens[0]?.codigos?.includes("BR263500935831Z"),
+  "com o rastreio que a Shopee tinha");
+tudo &= ok(lote.itens[0]?.transportadora === "Correios", "e a transportadora resolvida pelo código");
+tudo &= ok(escritas3.length === 0, "e NADA foi escrito só por listar");
+
+sec("12 · escrever o lote");
+const feito = await chamar("escrita:executar", {});
+tudo &= ok(feito.escritos === 1, `1 escrito (deu ${feito.escritos})`);
+tudo &= ok(feito.falhas === 0, "sem falhas");
+tudo &= ok(escritas3.length === 1, "a Shopify recebeu exatamente 1 escrita");
+tudo &= ok(escritas3[0]?.codigos?.includes("BR263500935831Z"), "com o código certo");
+
+sec("13 · escrever duas vezes não escreve duas vezes");
+const denovo = await chamar("escrita:executar", {});
+tudo &= ok(denovo.escritos === 0, `a segunda vez escreve 0 (escreveu ${denovo.escritos})`);
+tudo &= ok(denovo.pulados >= 1, "e pula o que já tinha ido");
+tudo &= ok(escritas3.length === 1,
+  `a Shopify continua com 1 escrita só (tem ${escritas3.length})`);
+
+sec("14 · o que foi colado à mão não é reescrito pelo lote");
+// O #1004 foi escrito na etapa 4 deste teste, pela saída manual. O lote
+// não pode mandar de novo — e a prova não pode depender de a Shopify já
+// responder FULFILLED, porque aí a idempotência moraria no outro lado.
+const registro = JSON.parse((await import("node:fs"))
+  .readFileSync(join(dir, "estado", "escritas-shopify.json"), "utf8"));
+tudo &= ok(!!registro["1004"], "a escrita manual ficou registrada aqui também");
+tudo &= ok(registro["1004"]?.origem === "manual", "marcada como manual, para dar para auditar depois");
+
 rmSync(dir, { recursive: true, force: true });
 console.log(tudo ? "\n\x1b[32m\x1b[1m  o fluxo fecha de ponta a ponta\x1b[0m\n"
                  : "\n\x1b[31m\x1b[1m  o fluxo tem furo\x1b[0m\n");

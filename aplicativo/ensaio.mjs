@@ -30,7 +30,9 @@ writeFileSync(process.env.SHOPIFY_CONEXAO_ARQUIVO, JSON.stringify({
 
 const { montarCenario, fingirShopify } = await import(`${raiz}/scripts/cenario-conferencia.mjs`);
 const { planilha } = await montarCenario(dir);
-fingirShopify({ pedidos: {} });
+const escritas = fingirShopify({ pedidos: {
+  "#1001": { nome: "Sônia Aparecida Pinto", valor: 88.30, cep: "80000000" },
+} });
 
 await import("./principal.mjs");
 
@@ -72,6 +74,25 @@ app.whenReady().then(async () => {
   const noDisco = (await import(`${raiz}/src/estado.mjs`))
     .pendentesAbertos().find((p) => p.pedido === "#1003");
 
+  // ── etapa 4: a lista do lote e o clique que escreve ──
+  const lote = await w.webContents.executeJavaScript(`(async () => {
+    const r = await window.esteira.pedir("escrita:listar", {});
+    const d = r.dado && r.dado.dado ? r.dado.dado : r.dado;
+    window.TELA.escrita(d);
+    document.querySelector('[data-etapa="4"],[data-ir="4"]')?.click();
+    return { linhas: document.querySelectorAll("#tbEscrita tr").length,
+             botao: document.getElementById("eBotTexto").textContent,
+             travado: document.getElementById("bEscrever").disabled };
+  })()`);
+  const antesDoClique = escritas.length;
+  await w.webContents.executeJavaScript(`document.getElementById("bEscrever").click()`);
+  await new Promise((s) => setTimeout(s, 1500));
+  const depoisDoClique = await w.webContents.executeJavaScript(`({
+    botao: document.getElementById("eBotTexto").textContent,
+    titulo: document.getElementById("eTit").textContent,
+    numero: document.getElementById("eNum").textContent,
+  })`);
+
   const ok = (c, m) => { console.log(c ? `  \x1b[32m✓\x1b[0m ${m}` : `  \x1b[31m✗ ${m}\x1b[0m`); return c; };
   let tudo = true;
   console.log("");
@@ -81,8 +102,18 @@ app.whenReady().then(async () => {
   tudo &= ok(depois.tratados === 1, "virou uma decisão em 'já tratados'");
   tudo &= ok(noDisco?.conta === 128, `e no disco está na conta nova (${noDisco?.conta})`);
   tudo &= ok(noDisco?.contaCorrigida === true, "marcado como corrigido à mão");
-  console.log(tudo ? "\n\x1b[32m\x1b[1m  a conferência responde ao clique\x1b[0m\n"
-                   : "\n\x1b[31m\x1b[1m  a conferência NÃO responde ao clique\x1b[0m\n");
+  tudo &= ok(lote.linhas === 1, `a etapa 4 listou 1 pedido (listou ${lote.linhas})`);
+  tudo &= ok(/^Escrever (1|os \d+) na Shopify$/.test(lote.botao),
+    `o botão diz quantos vão (diz "${lote.botao}")`);
+  tudo &= ok(lote.travado === false, "e está liberado para clicar");
+  tudo &= ok(antesDoClique === 0, "nada tinha sido escrito antes do clique");
+  tudo &= ok(escritas.length === 1, `o clique escreveu 1 na Shopify (escreveu ${escritas.length})`);
+  tudo &= ok(depoisDoClique.titulo === "Escrito na Shopify",
+    `e a tela confirma (diz "${depoisDoClique.titulo}")`);
+  tudo &= ok(depoisDoClique.numero === "1", `com o número que a Shopify aceitou (${depoisDoClique.numero})`);
+
+  console.log(tudo ? "\n\x1b[32m\x1b[1m  a conferência e a escrita respondem ao clique\x1b[0m\n"
+                   : "\n\x1b[31m\x1b[1m  algum clique NÃO chega no robô\x1b[0m\n");
   process.exitCode = tudo ? 0 : 1;
 
   await new Promise((s) => setTimeout(s, 300));

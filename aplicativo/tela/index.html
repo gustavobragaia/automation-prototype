@@ -937,6 +937,7 @@ var GANCHOS = window.GANCHOS = {
   },
   cancelarShopify: function(){},
   esquecerPlanilha: function(){},
+  escrever: function(){ return Promise.resolve({escritos:prontos,falhas:0}); },
   decidir: function(){ return Promise.resolve({reversivel:true}); },
   desfazer: function(){ return Promise.resolve(true); },
   testarAds: function(){},                                // redefinido mais abaixo
@@ -976,6 +977,7 @@ document.addEventListener("click",function(e){
 });
 
 var TOTAL=0, prontos=0, escritos=0, rodando=false, coletou=false, escrito=false;
+var escrevendo=false;
 
 function pintaTrilha(){
   var feita=[arquivos.length>0, coletou, coletou&&pendencias()===0, escrito];
@@ -1594,14 +1596,20 @@ function pintaEscrita(){
       ?"A aprovação está desligada nos Ajustes. A escrita acontece logo depois da coleta."
       :"Confira a lista e libere o lote inteiro de uma vez. Nada foi escrito ainda.";
     $("bEscrever").disabled=false;
-    $("eBotTexto").textContent="Escrever os "+prontos+" na Shopify";
+    $("eBotTexto").textContent=prontos===1
+      ? "Escrever 1 na Shopify" : "Escrever os "+prontos+" na Shopify";
     $("blLista").hidden=false;
-    $("ctLista").textContent=prontos+" pedidos";
-    $("tbEscrita").innerHTML=A_ESCREVER.map(function(x){
-      return '<tr><td class="mono forte">'+x.p+'</td><td>'+x.c+'</td><td class="ter num">'+x.ct+
-        '</td><td class="mono">'+x.r+'</td><td class="ter">'+x.tr+'</td></tr>';}).join("")+
-      '<tr><td colspan="5" class="ter" style="text-align:center">e mais '+
-      Math.max(0,prontos-A_ESCREVER.length)+' pedidos</td></tr>';
+    $("ctLista").textContent=prontos+(prontos===1?" pedido":" pedidos");
+    // Mostra até 12 e diz quantos ficaram de fora. A lista inteira de 300
+    // não ajuda ninguém a conferir, e o que importa é a amostra bater.
+    var mostra=A_ESCREVER.slice(0,12);
+    $("tbEscrita").innerHTML=mostra.map(function(x){
+      return '<tr><td class="mono forte">'+esc(x.p)+'</td><td>'+esc(x.c)+'</td>'+
+        '<td class="ter num">'+esc(x.ct)+'</td><td class="mono">'+esc(x.r)+'</td>'+
+        '<td class="ter">'+esc(x.tr)+'</td></tr>';}).join("")+
+      (A_ESCREVER.length>mostra.length
+        ? '<tr><td colspan="5" class="ter" style="text-align:center">e mais '+
+          (A_ESCREVER.length-mostra.length)+' pedidos</td></tr>' : "");
   } else {
     $("eNum").style.color=""; $("eNum").textContent="0"; $("eUn").textContent="prontos";
     $("eTit").textContent="Nada para escrever ainda";
@@ -1644,11 +1652,30 @@ function comecarProxima(){
 }
 $("bProxima").onclick=comecarProxima;
 
+// Nada muda na tela antes de a Shopify ter aceitado. Marcar como escrito e
+// descobrir depois que falhou é o erro mais caro aqui: o cliente fecha o
+// computador achando que o dia terminou.
 function escreverTudo(){
-  escritos=prontos; escrito=true;
-  avisar("Escrito na Shopify",escritos+" rastreios gravados."+
-    (pendencias()?" "+pendencias()+" esperando você.":""));
-  pintaEscrita(); pintaTrilha(); pintaFechada(); ir("4");
+  if(escrevendo) return;
+  escrevendo=true;
+  $("bEscrever").disabled=true;
+  var antes=$("eBotTexto").textContent;
+  $("eBotTexto").textContent="Escrevendo…";
+  Promise.resolve(GANCHOS.escrever()).then(function(r){
+    escrevendo=false;
+    escritos=(r&&r.escritos!=null)?r.escritos:prontos;
+    var falhas=(r&&r.falhas)||0;
+    escrito=true;
+    avisar(falhas?"Escrito, com "+falhas+" falha"+(falhas>1?"s":""):"Escrito na Shopify",
+      escritos+" rastreio"+(escritos===1?"":"s")+" gravado"+(escritos===1?"":"s")+"."+
+      (falhas?" "+falhas+" não entrou"+(falhas>1?"ram":"")+" — está na etapa 3.":"")+
+      (pendencias()?" "+pendencias()+" esperando você.":""));
+    pintaEscrita(); pintaTrilha(); pintaFechada(); ir("4");
+  }).catch(function(e){
+    escrevendo=false;
+    $("bEscrever").disabled=false; $("eBotTexto").textContent=antes;
+    avisar("A escrita não aconteceu", e&&e.message?e.message:"");
+  });
 }
 
 function pintaFechada(){
@@ -1945,6 +1972,19 @@ window.TELA = {
   },
   planilha: somar,
   avisar: avisar,
+
+  // ── a escrita em lote ──
+  // A lista do que vai sair vem do robô, já com o pedido que a Shopify
+  // reconheceu e o rastreio que vai ser gravado.
+  escrita: function(dados){
+    A_ESCREVER=((dados&&dados.itens)||[]).map(function(x){
+      return { p:x.pedido, c:x.nome, ct:x.conta,
+               r:(x.codigos||[]).join(" · "), tr:x.transportadora||"—" };
+    });
+    prontos=A_ESCREVER.length;
+    coletou=true;
+    pintaEscrita(); pintaTrilha();
+  },
 
   // ── a conferência de verdade ──
   // Os itens que estavam escritos no HTML viram dados. A tela desenha o que

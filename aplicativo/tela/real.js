@@ -169,7 +169,7 @@ function rodada(){
     if (e.tipo === "rodada:fim") {
       TELA.rodada.terminar(e);
       // A conciliação já rodou junto com a coleta; agora a lista é real.
-      if (!e.erro) carregarConferencia();
+      if (!e.erro) { carregarConferencia(); carregarEscrita(); }
       return;
     }
     var estado = ESTADO_DO_EVENTO[e.tipo];
@@ -220,6 +220,21 @@ function paraleloEscolhido(){
   return b ? Number(b.dataset.n) : undefined;
 }
 
+/* ── A escrita em lote (etapa 4) ── */
+function escrita(){
+  GANCHOS.escrever = async function(){
+    const r = await pedir("escrita:executar", {});
+    // Depois de escrever, as duas listas mudam: quem entrou saiu da
+    // conferência, quem a Shopify recusou entrou nela.
+    carregarConferencia();
+    return r;
+  };
+}
+async function carregarEscrita(){
+  try { TELA.escrita(await pedir("escrita:listar")); }
+  catch (e) { console.error("[esteira] escrita:", e.message); }
+}
+
 /* ── A conferência ── */
 function conferencia(){
   GANCHOS.decidir = async function(pedido, ordem){
@@ -252,7 +267,7 @@ function avisos(){
 (async function(){
   var partes = [["ajustes",ajustes],["máquina",maquina],["AdsPower",adspower],["Shopify",shopify],
                 ["planilha",planilha],["rodada",rodada],
-                ["conferência",conferencia],["avisos",avisos]];
+                ["conferência",conferencia],["escrita",escrita],["avisos",avisos]];
   for (var i = 0; i < partes.length; i++) {
     try { await partes[i][1](); trocou.push(partes[i][0]); }
     catch (e) { falhou.push(partes[i][0] + ": " + e.message); }
