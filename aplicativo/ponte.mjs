@@ -22,7 +22,8 @@ import { lerDetalhe } from "../src/armazenamento/detalhe.mjs";
 import { rodarCiclo, descobrirContas } from "../src/ciclo.mjs";
 import { iniciarConexao, conexaoEmAndamento, cancelarConexao } from "../src/shopify-oauth.mjs";
 import { resolverManual, prepararManual } from "../src/manual.mjs";
-import { lerAjustes, salvarAjustes, aplicarNoAmbiente, SEGREDOS } from "../src/ajustes.mjs";
+import { lerAjustes, salvarAjustes, aplicarNoAmbiente, SEGREDOS,
+         faltaConfigurar } from "../src/ajustes.mjs";
 import { aoEvento, emitir } from "../src/eventos.mjs";
 import { pedirParada } from "../src/fila.mjs";
 
@@ -109,11 +110,14 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
     // Nenhum segredo volta inteiro para a tela — nem a senha da Shopee, nem
     // as chaves. Ela recebe só "guardada", o bastante para mostrar que
     // existe um valor salvo. Quem precisa do valor é o robô, aqui dentro.
-    "ajustes:ler": async () => semSegredos(lerAjustes()),
+    "ajustes:ler": async () => {
+      const a = lerAjustes();
+      return { ...semSegredos(a), falta: faltaConfigurar(a) };
+    },
     "ajustes:salvar": (mudancas) => tentar(async () => {
       const a = salvarAjustes(limparGuardados(mudancas ?? {}));
       aplicarNoAmbiente(a);
-      return semSegredos(a);
+      return { ...semSegredos(a), falta: faltaConfigurar(a) };
     }),
 
     // ── estado da máquina e das conexões ──────────────────────────────
@@ -286,6 +290,13 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
     },
     "rodada:iniciar": ({ contas, escrever = false, concorrencia }) => tentar(async () => {
       if (rodadaEmCurso) throw new Error("já existe uma rodada em andamento");
+      // Antes de abrir o primeiro navegador. Uma rodada que começa e morre
+      // na terceira conta já abriu duas, mexeu em duas sessões e gastou
+      // dez minutos — tudo para descobrir algo que dava para saber agora.
+      const falta = faltaConfigurar();
+      if (falta.length)
+        throw new Error("antes de rodar, preencha em Ajustes → Contas da Shopee: " +
+                        falta.join("; "));
       if (concorrencia) process.env.CONCORRENCIA = String(concorrencia);
       // As planilhas que a pessoa escolheu vão junto: sem isto a rodada
       // relê o PLANILHA do ambiente, que no app é o .env do projeto.

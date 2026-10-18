@@ -12,6 +12,14 @@ import { createServer } from "node:http";
 import { parseTracking, parseConta, emailDaConta } from "./src/tracking.mjs";
 import { casar } from "./src/match.mjs";
 import { montarEntrada, transportadoraDe, urlRastreio, enviar } from "./src/shopify.mjs";
+// O padrão de e-mail não tem mais valor padrão — ele é configuração do
+// cliente. Um teste tem que declarar o que está exercitando, senão passa
+// a depender de quem instalou o app por último.
+process.env.SHOPEE_PREFIXO ??= "chompspee";
+process.env.SHOPEE_PREFIXO_ALTO ??= "Brushopee";
+process.env.SHOPEE_FAIXA_PREFIXO ??= "200";
+process.env.SHOPEE_EMAIL_DOMINIO ??= "givmail.com";
+
 
 const ok = (m) => console.log(`  \x1b[32m✓\x1b[0m ${m}`);
 const info = (m) => console.log(`    ${m}`);

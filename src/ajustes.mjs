@@ -19,13 +19,18 @@ const PADRAO = {
   adspowerChave: "",
 
   // Contas da Shopee. Tudo isto era .env, que o cliente não tem e não
-  // saberia editar. Os padrões são os da Chomps, para nada mudar para quem
-  // já usa; outro comprador do Esteira troca na tela.
+  // saberia editar.
+  //
+  // Nascem VAZIOS de propósito. Os padrões eram os da Chomps, e para o
+  // segundo comprador do Esteira isso é pior que não ter padrão nenhum: o
+  // robô tentaria entrar como "chompspee124@givmail.com" com a senha dele,
+  // todas as contas recusariam, e não haveria pista do porquê. Melhor o app
+  // se recusar a rodar e dizer o que falta.
   shopeeSenha: "",            // a mesma para todas as contas
-  emailPrefixo: "chompspee",  // o começo do e-mail das contas
-  emailPrefixoAlto: "Brushopee", // vazio = um prefixo só para todas
-  emailFaixa: 200,            // a partir deste número vale o prefixo de cima
-  emailDominio: "givmail.com",
+  emailPrefixo: "",           // o começo do e-mail das contas
+  emailPrefixoAlto: "",       // vazio = um prefixo só para todas
+  emailFaixa: 0,              // a partir deste número vale o prefixo de cima
+  emailDominio: "",
   codigoChave: "",            // RapidAPI: lê o código de verificação no e-mail
   loginAutomatico: true,      // se o robô entra sozinho quando a sessão cai
 
@@ -92,6 +97,26 @@ const NO_AMBIENTE = {
 // prefixo" quer dizer que todas as contas usam o mesmo começo de e-mail —
 // e isso precisa chegar ao robô, senão o padrão da Chomps volta sozinho.
 const VAZIO_VALE = new Set(["emailPrefixoAlto"]);
+
+// O que ainda falta preencher para uma rodada poder acontecer.
+//
+// Checar ANTES de começar, e não no meio: a sessão de uma conta pode estar
+// viva hoje e o robô nem precisar da senha — e aí o problema só apareceria
+// daqui a três dias, com a rodada já na metade.
+//
+// Cada item é uma frase para a pessoa ler, não o nome de um campo.
+export function faltaConfigurar(a = lerAjustes()) {
+  const falta = [];
+  if (!a.shopeeSenha) falta.push("a senha das contas da Shopee");
+  if (!a.emailPrefixo) falta.push("o começo do e-mail das contas");
+  if (!a.emailDominio) falta.push("o domínio do e-mail das contas");
+  if (!a.codigoChave) falta.push("a chave para ler o código de verificação");
+  // Um segundo começo sem faixa não vale para conta nenhuma — e quem
+  // digitou um esperava que valesse para alguma.
+  if (a.emailPrefixoAlto && !(Number(a.emailFaixa) > 0))
+    falta.push("a partir de qual conta vale o segundo começo de e-mail");
+  return falta;
+}
 
 export function aplicarNoAmbiente(a = lerAjustes()) {
   for (const [campo, variavel] of Object.entries(NO_AMBIENTE)) {

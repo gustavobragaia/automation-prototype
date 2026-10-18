@@ -10,7 +10,7 @@ import { join } from "node:path";
 const pasta = mkdtempSync(join(tmpdir(), "esteira-ajustes-"));
 process.env.AJUSTES_ARQUIVO = join(pasta, "ajustes.json");
 
-const { lerAjustes, salvarAjustes, aplicarNoAmbiente } = await import("../src/ajustes.mjs");
+const { lerAjustes, salvarAjustes, aplicarNoAmbiente, faltaConfigurar } = await import("../src/ajustes.mjs");
 
 const ok = (c, m) => console.log(c ? `  \x1b[32m✓\x1b[0m ${m}` : `  \x1b[31m✗ ${m}\x1b[0m`) || c;
 const sec = (t) => console.log(`\n\x1b[1m${t}\x1b[0m`);
@@ -127,6 +127,40 @@ const vistos = JSON.parse((await import("node:child_process")).execFileSync(proc
 tudo &= ok(vistos.senha === "senha-de-teste", "a senha está lá depois de reabrir");
 tudo &= ok(vistos.dominio === "exemplo.com", "e o domínio também");
 tudo &= ok(vistos.login === false, "e o login desligado");
+
+sec("instalação nova: nada vem preenchido");
+// O padrão NÃO pode ser a configuração da Chomps. Para o segundo comprador
+// do Esteira, o robô tentaria entrar como "chompspee124@givmail.com" com a
+// senha dele, as 80 contas recusariam, e não haveria pista do porquê.
+rmSync(process.env.AJUSTES_ARQUIVO, { force: true });
+const novo = lerAjustes();
+tudo &= ok(novo.emailPrefixo === "", "o começo do e-mail nasce vazio");
+tudo &= ok(novo.emailDominio === "", "o domínio também");
+tudo &= ok(novo.shopeeSenha === "", "e a senha");
+
+sec("e o app diz o que falta, em português");
+const falta = faltaConfigurar(novo);
+tudo &= ok(falta.length === 4, `quatro coisas faltando (listou ${falta.length})`);
+tudo &= ok(falta.some((f) => /senha/.test(f)), "a senha está na lista");
+tudo &= ok(falta.some((f) => /domínio/.test(f)), "o domínio está na lista");
+tudo &= ok(!falta.some((f) => /_/.test(f)),
+  "e nenhum item é nome de variável — é frase para ler");
+
+sec("segundo começo sem faixa também é coisa faltando");
+salvarAjustes({ shopeeSenha: "x", codigoChave: "y",
+                emailPrefixo: "loja", emailDominio: "ex.com" });
+tudo &= ok(faltaConfigurar().length === 0, "com o básico preenchido, não falta nada");
+salvarAjustes({ emailPrefixoAlto: "Outro" });
+tudo &= ok(faltaConfigurar().some((f) => /a partir de qual conta/.test(f)),
+  "mas um segundo começo sem faixa não vale para ninguém, e o app avisa");
+
+sec("sem configurar, o robô não monta e-mail nenhum");
+rmSync(process.env.AJUSTES_ARQUIVO, { force: true });
+for (const v of ["SHOPEE_PREFIXO","SHOPEE_PREFIXO_ALTO","SHOPEE_EMAIL_DOMINIO"]) delete process.env[v];
+let estourouEmail = false;
+try { emailDaConta(124); } catch (e) { estourouEmail = /Ajustes/.test(e.message); }
+tudo &= ok(estourouEmail,
+  "estoura apontando para a tela, em vez de montar um e-mail de outro cliente");
 
 rmSync(pasta, { recursive: true, force: true });
 console.log(tudo ? "\n\x1b[32m\x1b[1m  ajustes de pé\x1b[0m\n"

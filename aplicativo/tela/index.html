@@ -939,6 +939,10 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
         </div>
 
         <p class="nota" id="shExemplo" style="margin-top:4px"></p>
+        <div class="aviso" id="shFalta" hidden style="margin-top:12px">
+          <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+          <span><b>Falta preencher para o robô conseguir rodar:</b>
+            <span id="shFaltaLista"></span></span></div>
 
         <div class="linha-chave" style="margin-top:16px">
           <div><b>Entrar sozinho quando a sessão cair</b>
@@ -2077,6 +2081,11 @@ window.TELA = {
     if(a.loginAutomatico!=null)
       $("chLogin").setAttribute("aria-pressed",String(a.loginAutomatico!==false));
     pintaExemploEmail();
+    // O que falta fica visível aqui, e não só quando a rodada recusa: assim
+    // ele resolve ao configurar, não às nove da manhã com a planilha pronta.
+    var falta=a.falta||[];
+    $("shFalta").hidden=!falta.length;
+    $("shFaltaLista").textContent=falta.join("; ")+".";
   },
 
   // ── a escrita em lote ──

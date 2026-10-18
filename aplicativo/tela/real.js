@@ -77,6 +77,7 @@ async function ajustes(){
     m.emailFaixa = Number($("shFaixa").value.trim()) || 0;
     m.loginAutomatico = $("chLogin").getAttribute("aria-pressed") === "true";
     pedir("ajustes:salvar", m)
+      .then(function(novo){ TELA.ajustes(novo); })   // a lista do que falta reaparece
       .catch(function(e){ console.error("[esteira] ajustes:", e.message); });
   };
   SEGREDOS.concat(simples).forEach(function(par){

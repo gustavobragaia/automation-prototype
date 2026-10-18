@@ -9,6 +9,14 @@
 import { readFileSync } from "node:fs";
 import { parseTracking, parseConta, emailDaConta } from "./src/tracking.mjs";
 import { casar, normNome, normProduto } from "./src/match.mjs";
+// O padrão de e-mail não tem mais valor padrão — ele é configuração do
+// cliente. Um teste tem que declarar o que está exercitando, senão passa
+// a depender de quem instalou o app por último.
+process.env.SHOPEE_PREFIXO ??= "chompspee";
+process.env.SHOPEE_PREFIXO_ALTO ??= "Brushopee";
+process.env.SHOPEE_FAIXA_PREFIXO ??= "200";
+process.env.SHOPEE_EMAIL_DOMINIO ??= "givmail.com";
+
 
 const pedidos = JSON.parse(readFileSync(new URL("./data/pedidos.json", import.meta.url)));
 const pct = (n, t) => `${((n / t) * 100).toFixed(2)}%`;

@@ -10,6 +10,14 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { lerPendentes } from "../src/planilha.mjs";
 import { lerColetas, conciliar } from "../src/conciliar.mjs";
 import { emailDaConta } from "../src/tracking.mjs";
+// O padrão de e-mail não tem mais valor padrão — ele é configuração do
+// cliente. Um teste tem que declarar o que está exercitando, senão passa
+// a depender de quem instalou o app por último.
+process.env.SHOPEE_PREFIXO ??= "chompspee";
+process.env.SHOPEE_PREFIXO_ALTO ??= "Brushopee";
+process.env.SHOPEE_FAIXA_PREFIXO ??= "200";
+process.env.SHOPEE_EMAIL_DOMINIO ??= "givmail.com";
+
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 

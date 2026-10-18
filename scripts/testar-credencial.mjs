@@ -1,5 +1,13 @@
 // As rotas sensíveis do coletor só podem responder à nossa extensão.
 process.env.SHOPEE_SENHA = "senha-de-teste";
+// O padrão de e-mail é configuração do cliente, sem valor padrão. O teste
+// declara o que exercita, em vez de herdar o de quem instalou por último.
+process.env.SHOPEE_PREFIXO ??= "chompspee";
+process.env.SHOPEE_PREFIXO_ALTO ??= "Brushopee";
+process.env.SHOPEE_FAIXA_PREFIXO ??= "200";
+process.env.SHOPEE_EMAIL_DOMINIO ??= "givmail.com";
+process.env.SHOPEE_SENHA ??= "senha-de-teste";
+
 const { iniciarColetor } = await import("../src/coletor.mjs");
 const { novoToken, limparToken } = await import("../src/credenciais.mjs");
 

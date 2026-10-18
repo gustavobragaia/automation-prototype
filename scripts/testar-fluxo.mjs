@@ -306,6 +306,21 @@ tudo &= ok(contasDireto?.length === 2, `e acha as 2 contas (achou ${contasDireto
 delete process.env.PLANILHA_ABA;
 delete process.env.PLANILHA;
 
+/* ───────── 18. sem configurar, a rodada nem começa ───────── */
+sec("18 · a rodada recusa antes de abrir o primeiro navegador");
+// Checar no meio seria tarde: a essa altura já abriu dois perfis, mexeu em
+// duas sessões da Shopee e gastou dez minutos — para descobrir algo que
+// dava para saber antes de clicar.
+process.env.AJUSTES_ARQUIVO = join(dir, "ajustes-vazio.json");
+let semConfig = null;
+try {
+  await chamar("rodada:iniciar", { contas: [{ conta: 124, serial: 1 }] });
+} catch (e) { semConfig = e.message; }
+tudo &= ok(!!semConfig, "a rodada foi recusada");
+tudo &= ok(/Ajustes/.test(semConfig ?? ""), `e a mensagem diz onde resolver (${semConfig})`);
+tudo &= ok(/senha/.test(semConfig ?? ""), "dizendo o que falta, não só que falta algo");
+tudo &= ok(!(await chamar("rodada:emCurso")), "e nenhuma rodada ficou pendurada");
+
 rmSync(dir, { recursive: true, force: true });
 console.log(tudo ? "\n\x1b[32m\x1b[1m  o fluxo fecha de ponta a ponta\x1b[0m\n"
                  : "\n\x1b[31m\x1b[1m  o fluxo tem furo\x1b[0m\n");

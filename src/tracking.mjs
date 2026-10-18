@@ -97,9 +97,11 @@ export const FAIXA_PREFIXO = () => Number(process.env.SHOPEE_FAIXA_PREFIXO ?? 20
 // comprador do Esteira vai ter outro prefixo e outro domínio. Os valores
 // abaixo continuam sendo os da Chomps por padrão, para nada mudar para
 // quem já usa, mas agora saem dos Ajustes.
-const PREFIXO_BAIXO = () => process.env.SHOPEE_PREFIXO ?? "chompspee";
-const PREFIXO_ALTO = () => process.env.SHOPEE_PREFIXO_ALTO ?? "Brushopee";
-const DOMINIO = () => process.env.SHOPEE_EMAIL_DOMINIO ?? "givmail.com";
+// Sem padrão: um padrão aqui seria o e-mail de OUTRO cliente, e o robô
+// tentaria entrar com ele. Melhor estourar do que logar errado 80 vezes.
+const PREFIXO_BAIXO = () => process.env.SHOPEE_PREFIXO ?? "";
+const PREFIXO_ALTO = () => process.env.SHOPEE_PREFIXO_ALTO ?? "";
+const DOMINIO = () => process.env.SHOPEE_EMAIL_DOMINIO ?? "";
 
 export function prefixoDaConta(numero) {
   const alto = PREFIXO_ALTO();
@@ -115,6 +117,9 @@ export function prefixoDaConta(numero) {
 // conferido entrando na conta. O "007" que eu tinha assumido veio do nome
 // do perfil no AdsPower ("Shopee 076"), que é outra coisa.
 export function emailDaConta(numero, { digitos = Number(process.env.SHOPEE_DIGITOS ?? 0) } = {}) {
+  if (!PREFIXO_BAIXO() || !DOMINIO())
+    throw new Error("o e-mail das contas da Shopee não está configurado — " +
+                    "Ajustes → Contas da Shopee");
   const n = digitos > 0 ? String(numero).padStart(digitos, "0") : String(Number(numero));
   return `${prefixoDaConta(numero)}${n}@${DOMINIO()}`;
 }
