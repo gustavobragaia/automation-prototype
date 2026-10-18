@@ -385,3 +385,38 @@ enxerga a rodada inteira, porque roda no mesmo processo da fila.
 Oferecer 5 ou 10 navegadores na tela deixa de ser uma promessa que o código
 não cumpre. O limite real de paralelismo volta a ser a máquina, não o risco
 de queimar conta.
+
+---
+
+## 9. Perfil ambíguo bloqueia a conta (2026-10-18)
+
+Entrar no perfil errado é o pior erro que este sistema pode cometer: os
+cookies de uma conta sobrescrevem os da outra, o robô entra como quem não
+devia e escreve o rastreio no pedido de **outro cliente** — sem nenhum erro
+na tela. Nada no resto do sistema pega isso depois.
+
+### São dois casos diferentes
+
+| | O que é | De onde vem |
+|---|---|---|
+| **A** | duas abas do AdsPower com o mesmo número no nome (`Shopee 225` duas vezes) | acontece de verdade, ao duplicar perfil |
+| **B** | duas contas apontando para o mesmo `user_id` | **não** vem do AdsPower (`user_id` é único); vem de lista escrita à mão, `contas.json` |
+
+O painel foi desenhado só com o B em mente. Na prática o A é o que vai
+disparar, e era o que estava sem tratamento de verdade.
+
+### A regra
+
+**Na dúvida, não abre nenhum.** Antes, o A resolvia com "primeiro vence" e um
+aviso no log: o robô escolhia sozinho, e escolher errado é pior que não
+rodar. Agora a conta sai da rodada e vai para a conferência, com os `user_id`
+em conflito no aviso para alguém saber qual apagar.
+
+O B é checado nos dois caminhos: depois de resolver pela planilha, e também
+em `contas.json`, que não passa pelo `resolverContas`.
+
+### Medido
+
+Contra os 972 perfis reais do cliente: 972 contas mapeadas, 0 duplicadas,
+0 sem número no nome. Hoje está limpo — a checagem é para o dia em que
+alguém duplicar um perfil, que é quando ninguém está olhando.

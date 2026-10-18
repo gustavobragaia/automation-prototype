@@ -9,7 +9,7 @@ import { carregar, salvar, registrar, historico, registrarRodada } from "./estad
 import { listarPerfisOuNull } from "./adspower.mjs";
 import { parseConta } from "./tracking.mjs";
 import { lerPendentes } from "./planilha.mjs";
-import { resolverContas } from "./perfis.mjs";
+import { resolverContas, perfisCompartilhados } from "./perfis.mjs";
 import { anotarMapeamento } from "./estado.mjs";
 import { lerColetas } from "./conciliar.mjs";
 import { escreverRastreios } from "./escrita.mjs";
@@ -30,6 +30,15 @@ export async function descobrirContas(args = [], { aoLog = () => {} } = {}) {
   if (existsSync("contas.json")) {
     const lista = JSON.parse(readFileSync("contas.json", "utf8"));
     aoLog(`contas.json: ${lista.length} conta(s) — recorte manual, a planilha não é lida`);
+    // Lista escrita à mão: aqui dois alvos PODEM apontar para o mesmo
+    // perfil, e aí os cookies de um sobrescrevem os do outro.
+    const conflitos = perfisCompartilhados(lista);
+    if (conflitos.size) {
+      const presas = new Set([...conflitos.values()].flat());
+      for (const [id, contas] of conflitos)
+        aoLog(`perfil ${id} está em contas.json para as contas ${contas.join(" e ")} — as duas ficam de fora`);
+      return lista.filter((c) => !presas.has(Number(c.conta)));
+    }
     return lista;
   }
 
@@ -49,8 +58,10 @@ export async function descobrirContas(args = [], { aoLog = () => {} } = {}) {
     for (const p of r.pendentes) if (p.pedido) anotarMapeamento(p.pedido, p.conta, "planilha");
 
     // A planilha dá o número da conta; a fila precisa do user_id do perfil.
-    const { resolvidas } = await resolverContas(
+    const { resolvidas, ambiguas } = await resolverContas(
       r.contas.map((c) => ({ conta: c.conta, pedidosEsperados: c.pedidos.length })), { aoLog });
+    if (ambiguas.length)
+      aoLog(`${ambiguas.length} conta(s) fora da rodada por perfil ambíguo — vão para conferência`);
     return resolvidas;
   }
 
