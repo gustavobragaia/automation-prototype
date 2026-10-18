@@ -141,7 +141,7 @@ export function historico(limite = 200) {
 }
 
 export function registrarRodada(r) {
-  db().prepare(`
+  const info = db().prepare(`
     INSERT INTO rodadas (inicio, duracao_ms, contas, coletadas, pedidos_vistos,
                          novos, escritos, revisao, falhas, planilha)
     VALUES (@inicio, @duracao_ms, @contas, @coletadas, @pedidos_vistos,
@@ -151,6 +151,48 @@ export function registrarRodada(r) {
     escritos: r.escritos, revisao: r.revisao,
     falhas: JSON.stringify(r.falhas ?? []), planilha: r.planilha ?? null,
   });
+  return Number(info.lastInsertRowid);   // os motivos referenciam a rodada
 }
+
+// ── motivos ───────────────────────────────────────────────────────────────
+// Append-only, uma linha por rodada. `pedidos.revisao_motivo` guarda só o
+// motivo ATUAL e é sobrescrito; aqui fica a história, que é o que responde
+// "por que o pedido do dia 18 ficou sem rastreio" semanas depois.
+
+export function gravarMotivos(pendencias, { rodadaId = null, em = new Date().toISOString() } = {}) {
+  if (!pendencias?.length) return 0;
+  const ins = db().prepare(`
+    INSERT INTO pedido_motivos (order_id, pedido_shopify, conta, rodada_id, motivo, grupo, detalhe, em)
+    VALUES (@order_id, @pedido_shopify, @conta, @rodada_id, @motivo, @grupo, @detalhe, @em)`);
+  const marcar = db().prepare(`
+    UPDATE pedidos SET revisao_motivo = @motivo, revisao_grupo = @grupo, revisao_em = @em
+    WHERE pedido_shopify = @pedido_shopify`);
+
+  const tudo = db().transaction((lista) => {
+    for (const p of lista) {
+      const d = p.motivo.sugestoes || p.motivo.shopee || p.motivo.erro
+        ? JSON.stringify({ sugestoes: p.motivo.sugestoes?.map((s) => s.conta),
+                           shopee: p.motivo.shopee, shopify: p.motivo.shopify, erro: p.motivo.erro })
+        : null;
+      ins.run({ order_id: p.orderId ?? null, pedido_shopify: p.pedido ?? null,
+                conta: p.conta ?? null, rodada_id: rodadaId,
+                motivo: p.motivo.codigo, grupo: p.motivo.grupo, detalhe: d, em });
+      if (p.pedido) marcar.run({ motivo: p.motivo.codigo, grupo: p.motivo.grupo, em, pedido_shopify: p.pedido });
+    }
+  });
+  tudo(pendencias);
+  return pendencias.length;
+}
+
+const lerMotivos = (sql, arg) => db().prepare(sql).all(arg).map((r) => ({
+  pedidoShopify: r.pedido_shopify, conta: r.conta, orderId: r.order_id,
+  motivo: r.motivo, grupo: r.grupo, detalhe: r.detalhe, rodadaId: r.rodada_id, em: r.em,
+}));
+
+export const motivosDoPedido = (pedidoShopify) =>
+  lerMotivos("SELECT * FROM pedido_motivos WHERE pedido_shopify = ? ORDER BY em", pedidoShopify);
+
+export const motivosDaRodada = (rodadaId) =>
+  lerMotivos("SELECT * FROM pedido_motivos WHERE rodada_id = ? ORDER BY id", rodadaId);
 
 export const nome = "sqlite";

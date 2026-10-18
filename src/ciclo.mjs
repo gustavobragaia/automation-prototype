@@ -5,7 +5,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { rodarFila } from "./fila.mjs";
 import { extrairPedido } from "./shopee.mjs";
-import { carregar, salvar, registrar, historico, registrarRodada } from "./estado.mjs";
+import { carregar, salvar, registrar, historico, registrarRodada, gravarMotivos } from "./estado.mjs";
 import { listarPerfisOuNull } from "./adspower.mjs";
 import { parseConta } from "./tracking.mjs";
 import { lerPendentes } from "./planilha.mjs";
@@ -154,7 +154,16 @@ export async function rodarCiclo({ contas, escrever = true, simular = false, aoL
     revisao: pendencias.filter((p) => p.motivo.grupo === "precisa").length,
     planilha,
   };
-  registrarRodada(rodada);
+  const rodadaId = registrarRodada(rodada);
+
+  // O motivo também vira registro, uma linha por rodada. Sem isto, daqui a
+  // dois meses ninguém responde por que um pedido ficou sem rastreio no dia 18.
+  try {
+    const n = gravarMotivos(pendencias, { rodadaId });
+    if (n) aoLog(`${n} motivo(s) gravado(s) no histórico`);
+  } catch (e) {
+    aoLog(`motivos não gravados: ${e.message}`);   // nunca derruba a rodada
+  }
 
   const motivos = avaliarRodada({ contas: contas.length, coletadas, pedidosVistos: vistos, falhas });
   if (motivos.length) await alarmar("Rodada com problema", motivos.join("\n"));
