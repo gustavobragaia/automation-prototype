@@ -7,6 +7,7 @@
   "description": "Rastreios da Shopee para a Shopify, na máquina do operador",
   "main": "principal.mjs",
   "scripts": {
+    "start": "electron .",
     "dev": "electron .",
     "empacotar": "electron-builder"
   },
