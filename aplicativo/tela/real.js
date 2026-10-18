@@ -138,6 +138,17 @@ function planilha(){
     var caminhos = await window.esteira.escolherPlanilha();
     for (var i = 0; i < caminhos.length; i++) await ler(caminhos[i]);
   };
+  GANCHOS.soltarPlanilha = async function(arquivos){
+    for (var i = 0; i < arquivos.length; i++) {
+      var caminho = window.esteira.caminhoDoArquivo(arquivos[i]);
+      if (!caminho) {
+        TELA.avisar("Não consegui ler esse arquivo",
+                    "Tente pelo botão, escolhendo o arquivo na janela do sistema.");
+        continue;
+      }
+      await ler(caminho);
+    }
+  };
 }
 async function ler(caminho){
   var nome = caminho.split(/[\\/]/).pop();
@@ -200,6 +211,7 @@ function rodada(){
       // A rodada já mandou "rodada:fim", então a tela não fica girando;
       // aqui é só dizer por quê.
       TELA.rodada.terminar({ erro: e.message });
+      TELA.erroNaRodada(e.message);
       TELA.avisar("A rodada não terminou", e.message);
       console.error("[esteira] rodada:", e.message);
     } finally { botao.disabled = false; }

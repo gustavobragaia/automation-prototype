@@ -93,6 +93,19 @@ app.whenReady().then(async () => {
     numero: document.getElementById("eNum").textContent,
   })`);
 
+  // Não dá para simular um arrastar do sistema daqui: o caminho do arquivo
+  // só existe num evento de drop de verdade. Dá para provar o que quebrou
+  // antes — que a tela estava com o tratador de EXEMPLO, que inventa
+  // números e nunca avisa o robô. Se alguém soltar o gancho de novo, cai.
+  const ligacoes = await w.webContents.executeJavaScript(`({
+    soltarLigado: /caminhoDoArquivo/.test(String(window.GANCHOS.soltarPlanilha)),
+    escolherLigado: /escolherPlanilha/.test(String(window.GANCHOS.escolherPlanilha)),
+    rodarLigado: /rodada:iniciar/.test(String(window.GANCHOS.rodar)),
+    escreverLigado: /escrita:executar/.test(String(window.GANCHOS.escrever)),
+    decidirLigado: /conferencia:decidir/.test(String(window.GANCHOS.decidir)),
+    temCaminhoDoArquivo: typeof window.esteira.caminhoDoArquivo === "function",
+  })`);
+
   const ok = (c, m) => { console.log(c ? `  \x1b[32m✓\x1b[0m ${m}` : `  \x1b[31m✗ ${m}\x1b[0m`); return c; };
   let tudo = true;
   console.log("");
@@ -102,6 +115,12 @@ app.whenReady().then(async () => {
   tudo &= ok(depois.tratados === 1, "virou uma decisão em 'já tratados'");
   tudo &= ok(noDisco?.conta === 128, `e no disco está na conta nova (${noDisco?.conta})`);
   tudo &= ok(noDisco?.contaCorrigida === true, "marcado como corrigido à mão");
+  tudo &= ok(ligacoes.temCaminhoDoArquivo, "o preload sabe o caminho de um arquivo arrastado");
+  tudo &= ok(ligacoes.soltarLigado, "ARRASTAR a planilha vai para o robô, não para o exemplo");
+  tudo &= ok(ligacoes.escolherLigado, "e o botão de escolher também");
+  tudo &= ok(ligacoes.rodarLigado, "'Iniciar coleta' chama a rodada de verdade");
+  tudo &= ok(ligacoes.escreverLigado, "'Escrever na Shopify' chama a escrita de verdade");
+  tudo &= ok(ligacoes.decidirLigado, "e as decisões da conferência vão para a ponte");
   tudo &= ok(lote.linhas === 1, `a etapa 4 listou 1 pedido (listou ${lote.linhas})`);
   tudo &= ok(/^Escrever (1|os \d+) na Shopify$/.test(lote.botao),
     `o botão diz quantos vão (diz "${lote.botao}")`);

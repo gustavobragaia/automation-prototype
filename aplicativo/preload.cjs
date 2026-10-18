@@ -1,7 +1,7 @@
 // A superfície que a tela enxerga. Meia dúzia de funções, e nada de Node.
 //
 // É CommonJS de propósito: preload com sandbox ligado não carrega ESM.
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("esteira", {
   /** A tela precisa saber: no macOS a barra de título fica escondida, e os
@@ -13,6 +13,16 @@ contextBridge.exposeInMainWorld("esteira", {
   logs: () => ipcRenderer.invoke("logs"),
   avisar: (titulo, corpo) => ipcRenderer.invoke("avisar", { titulo, corpo }),
   escolherPlanilha: () => ipcRenderer.invoke("escolher-planilha"),
+  /**
+   * O caminho em disco de um arquivo que a pessoa arrastou para a janela.
+   *
+   * `File.path`, que resolvia isto, foi removido do Electron na 32. Agora é
+   * `webUtils.getPathForFile`, e só o preload o enxerga — a tela continua
+   * sem acesso nenhum ao disco, recebendo só a string.
+   */
+  caminhoDoArquivo: (arquivo) => {
+    try { return webUtils.getPathForFile(arquivo) || null; } catch { return null; }
+  },
   /** O que está acontecendo agora, com nome fixo. Devolve como cancelar. */
   aoEvento: (fn) => {
     const ouvir = (_e, evento) => fn(evento);

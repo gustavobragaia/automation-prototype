@@ -937,6 +937,10 @@ var GANCHOS = window.GANCHOS = {
   },
   cancelarShopify: function(){},
   esquecerPlanilha: function(){},
+  // No navegador não há caminho de arquivo: segue com o exemplo.
+  soltarPlanilha: function(arquivos){
+    Array.prototype.forEach.call(arquivos,function(f){ somar(f.name); });
+  },
   escrever: function(){ return Promise.resolve({escritos:prontos,falhas:0}); },
   decidir: function(){ return Promise.resolve({reversivel:true}); },
   desfazer: function(){ return Promise.resolve(true); },
@@ -1076,10 +1080,14 @@ fArq.onchange=function(){Array.prototype.forEach.call(fArq.files,function(f){som
   e.preventDefault();solta.classList.add("sobre");});});
 ["dragleave","drop"].forEach(function(ev){solta.addEventListener(ev,function(e){
   e.preventDefault();solta.classList.remove("sobre");});});
+// Arrastar é o jeito principal de subir a planilha, então tem que passar
+// pelo mesmo caminho do botão. Enquanto não passava, soltar o arquivo
+// carregava NÚMEROS DE EXEMPLO e o robô nunca ficava sabendo da planilha —
+// a rodada depois falhava dizendo que não havia planilha nenhuma.
 solta.addEventListener("drop",function(e){
   var fs=e.dataTransfer&&e.dataTransfer.files;
-  if(fs&&fs.length) Array.prototype.forEach.call(fs,function(f){somar(f.name);});
-  else somar("pedidos-"+hora().replace(":","")+".xlsx");
+  if(fs&&fs.length) return GANCHOS.soltarPlanilha(fs);
+  somar("pedidos-"+hora().replace(":","")+".xlsx");
 });
 $("listaArq").addEventListener("click",function(e){
   var b=e.target.closest("[data-tirar]"); if(!b) return;
@@ -1213,6 +1221,15 @@ function pararColeta(){
 }
 $("bParar").onclick=function(){ GANCHOS.pararRodada(); };
 GANCHOS.pararRodada=function(){ pararColeta(); pintaColeta(); pintaTrilha(); };
+// Uma rodada que não começa precisa dizer por quê onde a pessoa está
+// olhando. Só notificação do sistema é fácil demais de perder — e quem
+// clicou em "Iniciar coleta" fica achando que o programa travou.
+function erroNaRodada(msg){
+  var alvo=$("resumoContas"), cx=$("erroRodada");
+  if(!cx){ cx=document.createElement("p"); cx.id="erroRodada"; cx.className="nota";
+           cx.style.color="var(--erro)"; alvo.parentNode.insertBefore(cx,alvo.nextSibling); }
+  cx.textContent=msg; cx.hidden=!msg;
+}
 $("bRodar").onclick=function(){ GANCHOS.rodar(); };
 GANCHOS.rodar=function(){
   if(rodando||!arquivos.length) return;
@@ -1972,6 +1989,7 @@ window.TELA = {
   },
   planilha: somar,
   avisar: avisar,
+  erroNaRodada: erroNaRodada,
 
   // ── a escrita em lote ──
   // A lista do que vai sair vem do robô, já com o pedido que a Shopify
@@ -2016,6 +2034,7 @@ window.TELA = {
       estadoConta = {};
       CONTAS_RODADA.forEach(function(c){ estadoConta[c.n]="fila"; });
       rodando=true; coletou=false; escrito=false; escritos=0;
+      erroNaRodada("");            // o erro da tentativa anterior sai de cena
       document.body.classList.add("rodando");
       $("bRodar").disabled=true; $("bParar").disabled=false;
       pintaColeta(); pintaTrilha();
