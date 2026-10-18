@@ -13,6 +13,17 @@ import { mkdirSync } from "node:fs";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
+// O nome fixado na mão, antes de perguntar qualquer caminho.
+//
+// `app.getPath("userData")` deriva do nome do app, e o nome vem do
+// package.json — que o Electron só lê quando se abre a PASTA. Aberto por um
+// arquivo, o nome vira "Electron" e o app passa a procurar estado em
+// ".../Application Support/Electron": carteira vazia, loja desconectada,
+// Ajustes em branco. Tudo intacto no disco, no outro lugar.
+//
+// Nunca derive de onde o programa foi aberto algo de que o cliente depende.
+app.setName("Esteira");
+
 // Em desenvolvimento, o .env do projeto vale, e vem primeiro: é como o robô
 // já roda pelo terminal. Sem ele a rodada pelo app não consegue logar numa
 // conta cuja sessão morreu — a senha da Shopee mora lá.

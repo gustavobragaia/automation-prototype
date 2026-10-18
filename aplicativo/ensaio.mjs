@@ -106,6 +106,12 @@ app.whenReady().then(async () => {
     temCaminhoDoArquivo: typeof window.esteira.caminhoDoArquivo === "function",
   })`);
 
+  // O nome do app decide onde mora TODO o estado. Aberto por um arquivo em
+  // vez da pasta, o Electron não lê o package.json, o nome vira "Electron"
+  // e o cliente abre o dia com a carteira vazia e os Ajustes em branco —
+  // tudo intacto no disco, no outro lugar.
+  const nome = app.getName();
+
   const ok = (c, m) => { console.log(c ? `  \x1b[32m✓\x1b[0m ${m}` : `  \x1b[31m✗ ${m}\x1b[0m`); return c; };
   let tudo = true;
   console.log("");
@@ -115,6 +121,7 @@ app.whenReady().then(async () => {
   tudo &= ok(depois.tratados === 1, "virou uma decisão em 'já tratados'");
   tudo &= ok(noDisco?.conta === 128, `e no disco está na conta nova (${noDisco?.conta})`);
   tudo &= ok(noDisco?.contaCorrigida === true, "marcado como corrigido à mão");
+  tudo &= ok(nome === "Esteira", `o app se chama "${nome}" — é daí que sai o estado`);
   tudo &= ok(ligacoes.temCaminhoDoArquivo, "o preload sabe o caminho de um arquivo arrastado");
   tudo &= ok(ligacoes.soltarLigado, "ARRASTAR a planilha vai para o robô, não para o exemplo");
   tudo &= ok(ligacoes.escolherLigado, "e o botão de escolher também");
