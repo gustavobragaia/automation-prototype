@@ -1,7 +1,7 @@
 // Estas validações são a ÚNICA coisa entre um link forjado e o token de
 // acesso da loja de um cliente. Testadas pelos dois lados: o que tem que
 // passar, e sobretudo o que NÃO pode.
-import { createHmac } from "node:crypto";
+
 import { lojaValida, hmacValido, novoEstado, lerEstado, destinoLocal }
   from "../servidor/lib/validar.js";
 
@@ -10,9 +10,15 @@ const sec = (t) => console.log(`\n\x1b[1m${t}\x1b[0m`);
 let tudo = true;
 
 const SEGREDO = "segredo-de-teste";
-const assinar = (p) => createHmac("sha256", SEGREDO)
-  .update(Object.keys(p).filter((k) => k !== "hmac").sort().map((k) => `${k}=${p[k]}`).join("&"))
-  .digest("hex");
+// assina como a Shopify assina, com WebCrypto — o mesmo que o Worker usa
+const assinar = async (p) => {
+  const base = Object.keys(p).filter((k) => k !== "hmac").sort()
+    .map((k) => `${k}=${p[k]}`).join("&");
+  const chave = await crypto.subtle.importKey("raw", new TextEncoder().encode(SEGREDO),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const a = await crypto.subtle.sign("HMAC", chave, new TextEncoder().encode(base));
+  return [...new Uint8Array(a)].map((b) => b.toString(16).padStart(2, "0")).join("");
+};
 
 sec("o endereço da loja");
 tudo &= ok(lojaValida("testeloja-4ajtpkll.myshopify.com"), "loja real passa");
@@ -27,21 +33,21 @@ tudo &= ok(!lojaValida("a".repeat(200) + ".myshopify.com"), "absurdamente longo 
 
 sec("a assinatura da Shopify");
 const bons = { code: "abc123", shop: "loja.myshopify.com", state: "4000.ff", timestamp: "1700000000" };
-tudo &= ok(hmacValido({ ...bons, hmac: assinar(bons) }, SEGREDO), "retorno assinado passa");
-tudo &= ok(!hmacValido({ ...bons, hmac: assinar(bons) }, "outro-segredo"),
+tudo &= ok(await hmacValido({ ...bons, hmac: await assinar(bons) }, SEGREDO), "retorno assinado passa");
+tudo &= ok(!await hmacValido({ ...bons, hmac: await assinar(bons) }, "outro-segredo"),
            "assinatura de outro segredo é recusada");
-tudo &= ok(!hmacValido({ ...bons, code: "trocado", hmac: assinar(bons) }, SEGREDO),
+tudo &= ok(!await hmacValido({ ...bons, code: "trocado", hmac: await assinar(bons) }, SEGREDO),
            "mexeu no code depois de assinar: recusado");
-tudo &= ok(!hmacValido({ ...bons, shop: "evil.myshopify.com", hmac: assinar(bons) }, SEGREDO),
+tudo &= ok(!await hmacValido({ ...bons, shop: "evil.myshopify.com", hmac: await assinar(bons) }, SEGREDO),
            "trocou a loja depois de assinar: recusado");
-tudo &= ok(!hmacValido({ ...bons }, SEGREDO), "sem hmac nenhum: recusado");
-tudo &= ok(!hmacValido({ ...bons, hmac: "" }, SEGREDO), "hmac vazio: recusado");
-tudo &= ok(!hmacValido({ ...bons, hmac: assinar(bons).slice(0, 10) }, SEGREDO),
+tudo &= ok(!await hmacValido({ ...bons }, SEGREDO), "sem hmac nenhum: recusado");
+tudo &= ok(!await hmacValido({ ...bons, hmac: "" }, SEGREDO), "hmac vazio: recusado");
+tudo &= ok(!await hmacValido({ ...bons, hmac: (await assinar(bons)).slice(0, 10) }, SEGREDO),
            "hmac curto não passa por comparação de tamanho");
-tudo &= ok(!hmacValido({ ...bons, hmac: assinar(bons) }, ""), "sem segredo: recusado");
-tudo &= ok(!hmacValido(null, SEGREDO), "parâmetros nulos: recusado");
+tudo &= ok(!await hmacValido({ ...bons, hmac: await assinar(bons) }, ""), "sem segredo: recusado");
+tudo &= ok(!await hmacValido(null, SEGREDO), "parâmetros nulos: recusado");
 // parâmetro a mais tem que invalidar — senão dá para pendurar coisa na URL
-tudo &= ok(!hmacValido({ ...bons, extra: "1", hmac: assinar(bons) }, SEGREDO),
+tudo &= ok(!await hmacValido({ ...bons, extra: "1", hmac: await assinar(bons) }, SEGREDO),
            "parâmetro pendurado depois da assinatura: recusado");
 
 sec("o state, que liga o retorno ao nosso pedido");

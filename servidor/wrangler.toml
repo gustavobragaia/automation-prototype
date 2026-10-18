@@ -1,0 +1,17 @@
+name = "esteira"
+main = "src/worker.js"
+compatibility_date = "2026-09-01"
+
+# O token da loja nunca é gravado aqui: ele é repassado por POST para o
+# aplicativo na máquina do cliente. Por isso não há KV, D1 nem nada de
+# armazenamento neste worker — e é de propósito.
+
+[vars]
+BASE_URL = "https://esteira.cloud"
+# SHOPIFY_CLIENT_ID entra como var pelo painel ou por `wrangler secret`
+# SHOPIFY_CLIENT_SECRET entra SÓ como secret: é com ele que o HMAC é
+# conferido, e com ele vazado qualquer um forja um retorno da Shopify.
+
+[[routes]]
+pattern = "esteira.cloud/*"
+zone_name = "esteira.cloud"

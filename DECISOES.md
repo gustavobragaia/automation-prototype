@@ -629,8 +629,35 @@ state bem-formado e diferente — que é justamente o que uma página hostil
 consegue montar — teria passado. O teste ganhou esse caso, e agora a mutação
 é pega.
 
+### Distribuição: pública não listada, não personalizada
+
+A distribuição personalizada é **uma loja por app** — serve para um cliente
+só. Como o plano é Matheus e depois mais dois, seriam três apps e três de
+tudo. O certo é **pública**, e ela pode ser **não listada**: qualquer loja
+instala pelo link direto, sem aparecer na busca da App Store e sem revisão
+de vitrine.
+
+O Dev Dashboard novo **não pede** o método na criação do app, nem o oferece
+nas configurações. Ou seja: a escolha irreversível ainda não foi gasta. Ela
+aparece quando for preciso, e aí já sabemos qual marcar.
+
+### Hospedagem: Cloudflare Workers
+
+A conta da Vercel está suspensa por falta de forma de pagamento, e não faz
+sentido pagar por duas funções que rodam uma vez por cliente. O Worker faz
+o mesmo de graça.
+
+Isso obrigou a tirar o `node:crypto` do `validar.js` e usar **WebCrypto**,
+que existe nos dois mundos. O ganho não é só portabilidade: o mesmo arquivo
+roda no Worker e nos testes em Node, sem flag de compatibilidade e sem uma
+segunda implementação das validações — que é exatamente o erro que este
+projeto já pagou caro.
+
+A troca de host custou a reescrita de um arquivo. Teria custado muito mais
+se as validações estivessem espalhadas pelos handlers.
+
 ### Ainda falta
 
-Criar o app no Dev Dashboard com custom distribution, apontar o DNS e
-exercitar contra a Shopify de verdade. A lógica está pronta e provada contra
-uma Shopify simulada.
+Mover os nameservers do domínio para a Cloudflare (a rota `esteira.cloud/*`
+exige a zona lá), subir o worker, criar o app com distribuição pública e
+exercitar contra a Shopify de verdade.

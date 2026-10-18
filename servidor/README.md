@@ -1,6 +1,7 @@
 # Retorno do OAuth da Shopify
 
-Duas rotas em `esteira.cloud`. É tudo o que roda fora da máquina do cliente.
+Duas rotas em `esteira.cloud`, num Cloudflare Worker. É tudo o que roda fora
+da máquina do cliente.
 
 | | |
 |---|---|
@@ -22,10 +23,13 @@ que liga o retorno ao pedido que aquela máquina fez.
 ## Variáveis
 
 ```
-SHOPIFY_CLIENT_ID=        # do app no Dev Dashboard (nosso, não do cliente)
-SHOPIFY_CLIENT_SECRET=    # idem — é com ele que o HMAC é conferido
-BASE_URL=https://esteira.cloud
+BASE_URL=https://esteira.cloud     # já no wrangler.toml
+SHOPIFY_CLIENT_ID=                 # público; var normal
+SHOPIFY_CLIENT_SECRET=             # SECRET, nunca var: wrangler secret put
 ```
+
+Subir: `npx wrangler deploy`. O domínio precisa estar na Cloudflare (os
+nameservers apontando para lá) para a rota `esteira.cloud/*` funcionar.
 
 ## O que é conferido antes de qualquer coisa
 

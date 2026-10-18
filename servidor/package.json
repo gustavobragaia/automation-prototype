@@ -2,6 +2,10 @@
   "name": "esteira-servidor",
   "private": true,
   "type": "module",
-  "description": "Retorno do OAuth da Shopify. O token NUNCA fica aqui.",
-  "engines": { "node": ">=20" }
+  "description": "Retorno do OAuth da Shopify, em Cloudflare Workers. O token NUNCA fica aqui.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "publicar": "wrangler deploy"
+  },
+  "devDependencies": { "wrangler": "^4.21.0" }
 }
