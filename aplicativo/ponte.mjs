@@ -53,6 +53,17 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
   // sai daqui e não de PLANILHA no ambiente: quem instala o app não tem .env.
   let planilhas = [];
   let escritaEmCurso = false;
+  let diagnosticoEmCurso = null;
+  const diagnosticarDeVerdade = (cfg) => tentar(async () => {
+    // "guardada" quer dizer que a tela não mexeu no campo: usa a de verdade.
+    const a = lerAjustes();
+    const c = { ...(cfg ?? {}) };
+    if (!c.chave || c.chave === "guardada") c.chave = a.adspowerChave;
+    if (!c.base) c.base = a.adspowerBase;
+    const d = await diagnosticar(c);
+    return { ...d, abertaSemChave: d.ok ? await apiAbertaSemChave(c) : false };
+  });
+
 
   const ARQ_PERFIS = () => emEstado("perfis-da-rodada.json");
   const guardarPerfis = (porConta) => {
@@ -155,15 +166,12 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
     // ── estado da máquina e das conexões ──────────────────────────────
     "maquina:ler": async () => ({ ...lerMaquina(), teto: TETO, custoPorNavegador: custoGB(1) }),
 
-    "adspower:diagnosticar": (cfg) => tentar(async () => {
-      // "guardada" quer dizer que a tela não mexeu no campo: usa a de verdade.
-      const a = lerAjustes();
-      const c = { ...(cfg ?? {}) };
-      if (!c.chave || c.chave === "guardada") c.chave = a.adspowerChave;
-      if (!c.base) c.base = a.adspowerBase;
-      const d = await diagnosticar(c);
-      return { ...d, abertaSemChave: d.ok ? await apiAbertaSemChave(c) : false };
-    }),
+    // Um teste por vez. O AdsPower aceita ~1 chamada por segundo; cliques
+    // repetidos empilhavam diagnósticos e deixavam tudo mais lento
+    // justamente quando a pessoa clicava de novo por impaciência. Quem
+    // clica com um teste em andamento recebe a resposta desse mesmo teste.
+    "adspower:diagnosticar": (cfg) => (diagnosticoEmCurso ??= diagnosticarDeVerdade(cfg)
+      .finally(() => { diagnosticoEmCurso = null; })),
 
     "shopify:estado": () => tentar(async () => {
       const c = conexaoAtiva();

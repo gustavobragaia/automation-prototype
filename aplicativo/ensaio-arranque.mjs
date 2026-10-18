@@ -77,6 +77,41 @@ app.whenReady().then(async () => {
   tudo &= ok(!/null|undefined/.test(fatos.contasVazio + fatos.histVazio),
     "e nenhum 'null' ou 'undefined' escrito na tela");
 
+  // ── "Testar conexão" nunca pode girar para sempre ──
+  // Um servidor que aceita a conexão e NUNCA responde: o pior caso do
+  // AdsPower travado sincronizando. Foi o que o Gustavo viu — a tela
+  // "carregando só", sem prazo e sem explicação.
+  const http = await import("node:http");
+  const buraco = http.createServer(() => { /* aceita e nunca responde */ });
+  await new Promise((r) => buraco.listen(39555, "127.0.0.1", r));
+  await w.webContents.executeJavaScript(`(() => {
+    document.querySelector('[data-tela="ajustes"]').click();
+    document.getElementById("adsBase").value = "http://127.0.0.1:39555";
+    document.getElementById("bTestarAds").click();
+  })()`);
+  await new Promise((r) => setTimeout(r, 1000));
+  const durante = await w.webContents.executeJavaScript(`({
+    travado: document.getElementById("bTestarAds").disabled,
+    texto: document.getElementById("adsResultado").innerText })`);
+  // um segundo clique impaciente não pode empilhar outra chamada
+  await w.webContents.executeJavaScript(`document.getElementById("bTestarAds").click()`);
+  await new Promise((r) => setTimeout(r, 21000));
+  const depois = await w.webContents.executeJavaScript(`({
+    travado: document.getElementById("bTestarAds").disabled,
+    texto: document.getElementById("adsResultado").innerText })`);
+  buraco.close();
+
+  tudo &= ok(durante.travado, "durante o teste o botão fica travado — clique impaciente não empilha");
+  tudo &= ok(/Testando/.test(durante.texto), "e a tela diz que está testando");
+  // Quem responde primeiro é o próprio robô ("não está respondendo… porta
+  // 39555"), que é mais específico; o prazo de 20s da tela é a rede de
+  // segurança para quando nem ele responder. O que se exige é o resultado:
+  // parou de girar e explicou.
+  tudo &= ok(!/Testando/.test(depois.texto) && /AdsPower n[ãa]o/.test(depois.texto),
+    "com o AdsPower mudo, a tela PARA de girar e diz o que houve");
+  tudo &= ok(/aberto|sincroniz/.test(depois.texto), "e diz o que fazer");
+  tudo &= ok(!depois.travado, "e o botão volta a funcionar");
+
   await writeFile("/tmp/arranque.png", (await w.webContents.capturePage()).toPNG());
   console.log(tudo ? "\n\x1b[32m\x1b[1m  nada inventado na tela\x1b[0m\n"
                    : "\n\x1b[31m\x1b[1m  ainda há dado inventado na tela\x1b[0m\n");

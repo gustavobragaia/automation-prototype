@@ -81,18 +81,32 @@ async function ajustes(){
 
 /* ── AdsPower: o botão testa de verdade ── */
 function adspower(){
+  // Um teste que não responde não pode girar para sempre. 20 segundos é
+  // muito mais que os ~2s de sempre, e bem menos que os minutos que o
+  // AdsPower pode levar quando trava sincronizando.
+  var PRAZO_MS = 20000;
   GANCHOS.testarAds = async function(){
+    var botao = document.getElementById("bTestarAds");
+    botao.disabled = true;
     try {
-      var d = await pedir("adspower:diagnosticar", {
+      var prazo = new Promise(function(_, nao){
+        setTimeout(function(){ nao(new Error("prazo")); }, PRAZO_MS); });
+      var d = await Promise.race([pedir("adspower:diagnosticar", {
         base:  (document.getElementById("adsBase") ||{}).value,
-      });
+      }), prazo]);
       TELA.diagnostico({
         ok: d.ok, titulo: d.titulo, provado: d.verificado,
         passos: d.comoResolver, abertaSemChave: d.abertaSemChave,
       });
     } catch (e) {
-      TELA.diagnostico({ ok:false, titulo:"Não consegui testar", passos:[e.message] });
-    }
+      if (e.message === "prazo")
+        TELA.diagnostico({ ok:false, titulo:"O AdsPower não respondeu em 20 segundos",
+          passos:["Confira se o AdsPower está aberto e terminou de carregar.",
+                  "Se ele estiver sincronizando perfis, espere acabar e teste de novo.",
+                  "Se continuar, feche e abra o AdsPower."] });
+      else
+        TELA.diagnostico({ ok:false, titulo:"Não consegui testar", passos:[e.message] });
+    } finally { botao.disabled = false; }
   };
 }
 
@@ -351,10 +365,17 @@ function avisos(){
 }
 
 (async function(){
-  var partes = [["arranque",arranque],["arquivos",arquivos],
-                ["ajustes",ajustes],["máquina",maquina],["AdsPower",adspower],["Shopify",shopify],
-                ["planilha",planilha],["rodada",rodada],
-                ["conferência",conferencia],["escrita",escrita],["avisos",avisos]];
+  // Primeiro tudo que só LIGA botões (instantâneo), depois o que CARREGA
+  // (vai à ponte e espera). Na ordem antiga, um clique em "Testar conexão"
+  // durante a abertura caía no comportamento do protótipo — que mostra um
+  // "Conectado ao AdsPower" inventado.
+  var partes = [
+    // só ligam botões: instantâneos, rodam todos no mesmo instante, antes
+    // que qualquer clique ou arrastar consiga acontecer
+    ["AdsPower",adspower],["arquivos",arquivos],["planilha",planilha],["rodada",rodada],
+    ["conferência",conferencia],["escrita",escrita],["avisos",avisos],
+    // carregam: vão à ponte e esperam
+    ["arranque",arranque],["ajustes",ajustes],["máquina",maquina],["Shopify",shopify]];
   for (var i = 0; i < partes.length; i++) {
     try { await partes[i][1](); trocou.push(partes[i][0]); }
     catch (e) { falhou.push(partes[i][0] + ": " + e.message); }

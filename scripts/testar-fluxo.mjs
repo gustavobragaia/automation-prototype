@@ -398,6 +398,20 @@ const est22 = await chamar("shopify:estado");
 tudo &= ok(est22.conectada === false,
   "e o robô se diz desconectado — não é só a tela que muda");
 
+/* ───────── 23. testar o AdsPower não empilha chamadas ───────── */
+sec("23 · cliques repetidos em 'Testar conexão' viram UM teste só");
+// O AdsPower aceita ~1 chamada por segundo. Cada clique impaciente era um
+// diagnóstico novo, e eles se empilhavam justamente quando a pessoa clicava
+// de novo porque estava demorando.
+const ponte23 = construir({ aoLog: () => {} });
+const a23 = ponte23["adspower:diagnosticar"]({});
+const b23 = ponte23["adspower:diagnosticar"]({});
+tudo &= ok(a23 === b23, "o segundo clique recebe a MESMA resposta do primeiro, sem nova chamada");
+await a23;
+const c23 = ponte23["adspower:diagnosticar"]({});
+tudo &= ok(c23 !== a23, "e depois que termina, um teste novo pode começar");
+await c23;
+
 rmSync(dir, { recursive: true, force: true });
 console.log(tudo ? "\n\x1b[32m\x1b[1m  o fluxo fecha de ponta a ponta\x1b[0m\n"
                  : "\n\x1b[31m\x1b[1m  o fluxo tem furo\x1b[0m\n");

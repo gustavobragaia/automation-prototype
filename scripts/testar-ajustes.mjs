@@ -162,6 +162,37 @@ try { emailDaConta(124); } catch (e) { estourouEmail = /Ajustes/.test(e.message)
 tudo &= ok(estourouEmail,
   "estoura apontando para a tela, em vez de montar um e-mail de outro cliente");
 
+sec("os campos de segredo da tela e os do robô têm o mesmo nome");
+// O campo da chave do AdsPower se chamava "adsChave" na tela e
+// "adspowerChave" no robô. Resultado: a tela nunca reconhecia a chave
+// guardada — e o que a pessoa digitasse era DESCARTADO em silêncio, porque o
+// robô só aceita nomes da sua lista. Quem achou foi o Gustavo, não um teste.
+const { SEGREDOS } = await import("../src/ajustes.mjs");
+const { readFileSync: lerTela } = await import("node:fs");
+const tela = lerTela(new URL("../aplicativo/tela/index.html", import.meta.url), "utf8");
+const naTela = [...tela.matchAll(/data-segredo="([a-zA-Z]+)"/g)].map((m) => m[1]);
+const soNaTela = naTela.filter((n) => !SEGREDOS.includes(n));
+const soNoRobo = SEGREDOS.filter((n) => !naTela.includes(n));
+tudo &= ok(!soNaTela.length,
+  "todo campo de segredo da tela existe no robô" + (soNaTela.length ? ` — sobrando: ${soNaTela}` : ""));
+tudo &= ok(!soNoRobo.length,
+  "e todo segredo do robô tem campo na tela" + (soNoRobo.length ? ` — faltando: ${soNoRobo}` : ""));
+
+sec("e os campos comuns também");
+// A mesma classe de erro vale para os campos que não são segredo: um id na
+// tela mapeado para uma chave que o robô não conhece é configuração que some.
+const real = lerTela(new URL("../aplicativo/tela/real.js", import.meta.url), "utf8");
+const pares = [...real.matchAll(/\["(sh[A-Za-z]+|ads[A-Za-z]+)","([a-zA-Z]+)"\]/g)].map((m) => [m[1], m[2]]);
+const { lerAjustes: ler2 } = await import("../src/ajustes.mjs");
+const conhecidos = Object.keys(ler2());
+const orfaos = pares.filter(([, chave]) => !conhecidos.includes(chave));
+tudo &= ok(pares.length >= 5, `achei os ${pares.length} campos mapeados na tela`);
+tudo &= ok(!orfaos.length,
+  "todos apontam para um ajuste que o robô guarda" + (orfaos.length ? ` — órfãos: ${orfaos.map((p) => p.join("→"))}` : ""));
+const idsQueNaoExistem = pares.filter(([id]) => !tela.includes(`id="${id}"`));
+tudo &= ok(!idsQueNaoExistem.length,
+  "e todos os campos existem de fato na tela" + (idsQueNaoExistem.length ? ` — sumiram: ${idsQueNaoExistem.map((p) => p[0])}` : ""));
+
 rmSync(pasta, { recursive: true, force: true });
 console.log(tudo ? "\n\x1b[32m\x1b[1m  ajustes de pé\x1b[0m\n"
                  : "\n\x1b[31m\x1b[1m  ajustes com furo\x1b[0m\n");
