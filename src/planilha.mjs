@@ -50,6 +50,11 @@ const normaliza = (s) =>
   String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "")
     .toLowerCase().replace(/\s+/g, " ").trim();
 
+// A planilha diária que o cliente envia não tem cabeçalho: os dados começam
+// na linha 1. A de controle tem. Detectar é melhor que exigir um formato —
+// quem exporta a planilha não vai lembrar de pôr cabeçalho.
+const ORDEM_FIXA = { data: 1, pedido: 2, nome: 3, produto: 4, unidades: 5, valor: 6, rastreio: 7, conta: 8 };
+
 function mapearCabecalho(linha) {
   const achado = {};
   linha.eachCell((celula, col) => {
@@ -87,17 +92,29 @@ export async function lerPendentes(caminho, { aba, desde, dias } = {}) {
   const ws = aba ? wb.getWorksheet(aba) : wb.worksheets[0];
   if (!ws) throw new Error(`aba não encontrada em ${caminho}`);
 
-  const col = mapearCabecalho(ws.getRow(1));
+  let col = mapearCabecalho(ws.getRow(1));
   const faltando = ["pedido", "nome", "rastreio", "conta"].filter((c) => col[c] == null);
-  if (faltando.length)
-    throw new Error(`colunas não reconhecidas no cabeçalho: ${faltando.join(", ")} (aba "${ws.name}")`);
+  const semCabecalho = faltando.length > 0;
+
+  if (semCabecalho) {
+    // Sem cabeçalho reconhecível, vale a ordem fixa — mas só se a primeira
+    // linha realmente parecer dado, para não ler um cabeçalho estranho como
+    // se fosse pedido.
+    const primeira = ws.getRow(1);
+    const pareceDado =
+      parseConta(texto(primeira.getCell(ORDEM_FIXA.conta).value)).numeros.length === 1 ||
+      /\d/.test(texto(primeira.getCell(ORDEM_FIXA.pedido).value));
+    if (!pareceDado)
+      throw new Error(`colunas não reconhecidas e a linha 1 não parece dado: ${faltando.join(", ")} (aba "${ws.name}")`);
+    col = { ...ORDEM_FIXA };
+  }
 
   const pendentes = [];
   const ignorados = [];
   let total = 0;
 
   ws.eachRow((linha, n) => {
-    if (n === 1) return;
+    if (n === 1 && !semCabecalho) return;
     const ler = (campo) => (col[campo] ? texto(linha.getCell(col[campo]).value) : "");
 
     const pedido = ler("pedido");
@@ -143,5 +160,5 @@ export async function lerPendentes(caminho, { aba, desde, dias } = {}) {
     .map(([conta, pedidos]) => ({ conta, pedidos }))
     .sort((a, b) => b.pedidos.length - a.pedidos.length);
 
-  return { contas, pendentes, ignorados, total, aba: ws.name, corte };
+  return { contas, pendentes, ignorados, total, aba: ws.name, corte, semCabecalho };
 }
