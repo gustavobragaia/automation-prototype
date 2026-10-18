@@ -89,6 +89,90 @@ export function pedidoDividido(pedido, candidatos) {
   return candidatos;
 }
 
+/**
+ * Por que um pedido ficou sem rastreio.
+ *
+ * O `grupo` é a parte que importa: "sozinho" é o estado NORMAL de um pedido
+ * pago hoje — a Shopee ainda não despachou, e amanhã resolve. Misturar isso
+ * com o que precisa de decisão enche a conferência de ruído, e aí ninguém
+ * abre mais a tela.
+ *
+ * O texto é escrito para o operador, não para quem programou: nada de código
+ * de erro, e sempre com o que fazer.
+ */
+export const MOTIVOS = {
+  "sem-rastreio-ainda": {
+    grupo: "sozinho",
+    texto: "O pedido está na conta, mas a Shopee ainda não despachou.",
+    acao: "Nada a fazer. Volta sozinho na próxima rodada.",
+  },
+  "nao-achado-na-conta": {
+    grupo: "precisa",
+    texto: "Nenhum pedido com esse cliente na conta indicada pela planilha.",
+    acao: "Ou a compra foi feita em outra conta, ou a planilha aponta a conta errada.",
+  },
+  ambiguo: {
+    grupo: "precisa",
+    texto: "Mais de um pedido do mesmo cliente na conta, e o valor não desempatou.",
+    acao: "Escolha qual é o pedido certo.",
+  },
+  "nome-nao-confere": {
+    grupo: "precisa",
+    texto: "O número do pedido levou a um cliente diferente do que está na Shopee.",
+    acao: "Costuma ser número digitado errado na planilha. Confira antes de escrever.",
+  },
+  "conta-nao-reconhecida": {
+    grupo: "precisa",
+    texto: "A conta escrita na planilha não existe.",
+    acao: "Corrija a linha na planilha e suba de novo.",
+  },
+  "conta-sem-perfil": {
+    grupo: "precisa",
+    texto: "A conta não tem perfil vinculado no AdsPower.",
+    acao: "Vincule o perfil na tela de Contas.",
+  },
+  "perfil-duplicado": {
+    grupo: "precisa",
+    texto: "Duas contas apontam para o mesmo perfil do AdsPower.",
+    acao: "Os cookies de uma sobrescrevem os da outra. Separe os perfis antes de rodar.",
+  },
+  "verificacao-humana": {
+    grupo: "precisa",
+    texto: "A Shopee pediu confirmação de que é uma pessoa.",
+    acao: "Abra o navegador dessa conta e passe a verificação.",
+  },
+};
+
+/** O motivo completo, pronto para gravar e para mostrar. */
+export function motivoDe(codigo, extra = {}) {
+  const m = MOTIVOS[codigo];
+  if (!m) return { codigo, grupo: "precisa", texto: codigo, acao: "" };
+  return { codigo, ...m, ...extra };
+}
+
+/** Estados que viram motivo, e qual. */
+const MOTIVO_DO_ESTADO = {
+  "sem-codigo": "sem-rastreio-ainda",
+  "nao-achado": "nao-achado-na-conta",
+  ambiguo: "ambiguo",
+};
+
+/**
+ * Onde mais esse cliente aparece? Para o caso de a planilha apontar a conta
+ * errada — o operador não tem como caçar um nome em 80 contas.
+ */
+export function sugerirContas(nome, coletas, exceto) {
+  const alvo = normNome(nome);
+  if (!alvo) return [];
+  const achados = [];
+  for (const [conta, colhidos] of coletas) {
+    if (conta === exceto) continue;
+    for (const c of colhidos)
+      if (normNome(c.nome) === alvo) achados.push({ conta, pedido: c });
+  }
+  return achados;
+}
+
 const RESOLVIDO = new Set(["ok", "ok-valor", "ok-partes"]);
 export const resolvido = (estado) => RESOLVIDO.has(estado);
 
@@ -102,15 +186,29 @@ export function conciliar(contas, coletas) {
   const linhas = [];
 
   for (const [conta, colhidos] of [...coletas].sort((a, b) => a[0] - b[0]))
-    for (const p of porConta.get(conta) ?? [])
-      linhas.push({ conta, p, ...conciliarPedido(p, colhidos) });
+    for (const p of porConta.get(conta) ?? []) {
+      const r = conciliarPedido(p, colhidos);
+      const codigo = MOTIVO_DO_ESTADO[r.estado];
+      const linha = { conta, p, ...r };
+      if (codigo) {
+        // onde mais esse cliente aparece, para o caso de conta errada
+        const onde = codigo === "nao-achado-na-conta"
+          ? sugerirContas(p.nome, coletas, conta) : [];
+        linha.motivo = motivoDe(codigo, onde.length ? { sugestoes: onde } : {});
+      }
+      linhas.push(linha);
+    }
 
-  const resumo = { total: linhas.length, casados: 0, ambiguos: 0, semCodigo: 0, naoAchados: 0 };
+  const resumo = { total: linhas.length, casados: 0, ambiguos: 0, semCodigo: 0, naoAchados: 0,
+                   precisaDeVoce: 0, seResolveSozinho: 0 };
   for (const l of linhas) {
     if (resolvido(l.estado)) resumo.casados++;
     else if (l.estado === "ambiguo") resumo.ambiguos++;
     else if (l.estado === "sem-codigo") resumo.semCodigo++;
     else resumo.naoAchados++;
+    // o número que vai para a tela é este: o outro grupo não pede nada
+    if (l.motivo?.grupo === "precisa") resumo.precisaDeVoce++;
+    else if (l.motivo?.grupo === "sozinho") resumo.seResolveSozinho++;
   }
   return { linhas, resumo };
 }
