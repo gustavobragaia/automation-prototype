@@ -109,6 +109,8 @@ app.whenReady().then(async () => {
   tudo &= ok(await espera(`!!document.getElementById("bConectarCred")`), "\"Trocar de loja\" desconecta e mostra o formulário de novo");
   tudo &= ok(!existsSync(process.env.SHOPIFY_CONEXAO_ARQUIVO) || readFileSync(process.env.SHOPIFY_CONEXAO_ARQUIVO, "utf8").trim() === "null",
     "e apaga a conexão do disco de verdade");
+  tudo &= ok(await espera(`/Shopify não conectada/.test(document.getElementById("ladoStatus").innerText)`),
+    "e o pé da barra lateral para de dizer que está conectada");
   await escreve("#shopLoja", "loja-sparta-store.myshopify.com");
   if (!(await js(`(() => { const d = document.getElementById("shopCred"); if (!d) return false; d.open = true; return true; })()`)))
     throw new Error("o \"Ou conecte com a chave do app\" não está no cartão");

@@ -140,7 +140,10 @@ async function shopify(){
     catch (e) { TELA.shopify("desconectada"); TELA.avisar("Não consegui abrir a Shopify", e.message); }
   };
   GANCHOS.cancelarShopify = function(){ pararEspera(); pedir("shopify:cancelar").catch(function(){}); };
-  GANCHOS.desconectarShopify = function(){ return pedir("shopify:desconectar"); };
+  // o pé da barra lateral não pode continuar dizendo "conectada"
+  GANCHOS.desconectarShopify = function(){
+    return pedir("shopify:desconectar").then(function(r){ conexao.shop = false; pintaConexao(); return r; });
+  };
   // Rejeita com a frase da ponte; a tela mostra no próprio cartão.
   GANCHOS.conectarCredenciais = async function(loja, clientId, clientSecret){
     await pedir("shopify:conectarCredenciais", { loja: loja, clientId: clientId, clientSecret: clientSecret });
