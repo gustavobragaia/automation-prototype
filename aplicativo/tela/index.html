@@ -694,6 +694,11 @@ h1{font-size:26px;letter-spacing:-.03em}
 .lg.shopee path{fill:#EE4D2D}
 .lg.shopify path{fill:#95BF47}
 .rotulo h2 .lg{width:15px;height:15px}
+
+/* "Ou conecte com a chave do app", dentro do cartão da Shopify */
+details.cred{margin-top:16px;border-top:1px solid var(--linha);padding-top:12px}
+details.cred summary{cursor:pointer;font-size:12.5px;color:var(--tinta-2);font-weight:500}
+details.cred summary:hover{color:var(--tinta)}
 </style>
 </head>
 <body>
@@ -2469,6 +2474,9 @@ function pintaE4(){
   $("e4Acesso").textContent = con ? (shopDados.permanente ? "não expira" : "renova sozinho") : "—";
   $("e4Loja").style.color = con ? "" : "var(--erro)";
 }
+var ESCOPOS_TXT="read_orders,write_orders,read_fulfillments,write_fulfillments,"+
+  "read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,"+
+  "read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders";
 function pintaShopify(){
   pintaE4();
   var c=$("shopCorpo");
@@ -2479,10 +2487,40 @@ function pintaShopify(){
       '<button class="btn pri" id="bConectarShop"><svg class="lg" viewBox="0 0 24 24" '+
       'width="13" height="13"><path fill="currentColor" d="'+SHOPIFY_PATH+'"/></svg>Conectar Shopify</button>'+
       '<p class="nota">Abre a tela de permissões da Shopify no navegador. Você aprova lá e volta — '+
-      '<b>nenhuma chave para copiar</b>.</p>';
+      '<b>nenhuma chave para copiar</b>.</p>'+
+      // A outra porta: o app criado pelo dono dentro da própria loja. É a que
+      // funciona quando a Shopify recusa o botão acima ("link inválido").
+      '<details class="cred" id="shopCred"><summary>Ou conecte com a chave do app</summary>'+
+      '<ol class="passos-login" style="margin-top:10px">'+
+        '<li>No admin da loja, logado como <b>dono</b>: <b>Configurações → Apps → Desenvolver apps</b> '+
+          '→ criar um app no Dev Dashboard.</li>'+
+        '<li>Nos escopos, coloque os de pedidos e de fulfillment (a lista está abaixo) e clique em <b>Lançar</b>.</li>'+
+        '<li>Na página do app, <b>Instalar app</b> → escolha a loja.</li>'+
+        '<li>Copie o <b>ID do cliente</b> e a <b>Chave secreta do cliente</b> e cole aqui.</li></ol>'+
+      '<p class="nota mono" style="margin:0 0 12px;word-break:break-all">'+ESCOPOS_TXT+'</p>'+
+      '<label class="campo"><span>ID do cliente</span>'+
+        '<input id="shopCliId" spellcheck="false" autocomplete="off" placeholder="32 letras e números"></label>'+
+      '<label class="campo"><span>Chave secreta do cliente</span>'+
+        '<input id="shopCliChave" type="password" spellcheck="false" autocomplete="off" placeholder="a chave secreta"></label>'+
+      '<button class="btn pri" id="bConectarCred">Conectar com a chave</button>'+
+      '<div id="shopCredRes" style="margin-top:12px"></div>'+
+      '<p class="nota">A chave fica <b>só nesta máquina</b>. O robô troca ela por um acesso de 24 horas '+
+        'e renova sozinho.</p></details>';
     $("bConectarShop").onclick=function(){
       shopEstado="conectando"; pintaShopify();
       GANCHOS.conectarShopify(($("shopLoja")||{}).value||"");
+    };
+    $("bConectarCred").onclick=function(){
+      var b=$("bConectarCred"), res=$("shopCredRes");
+      b.disabled=true;
+      res.innerHTML='<span class="est andando"><span class="pt"></span>Testando com a Shopify…</span>';
+      Promise.resolve(GANCHOS.conectarCredenciais(($("shopLoja")||{}).value||"",
+          $("shopCliId").value, $("shopCliChave").value))
+        .catch(function(e){
+          res.innerHTML='<div class="aviso grave"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/>'+
+            '<circle cx="12" cy="12" r="9"/></svg><span><b>Não conectou.</b> '+esc(e&&e.message?e.message:String(e))+'</span></div>';
+          b.disabled=false;
+        });
     };
     return;
   }
@@ -2505,7 +2543,9 @@ function pintaShopify(){
     '<dl style="margin:14px 0 0">'+
     '<div class="par"><dt>Domínio</dt><dd class="mono">'+shopDados.dominio+'</dd></div>'+
     '<div class="par"><dt>Acesso</dt><dd>'+(shopDados.permanente
-      ? 'não expira — a Shopify entregou um token permanente' : 'renova sozinho')+'</dd></div>'+
+      ? 'não expira — a Shopify entregou um token permanente'
+      : shopDados.modo==="credenciais" ? 'pela chave do app — renova sozinho a cada 24 horas'
+      : 'renova sozinho')+'</dd></div>'+
     '<div class="par"><dt>Conectada em</dt><dd>'+shopDados.quando+'</dd></div></dl>'+
     '<p class="nota">O nome acima veio da própria Shopify, não do que foi digitado. '+
     'O acesso ficou <b>só nesta máquina</b>: nunca passou pelo nosso servidor.</p>'+

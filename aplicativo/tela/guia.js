@@ -144,6 +144,9 @@ async function seguir(){
 
 /* ── As telas de cada passo ── */
 var CHECK = '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+var ESCOPOS_LISTA = "read_orders,write_orders,read_fulfillments,write_fulfillments," +
+  "read_assigned_fulfillment_orders,write_assigned_fulfillment_orders," +
+  "read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders";
 var TELAS = {
   oi: function(){ return '' +
     '<div class="g-heroi rodando"><span class="marca">' + MARCA_SVG + '</span>' +
@@ -241,7 +244,22 @@ var TELAS = {
     '<div class="g-linha"><label class="campo" style="margin:0;flex:1"><span>Endereço da loja</span>' +
       '<input id="gLoja" spellcheck="false" placeholder="minhaloja.myshopify.com"></label>' +
       '<button class="btn pri" id="gConectar">Conectar</button></div>' +
-    '<div id="gShopRes" class="g-res" aria-live="polite"></div>';
+    '<div id="gShopRes" class="g-res" aria-live="polite"></div>' +
+    // Quando a Shopify recusa o botão acima ("link de instalação inválido"),
+    // este é o caminho: o dono cria o app dentro da própria loja.
+    '<details class="cred" id="gCred"><summary>Deu "link de instalação inválido"? Conecte com a chave do app</summary>' +
+      '<ol class="g-passos" style="margin-top:12px">' +
+        '<li><span>No admin da loja, logado como <b>dono</b>: <b>Configurações → Apps → Desenvolver apps</b> e crie um app no Dev Dashboard.</span></li>' +
+        '<li><span>Em <b>Escopos</b>, cole a lista abaixo e clique em <b>Lançar</b>.</span></li>' +
+        '<li><span>Na página do app, clique em <b>Instalar app</b> e escolha a loja.</span></li>' +
+        '<li><span>Copie o <b>ID do cliente</b> e a <b>Chave secreta do cliente</b> e cole aqui.</span></li>' +
+      '</ol>' +
+      '<p class="nota" style="margin:0 0 12px;word-break:break-all"><code>' + ESCOPOS_LISTA + '</code></p>' +
+      '<label class="campo"><span>ID do cliente</span><input id="gCliId" spellcheck="false" autocomplete="off" placeholder="32 letras e números"></label>' +
+      '<label class="campo"><span>Chave secreta do cliente</span><input id="gCliChave" type="password" spellcheck="false" autocomplete="off" placeholder="a chave secreta"></label>' +
+      '<button class="btn pri" id="gConectarCred">Conectar com a chave</button>' +
+      '<div id="gCredRes" class="g-res" aria-live="polite"></div>' +
+    '</details>';
   },
 
   esteira: function(){
@@ -413,6 +431,22 @@ var DEPOIS = {
     };
     pedir("shopify:estado").then(function(e){ if (e.conectada) { loja.value = e.dominio || ""; conectada(e); } })
       .catch(function(){});
+    c.querySelector("#gConectarCred").onclick = async function(){
+      var b = this, res2 = c.querySelector("#gCredRes");
+      if (!loja.value.trim()) { resultado(res2, "at", '<span class="est at"><span class="pt"></span>Digite o endereço da loja lá em cima primeiro.</span>'); return loja.focus(); }
+      b.disabled = true; pararEspera();
+      resultado(res2, "", '<span class="est andando"><span class="pt"></span>Testando com a Shopify…</span>');
+      try {
+        await pedir("shopify:conectarCredenciais", { loja: loja.value,
+          clientId: c.querySelector("#gCliId").value, clientSecret: c.querySelector("#gCliChave").value });
+        mexeu = true;
+        c.querySelector("#gCliChave").value = "";
+        resultado(res2, "", "");
+        conectada(await pedir("shopify:estado"));
+      } catch (e) {
+        resultado(res2, "er", '<span class="est er"><span class="pt"></span>Não conectou</span>' + lista([e.message]));
+      } finally { b.disabled = false; }
+    };
     botao.onclick = async function(){
       var l = loja.value.trim();
       if (!l) { resultado(res, "at", '<span class="est at"><span class="pt"></span>Digite o endereço da loja primeiro.</span>'); return loja.focus(); }

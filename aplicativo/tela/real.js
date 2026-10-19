@@ -141,6 +141,11 @@ async function shopify(){
   };
   GANCHOS.cancelarShopify = function(){ pararEspera(); pedir("shopify:cancelar").catch(function(){}); };
   GANCHOS.desconectarShopify = function(){ return pedir("shopify:desconectar"); };
+  // Rejeita com a frase da ponte; a tela mostra no próprio cartão.
+  GANCHOS.conectarCredenciais = async function(loja, clientId, clientSecret){
+    await pedir("shopify:conectarCredenciais", { loja: loja, clientId: clientId, clientSecret: clientSecret });
+    await mostrarShopify();
+  };
   await mostrarShopify();
 }
 function quandoTxt(iso){
@@ -175,7 +180,11 @@ async function mostrarShopify(){
   TELA.shopify("conectada", {
     loja: e.loja || e.dominio, dominio: e.dominio,
     escopos: (e.escopos||[]).length, faltando: e.faltando || [],
-    permanente: !e.expiraEm, quando: quandoTxt(e.conectadoEm),
+    // Só o token fixo e o OAuth sem prazo são permanentes. No modo
+    // "credenciais" (ID + chave) o acesso vale 24h e o robô renova sozinho —
+    // dizer "não expira" aí seria mentira.
+    permanente: e.modo !== "credenciais" && !e.expiraEm, modo: e.modo,
+    quando: quandoTxt(e.conectadoEm),
   });
 }
 

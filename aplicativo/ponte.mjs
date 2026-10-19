@@ -9,7 +9,7 @@
 
 import { lerMaquina, custoGB, TETO } from "../src/maquina.mjs";
 import { diagnosticar, apiAbertaSemChave } from "../src/adspower.mjs";
-import { conexaoAtiva, ESCOPOS } from "../src/shopify-conexao.mjs";
+import { conexaoAtiva, ESCOPOS, normalizarLoja, salvarConexao, provarCredenciais, esquecerToken } from "../src/shopify-conexao.mjs";
 import { identidadeDaLoja, escoposConcedidos } from "../src/shopify.mjs";
 import { lerPendentes } from "../src/planilha.mjs";
 import { escreverRastreios } from "../src/escrita.mjs";
@@ -43,6 +43,23 @@ const tentar = async (fn) => {
   try { return { ok: true, dado: await fn() }; }
   catch (e) { return { ok: false, erro: e.message }; }
 };
+
+// O que a Shopify responde quando recusa ID + chave, numa frase que diz o
+// que fazer. A mensagem crua continua no fim, para o suporte.
+export function explicarRecusa(msg = "") {
+  if (/shop_not_permitted/i.test(msg))
+    return "a Shopify não deixou este app acessar esta loja: o app precisa ser criado pelo admin da PRÓPRIA loja " +
+      "(Configurações → Apps → Desenvolver apps) e instalado nela. (" + msg.slice(0, 160) + ")";
+  if (/invalid_client|unauthorized|HTTP 401|HTTP 400/i.test(msg))
+    return "a Shopify recusou o ID ou a chave secreta — copie de novo os dois, com os botões de copiar do Dev Dashboard. (" +
+      msg.slice(0, 160) + ")";
+  if (/not.?installed|app_not_installed|HTTP 403/i.test(msg))
+    return "o app ainda não está instalado na loja — no Dev Dashboard, clique em Instalar app e escolha a loja. (" +
+      msg.slice(0, 160) + ")";
+  if (/HTTP 404|ENOTFOUND|getaddrinfo/i.test(msg))
+    return "não achei essa loja — confira o endereço que termina em .myshopify.com. (" + msg.slice(0, 160) + ")";
+  return msg;
+}
 
 export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, abrirNoNavegador } = {}) {
   // Os eventos do robô viram eventos da janela. Inscreve uma vez, no
@@ -299,6 +316,39 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
     // Trocar de loja apaga a conexão de verdade. Antes só mudava a tela: o
     // robô continuava escrevendo na loja antiga.
     "shopify:desconectar": async () => { apagarConexao(); return true; },
+
+    // A outra porta: o app criado pelo dono DENTRO da própria loja (Dev
+    // Dashboard da loja), conectado colando o Client ID e a chave secreta.
+    // Existe porque o app nosso, com distribuição personalizada, foi
+    // recusado na loja real com "link de instalação inválido" — inclusive
+    // com o dono logado. App e loja na mesma organização não passam por
+    // distribuição nenhuma, e a Shopify troca ID + chave por um acesso de
+    // 24h que o robô renova sozinho (modo "credenciais" em
+    // shopify-conexao.mjs). A chave fica só nesta máquina.
+    //
+    // Testa ANTES de salvar: troca por um acesso e pergunta o nome da loja.
+    // Chave errada nunca vira "conectada".
+    "shopify:conectarCredenciais": ({ loja, clientId, clientSecret } = {}) => tentar(async () => {
+      const l = normalizarLoja(loja);
+      if (!l) throw new Error("endereço de loja inválido — esperado algo como minhaloja.myshopify.com");
+      const id = String(clientId ?? "").trim(), chave = String(clientSecret ?? "").trim();
+      if (!/^[a-f0-9]{32}$/i.test(id))
+        throw new Error("o ID do cliente tem 32 letras e números — confira se copiou o campo \"ID do cliente\" inteiro");
+      if (chave.length < 20)
+        throw new Error("a chave secreta parece incompleta — use o botão de copiar ao lado de \"Chave secreta do cliente\"");
+
+      const c = { loja: l, modo: "credenciais", clientId: id, clientSecret: chave };
+      let novo;
+      try {
+        // sempre pergunta à Shopify (nunca o acesso guardado de antes), e
+        // confirma lendo o nome da loja; "env" = não grava no meio do teste
+        novo = await provarCredenciais(c);
+        await identidadeDaLoja({ conexao: { ...c, ...novo, origem: "env" } });
+      } catch (e) { esquecerToken(l); throw new Error(explicarRecusa(e.message)); }
+
+      salvarConexao({ ...c, ...novo, conectadoEm: new Date().toISOString() });
+      return { loja: l };
+    }),
 
     // Uma decisão da conferência, qualquer que seja. Porta única para a tela
     // não precisar saber qual ação do robô corresponde a cada botão, e para

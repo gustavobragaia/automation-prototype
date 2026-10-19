@@ -62,6 +62,8 @@ export function salvarConexao(c) {
 
 export function apagarConexao() {
   if (existsSync(ARQUIVO)) writeFileSync(ARQUIVO, "null");
+  // o acesso da loja antiga não pode sobreviver na memória
+  cache.clear();
 }
 
 /**
@@ -117,6 +119,20 @@ export async function tokenDaConexao(c = conexaoAtiva()) {
   return novo.accessToken;
 }
 
+/**
+ * Prova um ID + chave AGORA, sempre perguntando à Shopify — nunca pelo
+ * cache. Sem isso, trocar de loja e colar uma chave errada passava: o
+ * acesso da conexão anterior, guardado na memória para a mesma loja,
+ * respondia no lugar da chave nova. Quem chama só grava depois disto.
+ */
+export async function provarCredenciais(c) {
+  cache.delete(c.loja);
+  const novo = await trocarCredenciais(c);
+  cache.set(c.loja, { token: novo.accessToken, expiraEm: novo.expiraEm - MARGEM_MS });
+  return novo;
+}
+export function esquecerToken(loja) { if (loja) cache.delete(loja); else cache.clear(); }
+
 /** Cenário A: client_credentials. Token de ~24h, sem refresh token. */
 async function trocarCredenciais(c) {
   if (!c.clientId || !c.clientSecret)
@@ -151,10 +167,13 @@ async function renovarOAuth(c) {
 }
 
 async function postOAuth(loja, corpo) {
+  // Formulário, e não JSON: é o formato da documentação da Shopify para
+  // este endpoint (client_credentials e refresh_token). JSON também passava
+  // na loja de teste, mas isso é tolerância deles, não contrato.
   const r = await fetch(`https://${loja}/admin/oauth/access_token`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(corpo),
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    body: new URLSearchParams(corpo).toString(),
     signal: AbortSignal.timeout(30_000),
   });
   const j = await r.json().catch(() => ({}));

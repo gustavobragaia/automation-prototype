@@ -8,7 +8,7 @@ Deixe o AdsPower aberto. O Esteira conversa com ele.
 
 1. INSTALAR NO WINDOWS
 
-  1. Baixe o Esteira-Setup-0.1.2.exe
+  1. Baixe o Esteira-Setup-0.1.3.exe
   2. Abra o arquivo baixado
   3. O Windows vai mostrar uma tela azul: "O Windows protegeu o computador".
      Isso é esperado: o Esteira ainda não tem assinatura digital.
@@ -16,7 +16,7 @@ Deixe o AdsPower aberto. O Esteira conversa com ele.
   4. O Esteira instala sozinho, sem perguntas, e abre.
      Também cria um atalho na Área de Trabalho.
 
-  (Se for num Mac: abra o Esteira-0.1.2-universal.dmg, arraste o Esteira
+  (Se for num Mac: abra o Esteira-0.1.3-universal.dmg, arraste o Esteira
   para Aplicativos, e na primeira vez libere em Ajustes do Sistema →
   Privacidade e Segurança → "Abrir Mesmo Assim".)
 
@@ -61,6 +61,15 @@ Deixe o AdsPower aberto. O Esteira conversa com ele.
     Digite o endereço da sua loja (algo como minhaloja.myshopify.com) e
     clique em "Conectar Shopify". O navegador abre a tela da Shopify:
     aprove, e o Esteira mostra a loja conectada sozinho.
+
+    Se a Shopify disser "O link de instalação para este app é inválido",
+    use "Ou conecte com a chave do app", logo abaixo do botão:
+      1. No admin da loja, logado como DONO: Configurações → Apps →
+         Desenvolver apps → criar um app no Dev Dashboard.
+      2. Em Escopos, cole a lista que aparece no Esteira e clique em Lançar.
+      3. Na página do app, Instalar app → escolha a loja.
+      4. Copie o "ID do cliente" e a "Chave secreta do cliente" e cole no
+         Esteira. Ele testa na hora e mostra a loja conectada.
 
   Enquanto faltar alguma coisa, aparece um aviso amarelo em Ajustes
   dizendo o que falta. Sem isso preenchido, a rodada não começa.

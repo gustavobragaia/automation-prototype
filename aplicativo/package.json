@@ -1,7 +1,7 @@
 {
   "name": "esteira",
   "productName": "Esteira",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "description": "Rastreios da Shopee para a Shopify, na máquina do operador",
@@ -13,7 +13,8 @@
     "ensaio": "electron ensaio.mjs",
     "ensaio:ajustes": "electron ensaio-ajustes.mjs",
     "ensaio:arranque": "electron ensaio-arranque.mjs",
-    "ensaios": "npm run ensaio:arranque && npm run ensaio && npm run ensaio:ajustes"
+    "ensaios": "npm run ensaio:arranque && npm run ensaio && npm run ensaio:ajustes && npm run ensaio:chave",
+    "ensaio:chave": "electron ensaio-chave.mjs"
   },
   "devDependencies": {
     "electron": "^34.0.0",
