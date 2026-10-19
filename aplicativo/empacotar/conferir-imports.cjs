@@ -10,7 +10,7 @@
 // Então o empacotamento confere o grafo inteiro e PARA se faltar alguma
 // coisa. Melhor um build que falha aqui do que um .dmg que não abre lá.
 const asar = require("@electron/asar");
-const { posix } = require("node:path");
+const { posix, sep } = require("node:path");
 
 function conferir(arquivoAsar) {
   const todos = new Set(asar.listPackage(arquivoAsar).map((p) => p.replace(/\\/g, "/")));
@@ -29,7 +29,9 @@ function conferir(arquivoAsar) {
   // /index.mjs confere a existência antes de importar e recusa com uma frase.
   const OPCIONAIS = new Set(["/src/armazenamento/index.mjs→./sqlite.mjs"]);
   for (const m of modulos) {
-    const texto = asar.extractFile(arquivoAsar, m.replace(/^\//, "")).toString("utf8");
+    // A lista acima foi normalizada para "/", mas o extractFile procura pelo
+    // separador do sistema — no Windows, "\\". Volta antes de extrair.
+    const texto = asar.extractFile(arquivoAsar, m.replace(/^\//, "").split("/").join(sep)).toString("utf8");
     // import estático, import() dinâmico e require, só os relativos
     const alvos = [...texto.matchAll(/(?:from\s+|import\s*\(\s*|require\s*\(\s*)["'](\.{1,2}\/[^"']+)["']/g)]
       .map((x) => x[1]);
