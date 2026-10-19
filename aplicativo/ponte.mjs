@@ -47,14 +47,19 @@ const tentar = async (fn) => {
 // O que a Shopify responde quando recusa ID + chave, numa frase que diz o
 // que fazer. A mensagem crua continua no fim, para o suporte.
 export function explicarRecusa(msg = "") {
+  // A ordem importa: a Shopify responde HTTP 400 para coisas diferentes, e
+  // o código no corpo é o que diz qual. Olhar o status primeiro fazia
+  // "app não instalado" virar "chave errada" — e mandava copiar de novo
+  // uma chave que estava certa.
+  if (/app_not_installed|not installed/i.test(msg))
+    return "o ID e a chave estão certos, mas o app ainda não está instalado na loja — no Dev Dashboard, " +
+      "na página do app, clique em Instalar app e escolha a loja. Depois, clique em Conectar de novo. (" +
+      msg.slice(0, 160) + ")";
   if (/shop_not_permitted/i.test(msg))
     return "a Shopify não deixou este app acessar esta loja: o app precisa ser criado pelo admin da PRÓPRIA loja " +
       "(Configurações → Apps → Desenvolver apps) e instalado nela. (" + msg.slice(0, 160) + ")";
-  if (/invalid_client|unauthorized|HTTP 401|HTTP 400/i.test(msg))
+  if (/invalid_client|unauthorized|application_cannot_be_found|HTTP 401/i.test(msg))
     return "a Shopify recusou o ID ou a chave secreta — copie de novo os dois, com os botões de copiar do Dev Dashboard. (" +
-      msg.slice(0, 160) + ")";
-  if (/not.?installed|app_not_installed|HTTP 403/i.test(msg))
-    return "o app ainda não está instalado na loja — no Dev Dashboard, clique em Instalar app e escolha a loja. (" +
       msg.slice(0, 160) + ")";
   if (/HTTP 404|ENOTFOUND|getaddrinfo/i.test(msg))
     return "não achei essa loja — confira o endereço que termina em .myshopify.com. (" + msg.slice(0, 160) + ")";

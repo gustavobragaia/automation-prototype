@@ -24,6 +24,9 @@ globalThis.fetch = async (url, o) => {
     formato = o.headers["Content-Type"];
     const b = Object.fromEntries(new URLSearchParams(o.body));
     if (b.grant_type !== "client_credentials") return new Response("{}", { status: 400 });
+    if (resposta === "nao-instalado")   // o que a loja da Sparta respondeu de verdade
+      return new Response(JSON.stringify({ error: "app_not_installed",
+        error_description: "The application is not installed on this shop." }), { status: 400 });
     if (resposta === "outra-org")
       return new Response(JSON.stringify({ error: "shop_not_permitted" }), { status: 400 });
     if (b.client_secret !== CHAVE)
@@ -51,6 +54,13 @@ resposta = "outra-org";
 r = await pedir({ loja: "loja-sparta-store.myshopify.com", clientId: ID, clientSecret: CHAVE });
 tudo &= ok(r.ok === false && /PRÓPRIA loja/.test(r.erro) && /shop_not_permitted/.test(r.erro),
   "app de outra organização: diz para criar pelo admin da própria loja (e guarda a mensagem crua)");
+tudo &= ok(!salvo(), "e nada é gravado");
+
+resposta = "nao-instalado";
+r = await pedir({ loja: "loja-sparta-store.myshopify.com", clientId: ID, clientSecret: CHAVE });
+tudo &= ok(r.ok === false && /ainda não está instalado/.test(r.erro) && /Instalar app/.test(r.erro) &&
+  !/recusou o ID/.test(r.erro),
+  "app não instalado (HTTP 400): diz para instalar — NÃO diz que a chave está errada");
 tudo &= ok(!salvo(), "e nada é gravado");
 
 resposta = "certo";
