@@ -14,6 +14,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeFileSync } from "node:fs";
 
+// O código que roda num processo novo precisa importar o robô por URL
+// file://, não por caminho: no Windows "D:\\..." não é URL e o Node recusa
+// ("Received protocol 'd:'"). Foi o que derrubou a suíte no runner Windows.
+import { pathToFileURL as _paraUrl } from "node:url";
+const RAIZ_URL = _paraUrl(process.cwd() + "/").href;
+
 const ok = (c, m) => console.log(c ? `  \x1b[32m✓\x1b[0m ${m}` : `  \x1b[31m✗ ${m}\x1b[0m`) || c;
 const sec = (t) => console.log(`\n\x1b[1m${t}\x1b[0m`);
 let tudo = true;
@@ -135,7 +141,7 @@ sec("7 · fecha o app, abre de novo: nada disso vivia na memória");
 const sobreviveu = JSON.parse(
   (await import("node:child_process")).execFileSync(process.execPath,
     ["--input-type=module", "-e", `
-      const { pendentesAbertos } = await import("${process.cwd()}/src/armazenamento/index.mjs");
+      const { pendentesAbertos } = await import("${RAIZ_URL}src/armazenamento/index.mjs");
       console.log(JSON.stringify(pendentesAbertos().map((p) => ({
         pedido: p.pedido, conta: p.conta, corrigida: p.contaCorrigida ?? false }))));
     `], { encoding: "utf8",
@@ -265,8 +271,8 @@ tudo &= ok(barrado?.lados?.shopify?.nome === "Outra Pessoa Entrega",
 sec("16 · e sobrevive a fechar o app");
 const sobrou = JSON.parse((await import("node:child_process")).execFileSync(process.execPath,
   ["--input-type=module", "-e", `
-    const { pendentesAbertos } = await import("${process.cwd()}/src/armazenamento/index.mjs");
-    const { lerDetalhe } = await import("${process.cwd()}/src/armazenamento/detalhe.mjs");
+    const { pendentesAbertos } = await import("${RAIZ_URL}src/armazenamento/index.mjs");
+    const { lerDetalhe } = await import("${RAIZ_URL}src/armazenamento/detalhe.mjs");
     const p = pendentesAbertos().find((x) => x.pedido === "#1099");
     console.log(JSON.stringify(p ? { motivo: p.motivo, det: lerDetalhe(p.detalhe) } : null));
   `], { encoding: "utf8", env: { ...process.env } }).trim());

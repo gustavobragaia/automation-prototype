@@ -56,7 +56,7 @@ const telaShopee = [
   { nome: "Marcos francisco da cruz", produto: "faca feng",      valor: 55.8,  rastreioTexto: "BR290000000005Z" },
   { nome: "Fábio Fictício Brito",       produto: "lamina samurai", valor: 288.0, rastreioTexto: "BR2900000000003" },
   { nome: "Caio Fictício Tadeu",             produto: "Faca Feng",      valor: 90.0,  rastreioTexto: "BR290000000002Z- BR290000000006Z - BR2900000000001" },
-  { nome: "Rogério Fictício Paz",       produto: "Stella",         valor: 33.95, rastreioTexto: "BR260300793540JSPXLM10000001" },
+  { nome: "Rogério Fictício Paz",       produto: "Stella",         valor: 33.95, rastreioTexto: "BR290000000007JSPXLM10000001" },
   { nome: "Ana Fictícia Souto",          produto: "yang",           valor: 19.99, rastreioTexto: "BR2900000000004" },
   { nome: "Juliano Fictício Dutra", produto: "Yang Pro",       valor: 19.99, rastreioTexto: "ainda sem rastreio" },
 ];

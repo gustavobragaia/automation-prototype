@@ -11,9 +11,12 @@
 import { spawn, execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const RAIZ = resolve(new URL("../..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+// fileURLToPath, e não .pathname: este decodifica espaço e acento e acerta a
+// letra de unidade do Windows ("D:\...") sem remendo.
+const RAIZ = fileURLToPath(new URL("../..", import.meta.url));
 const DIST = join(RAIZ, "aplicativo", "dist");
 const ok = (c, m) => { console.log(`${c ? "  ✓" : "  ✗"} ${m}`); return c; };
 let tudo = true;
@@ -71,7 +74,7 @@ for (const [t, nome] of [["1","etapa 1"],["2","etapa 2"],["3","etapa 3"],["4","e
   tudo &= ok(!v.length, `${nome}: nada inventado` + (v.length ? ` — vazou ${v.slice(0, 3).join(", ")}` : ""));
 }
 
-const { montarCenario } = await import("file://" + join(RAIZ, "scripts", "cenario-conferencia.mjs").replace(/\\/g, "/"));
+const { montarCenario } = await import(pathToFileURL(join(RAIZ, "scripts", "cenario-conferencia.mjs")).href);
 const { planilha } = await montarCenario(join(estado, "cenario"));
 const pl = await pedir("planilha:ler", { caminho: planilha });
 tudo &= ok(pl.ok && pl.dado?.total === 4, `lê uma planilha (.xlsx) — o exceljs empacotado funciona no Windows (${pl.dado?.total ?? pl.erro})`);

@@ -7,6 +7,12 @@ import { mkdtempSync, statSync, writeFileSync, readFileSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+// O código que roda num processo novo precisa importar o robô por URL
+// file://, não por caminho: no Windows "D:\\..." não é URL e o Node recusa
+// ("Received protocol 'd:'"). Foi o que derrubou a suíte no runner Windows.
+import { pathToFileURL as _paraUrl } from "node:url";
+const RAIZ_URL = _paraUrl(process.cwd() + "/").href;
+
 const pasta = mkdtempSync(join(tmpdir(), "esteira-ajustes-"));
 process.env.AJUSTES_ARQUIVO = join(pasta, "ajustes.json");
 
@@ -127,7 +133,7 @@ tudo &= ok(process.env.LOGIN_AUTOMATICO === "0", "desligado chega ao robô");
 sec("os segredos sobrevivem a fechar o app");
 const vistos = JSON.parse((await import("node:child_process")).execFileSync(process.execPath,
   ["--input-type=module", "-e", `
-    const { lerAjustes } = await import("${process.cwd()}/src/ajustes.mjs");
+    const { lerAjustes } = await import("${RAIZ_URL}src/ajustes.mjs");
     const a = lerAjustes();
     console.log(JSON.stringify({ senha: a.shopeeSenha, prefixo: a.emailPrefixo,
                                  dominio: a.emailDominio, login: a.loginAutomatico }));

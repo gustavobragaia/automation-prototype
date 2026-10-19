@@ -13,6 +13,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 
+// O código que roda num processo novo precisa importar o robô por URL
+// file://, não por caminho: no Windows "D:\\..." não é URL e o Node recusa
+// ("Received protocol 'd:'"). Foi o que derrubou a suíte no runner Windows.
+import { pathToFileURL as _paraUrl } from "node:url";
+const RAIZ_URL = _paraUrl(process.cwd() + "/").href;
+
 const ok = (c, m) => console.log(c ? `  \x1b[32m✓\x1b[0m ${m}` : `  \x1b[31m✗ ${m}\x1b[0m`) || c;
 const sec = (t) => console.log(`\n\x1b[1m${t}\x1b[0m`);
 let tudo = true;
@@ -36,7 +42,7 @@ function rodar(armazenamento) {
 
   // ── a carteira do dia, com três pendências ──
   emProcessoNovo(pasta, armazenamento, `
-    const { guardarPendentes } = await import("${process.cwd()}/src/armazenamento/index.mjs");
+    const { guardarPendentes } = await import("${RAIZ_URL}src/armazenamento/index.mjs");
     guardarPendentes([
       { pedido: "#164891", conta: 124, orderId: "A1", dias: 1 },
       { pedido: "#164925", conta: 128, orderId: "A2", dias: 2 },
@@ -47,27 +53,27 @@ function rodar(armazenamento) {
 
   // ── 1. resolvido à mão: sai da carteira e diz por quê ──
   emProcessoNovo(pasta, armazenamento, `
-    const { encerrarPendente } = await import("${process.cwd()}/src/armazenamento/index.mjs");
+    const { encerrarPendente } = await import("${RAIZ_URL}src/armazenamento/index.mjs");
     console.log(JSON.stringify(encerrarPendente("#164891", {
       desfecho: "manual", nota: "código colado na mão: BR123456789BR" })));
   `);
 
   // ── 2. fica para amanhã ──
   emProcessoNovo(pasta, armazenamento, `
-    const { adiarPendente } = await import("${process.cwd()}/src/armazenamento/index.mjs");
+    const { adiarPendente } = await import("${RAIZ_URL}src/armazenamento/index.mjs");
     console.log(JSON.stringify(adiarPendente("#164925", "2099-01-01")));
   `);
 
   // ── 3. a conta estava errada na planilha ──
   emProcessoNovo(pasta, armazenamento, `
-    const { encerrarPendente } = await import("${process.cwd()}/src/armazenamento/index.mjs");
+    const { encerrarPendente } = await import("${RAIZ_URL}src/armazenamento/index.mjs");
     console.log(JSON.stringify(encerrarPendente("#165091", {
       desfecho: "conta", conta: 207, nota: "estava como 152 na planilha" })));
   `);
 
   // ── agora o app "abriu de novo" e vai ler ──
   const depois = emProcessoNovo(pasta, armazenamento, `
-    const m = await import("${process.cwd()}/src/armazenamento/index.mjs");
+    const m = await import("${RAIZ_URL}src/armazenamento/index.mjs");
     const abertos = m.pendentesAbertos();
     console.log(JSON.stringify({
       nome: m.nome,
@@ -94,7 +100,7 @@ function rodar(armazenamento) {
 
   // ── o adiado volta quando a data chega ──
   const amanha = emProcessoNovo(pasta, armazenamento, `
-    const { pendentesAbertos } = await import("${process.cwd()}/src/armazenamento/index.mjs");
+    const { pendentesAbertos } = await import("${RAIZ_URL}src/armazenamento/index.mjs");
     console.log(JSON.stringify(pendentesAbertos({ hoje: "2099-06-01" })
       .map((p) => p.pedido)));
   `);
@@ -103,7 +109,7 @@ function rodar(armazenamento) {
 
   // ── não dá para resolver duas vezes ──
   const dedupe = emProcessoNovo(pasta, armazenamento, `
-    const { encerrarPendente } = await import("${process.cwd()}/src/armazenamento/index.mjs");
+    const { encerrarPendente } = await import("${RAIZ_URL}src/armazenamento/index.mjs");
     console.log(JSON.stringify(encerrarPendente("#164891", { desfecho: "manual", nota: "de novo" })));
   `);
   tudo &= ok(dedupe === false, "resolver de novo o mesmo pedido é recusado");

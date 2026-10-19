@@ -6,26 +6,25 @@ ANTES DE COMEÇAR
 Deixe o AdsPower aberto. O Esteira conversa com ele.
 
 
-1. INSTALAR
+1. INSTALAR NO WINDOWS
 
-  1. Abra o arquivo Esteira-0.1.0-universal.dmg
-  2. Arraste o ícone do Esteira para a pasta Aplicativos
-  3. Feche a janela e ejete o "Esteira" que apareceu na barra lateral do Finder
+  1. Baixe o Esteira-Setup-0.1.0.exe
+  2. Abra o arquivo baixado
+  3. O Windows vai mostrar uma tela azul: "O Windows protegeu o computador".
+     Isso é esperado: o Esteira ainda não tem assinatura digital.
+     Clique em "Mais informações" e depois em "Executar assim mesmo"
+  4. O Esteira instala sozinho, sem perguntas, e abre.
+     Também cria um atalho na Área de Trabalho.
+
+  (Se for num Mac: abra o Esteira-0.1.0-universal.dmg, arraste o Esteira
+  para Aplicativos, e na primeira vez libere em Ajustes do Sistema →
+  Privacidade e Segurança → "Abrir Mesmo Assim".)
 
 
-2. ABRIR PELA PRIMEIRA VEZ
+2. CONFERIR O ADSPOWER
 
-  O Mac vai bloquear na primeira vez. Isso é esperado: o Esteira ainda não
-  tem o selo da Apple. Para liberar:
-
-  1. Abra o Esteira em Aplicativos
-  2. Vai aparecer o aviso "Esteira não foi aberto". Clique em "Concluído"
-  3. Abra Ajustes do Sistema → Privacidade e Segurança
-  4. Role até o fim. Vai ter a frase "O Esteira foi bloqueado..."
-     Clique em "Abrir Mesmo Assim"
-  5. Digite a senha do Mac e confirme
-
-  Pronto. Das próximas vezes ele abre direto.
+  O AdsPower precisa estar aberto e com a API local ligada:
+  no AdsPower, Configurações → API local → ligue a opção.
 
 
 3. PREENCHER OS AJUSTES (uma vez só)
