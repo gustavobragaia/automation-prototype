@@ -406,10 +406,296 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
   .apoio button{padding:5px 7px}
   h1{font-size:19px}
 }
+
+/* ══ O guia da primeira vez (tela/guia.js) ══
+   Um painel no meio da janela, sobre um fundo levemente tingido. Cobre a
+   tela, mas não a barra: a janela continua arrastável no macOS. Aqui a cor
+   da marca aparece mais do que no resto do app — é o único momento de
+   boas-vindas; as cores de estado continuam querendo dizer estado. */
+#guia{position:fixed;left:0;right:0;bottom:0;top:44px;z-index:20;overflow:auto;display:flex;
+  padding:28px max(16px,env(safe-area-inset-left,0px));
+  background:radial-gradient(1100px 520px at 50% -10%,color-mix(in srgb,var(--marca) 13%,transparent),transparent 70%),var(--canvas)}
+:root[data-janela="darwin"] #guia{top:52px}
+.com-guia body{overflow:hidden}
+.g-caixa{margin:auto;width:100%;max-width:1000px;min-height:min(600px,calc(100vh - 120px));display:grid;
+  grid-template-columns:250px minmax(0,1fr);background:var(--canvas);border:1px solid var(--linha);
+  border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04),0 24px 60px -24px rgba(0,0,0,.28)}
+
+/* trilho da esquerda */
+.g-lado{background:var(--sup-1);border-right:1px solid var(--linha);padding:26px 22px;display:flex;flex-direction:column}
+.g-lado-topo{font:500 11px/1.3 var(--ui);letter-spacing:.06em;text-transform:uppercase;color:var(--tinta-3)}
+.g-barra{height:4px;border-radius:4px;background:var(--sup-3);margin:10px 0 6px;overflow:hidden}
+.g-barra i{display:block;height:100%;background:var(--marca);border-radius:4px;transition:width .35s ease}
+.g-conta{font-size:11.5px;color:var(--tinta-3);margin-bottom:22px}
+.g-trilho{list-style:none;margin:0;padding:0;position:relative}
+.g-trilho li{position:relative;display:flex;gap:12px;padding:0 0 20px;font-size:13px;color:var(--tinta-3)}
+.g-trilho li:last-child{padding-bottom:0}
+.g-trilho li::before{content:"";position:absolute;left:11px;top:26px;bottom:2px;width:1px;background:var(--linha-forte)}
+.g-trilho li:last-child::before{display:none}
+.g-trilho .n{width:23px;height:23px;flex:none;border-radius:50%;display:grid;place-items:center;
+  font:500 11px/1 var(--ui);border:1px solid var(--linha-forte);background:var(--canvas);color:var(--tinta-3);
+  position:relative;z-index:1;transition:all .2s}
+.g-trilho .n svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+.g-trilho .t{font-weight:500;line-height:23px}
+.g-trilho .s{display:block;font-size:11.5px;font-weight:400;line-height:1.35;color:var(--tinta-3);margin-top:-1px}
+.g-trilho [data-e="agora"]{color:var(--tinta)}
+.g-trilho [data-e="agora"] .n{border-color:var(--marca);background:var(--marca);color:#fff;
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--marca) 20%,transparent)}
+.g-trilho [data-e="feita"]{color:var(--tinta-2)}
+.g-trilho [data-e="feita"] .n{border-color:var(--ok);background:var(--ok);color:var(--canvas)}
+.g-trilho [data-e="feita"]::before{background:var(--ok)}
+.g-trilho [data-e="alerta"] .n{border-color:var(--atencao);background:var(--atencao-fundo);color:var(--atencao)}
+.g-lado-pe{margin-top:auto;padding-top:22px;font-size:11.5px;line-height:1.5;color:var(--tinta-3)}
+
+/* palco da direita */
+.g-corpo{display:flex;flex-direction:column;min-width:0}
+.g-conteudo{flex:1;padding:34px 40px 8px;max-width:680px;animation:g-entra .28s ease both}
+@keyframes g-entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.g-cab{display:flex;gap:14px;align-items:center;margin-bottom:16px}
+.g-icone{width:44px;height:44px;flex:none;border-radius:11px;display:grid;place-items:center;
+  background:var(--sup-2);border:1px solid var(--linha)}
+.g-icone img{width:24px;height:24px;border-radius:5px}
+.g-icone svg{width:23px;height:23px}
+.g-icone.marca-g svg *{stroke:var(--marca);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.g-icone.marca-g .caixa{fill:var(--marca)}
+.g-cab .eyebrow{margin-bottom:3px}
+.g-cab h1{margin:0}
+.g-lede{font-size:13.5px;line-height:1.65;color:var(--tinta-2);margin:0 0 14px;max-width:62ch}
+.g-lede b{color:var(--tinta);font-weight:500}
+
+/* instruções numeradas em cartões */
+.g-passos{list-style:none;margin:6px 0 20px;padding:0;display:grid;gap:8px;counter-reset:p}
+.g-passos li{counter-increment:p;display:flex;gap:12px;align-items:flex-start;padding:11px 14px;
+  border:1px solid var(--linha);border-radius:9px;background:var(--sup-1);font-size:13px;line-height:1.55;color:var(--tinta-2)}
+.g-passos li::before{content:counter(p);width:21px;height:21px;flex:none;border-radius:50%;display:grid;place-items:center;
+  font:600 11px/1 var(--ui);color:var(--marca);background:color-mix(in srgb,var(--marca) 14%,transparent);margin-top:1px}
+.g-passos b{color:var(--tinta);font-weight:500}
+
+.g-sub{font:500 12.5px/1 var(--ui);color:var(--tinta);margin:22px 0 10px}
+.g-marcar{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--tinta-2);margin:-2px 0 12px;cursor:pointer}
+.g-marcar input{accent-color:var(--marca);margin:0}
+.g-exemplo{font-size:12.5px;color:var(--tinta-2);margin:0 0 6px;padding:10px 12px;border-radius:8px;
+  background:var(--sup-1);border:1px dashed var(--linha-forte)}
+.g-exemplo:empty{display:none}
+.g-exemplo b{color:var(--tinta);font-weight:500}
+.g-exemplo code,.nota code{font-family:var(--mono);font-size:11.5px;color:var(--tinta)}
+.g-guardada{color:var(--ok);font-weight:500}
+.g-res{margin-top:14px;font-size:12.5px}
+.g-res:empty{display:none}
+.g-res .nota{margin-top:6px}
+.g-res.ok-caixa,.g-res.er-caixa,.g-res.at-caixa{padding:12px 14px;border-radius:9px}
+.g-res.ok-caixa{background:var(--ok-fundo)} .g-res.er-caixa{background:var(--erro-fundo)} .g-res.at-caixa{background:var(--atencao-fundo)}
+.g-resolver{margin:8px 0 0;padding-left:18px;color:var(--tinta-2);font-size:12px;line-height:1.6}
+.g-linha{display:flex;gap:8px;align-items:flex-end;max-width:540px}
+.g-link{color:var(--tinta);text-decoration:underline;text-underline-offset:2px;padding:0;font-size:inherit}
+.btn.g-roxo{background:var(--marca);border-color:var(--marca);color:#fff}
+.btn.g-roxo:hover{opacity:.9;background:var(--marca)}
+
+/* boas-vindas */
+.g-heroi{display:flex;flex-direction:column;align-items:flex-start;margin-bottom:6px}
+.g-heroi .marca svg{width:46px;height:46px;margin-bottom:16px}
+.g-heroi .marca svg *{stroke-width:1.7}
+.g-heroi h1{font-size:26px;margin-bottom:10px}
+.g-tres{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0 18px}
+.g-tres div{padding:14px;border:1px solid var(--linha);border-radius:10px;background:var(--sup-1)}
+.g-tres .g-icone{width:34px;height:34px;border-radius:9px;margin-bottom:10px;background:var(--canvas)}
+.g-tres .g-icone img{width:19px;height:19px} .g-tres .g-icone svg{width:18px;height:18px}
+.g-tres b{display:block;font-weight:500;font-size:13px;margin-bottom:3px}
+.g-tres span{font-size:12px;color:var(--tinta-2);line-height:1.5}
+.g-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--tinta-2);padding:4px 10px;
+  border-radius:20px;border:1px solid var(--linha);background:var(--sup-1)}
+.g-chip svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.g-mao{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+
+/* ilustrações do passeio — miniaturas desenhadas, não fotos */
+.g-ilus{position:relative;height:178px;border:1px solid var(--linha);border-radius:12px;margin:2px 0 18px;overflow:hidden;
+  background:linear-gradient(180deg,var(--sup-1),var(--canvas));display:grid;place-items:center}
+.g-mini{display:flex;align-items:center;flex-wrap:wrap;row-gap:8px;margin:0 0 14px}
+.g-mini .etapa{cursor:default;font-size:12px}
+.g-mini .liga{width:22px;margin-right:10px}
+.il-solta{width:290px;height:120px;border:1.5px dashed var(--linha-forte);border-radius:10px;display:grid;place-items:center;
+  color:var(--tinta-3);font-size:12px;position:relative}
+.il-arq{position:absolute;display:flex;gap:9px;align-items:center;padding:9px 12px;border-radius:8px;background:var(--canvas);
+  border:1px solid var(--linha-forte);box-shadow:0 6px 18px -8px rgba(0,0,0,.35);font-size:12px;animation:il-cai 2.6s ease-in-out infinite}
+.il-arq i{width:22px;height:26px;border-radius:3px;background:#1d6f42;position:relative}
+.il-arq i::after{content:"X";position:absolute;inset:0;display:grid;place-items:center;color:#fff;font:600 10px/1 var(--ui);font-style:normal}
+.il-arq small{display:block;color:var(--tinta-3);font-size:11px}
+@keyframes il-cai{0%{transform:translate(-70px,-60px) rotate(-6deg);opacity:0}25%{opacity:1}55%,100%{transform:translate(0,0) rotate(0)}}
+.il-contas{display:grid;gap:7px;width:320px}
+.il-conta{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:var(--canvas);border:1px solid var(--linha);font-size:12px}
+.il-conta .d{margin-left:auto;font-size:11.5px}
+.il-conta .bar{flex:1;height:4px;border-radius:4px;background:var(--sup-3);overflow:hidden;max-width:90px}
+.il-conta .bar i{display:block;height:100%;background:var(--tinta-2);animation:il-le 1.8s ease-in-out infinite}
+@keyframes il-le{0%{width:8%}100%{width:100%}}
+.il-cartao{width:330px;padding:12px 14px;border-radius:10px;background:var(--canvas);border:1px solid var(--linha);font-size:12px}
+.il-cartao .topo-c{display:flex;gap:8px;align-items:center;margin-bottom:9px}
+.il-tag{font-size:10.5px;padding:2px 7px;border-radius:20px;background:var(--atencao-fundo);color:var(--atencao)}
+.il-opc{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;border:1px solid var(--linha);margin-top:6px;font-family:var(--mono);font-size:11.5px}
+.il-opc.sim{border-color:var(--marca);background:color-mix(in srgb,var(--marca) 9%,transparent);animation:il-escolhe 2.4s ease-in-out infinite}
+.il-opc .u{margin-left:auto;font-family:var(--ui);font-size:11px;color:var(--marca);font-weight:500}
+@keyframes il-escolhe{0%,30%{border-color:var(--linha);background:transparent}45%,100%{border-color:var(--marca);background:color-mix(in srgb,var(--marca) 9%,transparent)}}
+.il-lista{width:330px;display:grid;gap:5px}
+.il-ped{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:7px;background:var(--canvas);border:1px solid var(--linha);font-size:12px}
+.il-ped code{font-family:var(--mono);font-size:11px;color:var(--tinta-2)}
+.il-ped .ck{margin-left:auto;width:16px;height:16px;border-radius:50%;background:var(--ok);display:grid;place-items:center;opacity:0;animation:il-ok 3s ease infinite}
+.il-ped:nth-child(2) .ck{animation-delay:.35s} .il-ped:nth-child(3) .ck{animation-delay:.7s}
+.il-ped .ck svg{width:9px;height:9px;stroke:var(--canvas);fill:none;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}
+@keyframes il-ok{0%,20%{opacity:0;transform:scale(.5)}35%,100%{opacity:1;transform:none}}
+
+/* pronto */
+.g-selo{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;margin-bottom:16px;
+  background:var(--ok-fundo);color:var(--ok)}
+.g-selo.at{background:var(--atencao-fundo);color:var(--atencao)}
+.g-selo svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.g-selo path{stroke-dasharray:30;stroke-dashoffset:30;animation:g-risca .5s .15s ease forwards}
+@keyframes g-risca{to{stroke-dashoffset:0}}
+.g-confere{list-style:none;margin:6px 0 18px;padding:0;display:grid;gap:8px}
+.g-confere li{display:flex;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--linha);border-radius:10px;font-size:13px}
+.g-confere .g-icone{width:34px;height:34px;border-radius:9px}
+.g-confere .g-icone img{width:19px;height:19px} .g-confere .g-icone svg{width:18px;height:18px}
+.g-confere .t{font-weight:500} .g-confere .d{display:block;color:var(--tinta-2);font-size:12px}
+.g-confere .est{margin-left:auto;font-size:12px}
+
+/* pé */
+.g-pe{display:flex;align-items:center;gap:10px;padding:16px 40px;border-top:1px solid var(--linha);background:var(--canvas)}
+.g-pe #gSeguir{margin-left:auto;padding:8px 18px}
+.g-pular{font-size:12.5px;color:var(--tinta-3);padding:6px 4px}
+.g-pular:hover{color:var(--tinta-2)}
+.g-fechar{position:fixed;right:max(14px,env(safe-area-inset-right,0px));top:56px;z-index:21;width:30px;height:30px;
+  border-radius:8px;display:grid;place-items:center;color:var(--tinta-3)}
+:root[data-janela="darwin"] .g-fechar{top:64px}
+.g-fechar:hover{background:var(--sup-2);color:var(--tinta)}
+.g-fechar svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+@media(prefers-reduced-motion:reduce){
+  .g-conteudo,.il-arq,.il-conta .bar i,.il-opc.sim,.il-ped .ck,.g-selo path{animation:none}
+  .il-ped .ck{opacity:1} .g-selo path{stroke-dashoffset:0}}
+@media(max-width:820px){
+  .g-caixa{grid-template-columns:1fr}
+  .g-lado{display:none}
+  .g-conteudo{padding:26px 22px 8px} .g-pe{padding:14px 22px}
+  .g-tres{grid-template-columns:1fr}
+}
+/* ══ Visual A: barra lateral + cartões ══
+   A rodada do dia vira um trilho vertical à esquerda (como o guia da
+   primeira vez), e o conteúdo de cada tela mora em cartões. O roxo da marca
+   é a ação principal; verde, amarelo e vermelho continuam sendo estado. */
+html,body{height:auto}
+body{display:grid;grid-template-columns:244px minmax(0,1fr);min-height:100vh;align-items:start}
+
+/* — a barra lateral — */
+.lateral{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;
+  background:var(--sup-1);border-right:1px solid var(--linha);padding:20px 14px 14px;overflow-y:auto}
+.lateral .barra{position:static;height:auto;border:none;background:none;padding:2px 8px 0;
+  margin-bottom:26px;gap:8px;flex-wrap:wrap}
+:root[data-janela="darwin"] .lateral{padding-top:44px}
+:root[data-janela="darwin"] .lateral .barra{height:auto;padding-left:8px}
+/* no macOS a janela não tem barra de título: o alto da lateral arrasta */
+:root[data-janela="darwin"] .lateral::before{content:"";position:absolute;left:0;right:0;top:0;height:40px;
+  -webkit-app-region:drag}
+:root[data-janela="darwin"] body::after{content:"";position:fixed;top:0;left:244px;right:0;height:22px;
+  -webkit-app-region:drag;z-index:5}
+.lateral .marca svg{width:19px;height:19px}
+.lateral .marca b{font-size:14.5px}
+.lado-rodada{padding:0 8px;margin-bottom:18px}
+.lado-lbl{display:block;font:500 10.5px/1 var(--ui);letter-spacing:.07em;text-transform:uppercase;color:var(--tinta-3)}
+.lado-prog{height:4px;border-radius:4px;background:var(--sup-3);margin:10px 0 6px;overflow:hidden}
+.lado-prog i{display:block;height:100%;width:6%;border-radius:4px;background:var(--marca);transition:width .35s ease}
+.lado-prog-t{font-size:11.5px;color:var(--tinta-3)}
+
+.lateral .esteira{background:none;border:none;overflow:visible}
+.lateral .trilha{flex-direction:column;align-items:stretch;height:auto;overflow:visible;padding:0;margin:0;max-width:none}
+.lateral .liga{display:none}
+.lateral .etapa{position:relative;display:grid;grid-template-columns:23px 1fr;column-gap:11px;row-gap:1px;align-items:start;
+  padding:7px 8px 15px;border-radius:9px;text-align:left;white-space:normal;color:var(--tinta-3)}
+.lateral .etapa:hover{background:var(--sup-2)}
+.lateral .etapa::after{content:"";position:absolute;left:19px;top:33px;bottom:-5px;width:1px;background:var(--linha-forte)}
+.lateral .etapa[data-etapa="4"]::after{display:none}
+.lateral .etapa[data-e="feita"]::after{background:var(--ok)}
+.lateral .etapa .n{grid-row:span 2;width:23px;height:23px;font-size:11px;z-index:1}
+.lateral .etapa[data-e="agora"] .n::before{display:none}
+.lateral .etapa[data-e="agora"]{color:var(--tinta);font-weight:400}
+.lateral .etapa[data-e="agora"] .n{background:var(--marca);border-color:var(--marca);color:#fff;border-width:1px;
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--marca) 22%,transparent)}
+body.rodando .lateral .etapa[data-e="agora"] .n{animation:g-pulsa 1.6s ease-in-out infinite}
+@keyframes g-pulsa{50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--marca) 12%,transparent)}}
+.lateral .etapa .n svg{width:11px;height:11px}
+.lateral .etapa .rot{display:block;font-weight:500;font-size:13px;line-height:23px}
+.lateral .etapa .sub{display:block;font-size:11.5px;line-height:1.35;color:var(--tinta-3)}
+.lateral .etapa[data-e="alerta"] .sub{color:var(--atencao)}
+
+.lateral .apoio{margin:auto 0 0;display:grid;gap:2px;padding-top:18px}
+.lateral .apoio button{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;
+  font-size:13px;color:var(--tinta-2);text-align:left}
+.lateral .apoio button svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.lateral .apoio button:hover{background:var(--sup-2);color:var(--tinta)}
+.lateral .apoio button[aria-current="page"]{background:var(--sup-3);color:var(--tinta)}
+.lado-status{display:flex;gap:9px;align-items:flex-start;text-align:left;margin-top:12px;padding:10px 11px;
+  border-radius:10px;border:1px solid var(--linha);background:var(--canvas);font-size:12px;line-height:1.4;color:var(--tinta-2)}
+.lado-status .pt{width:7px;height:7px;border-radius:50%;flex:none;margin-top:5px;background:var(--tinta-3)}
+.lado-status.ok .pt{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%,transparent)}
+.lado-status.at .pt{background:var(--atencao);box-shadow:0 0 0 3px color-mix(in srgb,var(--atencao) 22%,transparent)}
+.lado-status:hover{border-color:var(--linha-forte)}
+
+/* — o conteúdo — */
+.tela{max-width:1000px;margin:0;width:100%;padding:30px 44px 56px}
+.topo{padding-block:4px 22px}
+.topo .eyebrow{color:var(--marca)}
+h1{font-size:26px;letter-spacing:-.03em}
+.topo p{font-size:13.5px}
+.btn.pri{background:var(--marca);border-color:var(--marca);color:#fff}
+.btn.pri:hover{background:var(--marca);opacity:.9}
+.btn.pri svg{stroke:#fff}
+
+/* cada bloco vira um cartão */
+.tela section .bloco{border:1px solid var(--linha);border-radius:14px;padding:20px 22px;margin-bottom:14px;background:var(--canvas)}
+.tela section .bloco:first-of-type{padding-top:20px;border-top:1px solid var(--linha)}
+.tela .rotulo h2{font-size:13px;color:var(--tinta);letter-spacing:-.01em}
+
+/* números em blocos */
+.placar{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.placar>div{padding:16px 18px;border-radius:12px;background:var(--sup-1);border:1px solid var(--linha)}
+.placar .v{font-size:30px}
+.placar .r{font-size:12.5px;margin-top:8px}
+/* borda sólida: color-mix() na borda destes fazia o Chromium pintar o verde
+   com o fundo do amarelo até a próxima mudança de estilo */
+.placar .ok{background:var(--ok-fundo);border-color:var(--ok-fundo)}
+.placar .at{background:var(--atencao-fundo);border-color:var(--atencao-fundo)}
+.placar .at button.bloco-num{width:100%}
+
+/* etapa 1: a área de soltar em destaque, horizontal como na versão A */
+#t-1 .bloco:has(#solta){padding:0;border:none;background:none}
+#t-1 .solta{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:18px;
+  align-items:center;text-align:left;padding:22px 24px;border-radius:14px;
+  border:1.5px dashed color-mix(in srgb,var(--marca) 50%,var(--linha-forte));
+  background:color-mix(in srgb,var(--marca) 6%,var(--canvas));transition:border-color .15s,background .15s}
+#t-1 .solta:hover,#t-1 .solta.sobre{border-color:var(--marca);background:color-mix(in srgb,var(--marca) 11%,var(--canvas))}
+#t-1 .solta svg{grid-row:span 2;width:46px;height:46px;padding:12px;margin:0;border-radius:12px;box-sizing:border-box;
+  background:color-mix(in srgb,var(--marca) 18%,transparent);stroke:var(--marca);stroke-width:2}
+#t-1 .solta b{font-size:14.5px;align-self:end}
+#t-1 .solta small{font-size:12.5px;color:var(--tinta-2);margin:2px 0 0;align-self:start}
+#t-1 #listaArq{display:grid;gap:8px;margin-top:12px!important}
+#t-1 .arq{border:1px solid var(--linha);border-radius:12px;padding:12px 14px;background:var(--canvas)}
+#t-1 .arq:first-child{border-top:1px solid var(--linha)}
+#t-1 .arq::before{content:"X";width:30px;height:34px;flex:none;border-radius:5px;background:#1d6f42;
+  display:grid;place-items:center;color:#fff;font:700 12px/1 var(--ui)}
+.folha{border-radius:10px}
+
+/* o guia cobre a janela toda, inclusive a lateral */
+#guia{top:0}
+:root[data-janela="darwin"] #guia{top:0;padding-top:44px}
+.g-fechar{top:14px}
+:root[data-janela="darwin"] .g-fechar{top:14px}
+
+@media(max-width:1000px){ .tela{padding:26px 28px 48px} }
 </style>
 </head>
 <body>
 
+<!-- A barra lateral: a marca, as quatro etapas da rodada (com o resumo de
+     cada uma), as telas de apoio e o estado das conexões. Os ids e os
+     data-etapa/data-tela são os mesmos de quando isto era a barra de cima. -->
+<aside class="lateral" id="lateral">
 <div class="barra">
   <span class="marca">
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -419,11 +705,12 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
     </svg><b>Esteira</b>
   </span>
   <span class="selo-proto" title="Nenhum dado real de cliente nesta página">protótipo · dados de exemplo</span>
-  <nav class="apoio" id="apoio">
-    <button data-tela="contas">Contas</button>
-    <button data-tela="historico">Histórico</button>
-    <button data-tela="ajustes">Ajustes</button>
-  </nav>
+</div>
+
+<div class="lado-rodada">
+  <span class="lado-lbl">Rodada de hoje</span>
+  <div class="lado-prog"><i id="ladoProg"></i></div>
+  <span class="lado-prog-t" id="ladoProgT">Etapa 1 de 4</span>
 </div>
 
 <div class="esteira">
@@ -441,6 +728,14 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
       <span class="rot">Escrita na Shopify</span><span class="sub" id="s4"></span></button>
   </div>
 </div>
+
+<nav class="apoio" id="apoio">
+  <button data-tela="contas"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3.5 3.5 0 010 7M21 20c0-2.6-1.7-4.9-4-5.7"/></svg>Contas</button>
+  <button data-tela="historico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Histórico</button>
+  <button data-tela="ajustes"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Ajustes</button>
+</nav>
+<button class="lado-status" id="ladoStatus" data-tela="ajustes" hidden></button>
+</aside>
 
 <main class="tela">
 
@@ -465,7 +760,7 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
     <div class="solta" id="solta" role="button" tabindex="0">
       <svg viewBox="0 0 24 24"><path d="M12 16V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
       <b>Arraste a planilha aqui</b>
-      <small>ou clique para escolher · .xlsx, .csv</small>
+      <small>ou clique para escolher · .xlsx, .xls ou .csv — dá para soltar mais de uma</small>
     </div>
     <input type="file" id="fArq" accept=".xlsx,.xls,.csv" multiple hidden>
     <div id="listaArq" style="margin-top:4px"></div>
@@ -476,7 +771,7 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
     <div class="placar">
       <div><div class="v num" id="lePed">0</div><div class="r">pedidos para buscar<br><span class="ter">em <span id="leCont">0</span> contas</span></div></div>
       <div><div class="v num ter" id="leJa">0</div><div class="r">já tinham rastreio<br><span class="ter">ignoradas</span></div></div>
-      <div><div class="v num ter">1</div><div class="r">linha sem conta<br><span class="ter">linha 31</span></div></div>
+      <div id="leSemBloco" hidden><div class="v num ter" id="leSem">0</div><div class="r" id="leSemRot">linhas sem conta<br><span class="ter" id="leSemOnde"></span></div></div>
     </div>
     <div style="margin-top:20px"><button class="btn pri" data-ir="2">Seguir para a coleta
       <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
@@ -763,23 +1058,23 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
 
   <div class="bloco">
     <div class="placar">
-      <div><div class="v num">80</div><div class="r">contas na planilha</div></div>
-      <div class="ok"><div class="v num">76</div><div class="r">com sessão viva</div></div>
-      <div class="at"><div class="v num">2</div><div class="r">vão precisar de senha</div></div>
-      <div><div class="v num" style="color:var(--erro)">2</div><div class="r">com perfil duplicado</div></div>
+      <!-- Eram 80/76/2/2 fixos. Agora saem das contas que o robô já visitou. -->
+      <div><div class="v num" id="ctTotal">0</div><div class="r">contas visitadas</div></div>
+      <div class="ok"><div class="v num" id="ctViva">0</div><div class="r">já estavam conectadas</div></div>
+      <div class="at"><div class="v num" id="ctLogou">0</div><div class="r">o robô precisou entrar</div></div>
+      <div><div class="v num" id="ctDup">0</div><div class="r">com perfil duplicado</div></div>
     </div>
   </div>
 
   <div class="bloco">
     <div class="rotulo"><h2><img class="ads" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAAEGElEQVRYCb2X229UZRTFV6cXKFIoBQsClXK/h6JgQowhxhLfDOH64KPhAeOfwwOPPKO8mfAgAdSEEoIFFNsosUVuStUCpYUWaMf1m83AtM75hpowO5nJnHO+b+211758Z2quXMvnjxyXun6Snj5TVaw2J21dK32+T6o7ekI684P05GlVfL9wQsBj9lnT8Wk+Pzj04n5Vf6BE7tl4VX1OcjY+YQKT7ky5yNVMuTHdy7wlroCRSYCNW9ZI69sDxFjTMvYvXyKtbvP+xM5MAuzZuEI6vFfa+Y40s17KvwIL1jR47bb10oFOaYVJpCxJgCgA+OwTad9H0vy5aRI4nztb2vWetHuntPjNyimoS7HjGaAtc6Q9H0pLDPjVaanvdvldbYukzu3S5lWhwoSLrJJVJAAAJGZY1g86pNYW6YRJXOx9OTvqjUK6Oh352yaBcuzJWd+6WgNQBL4uZ69EoLgRYIry0G7Lu0D65oJEK+3YHORaSlJUb8e1OMcynPNoWgQKWAZbaBUO7pJWLpX+eSCtbZcaGyJqSDYYleiZdJXmTJIAygFYzhbNj8K8+ps0/DiiRXbSgY09CXXiKvs7kwBg9x9KowZqnBHRAcP4bG6SFjRHDUCQgUVtwJWxPjrmH77gfBl+lMxAOgXfX5GaZkkf74hOoL9x3OxWI784gEC977Nu1sxw/Nc9ic+5H6XLv/pewhxPtg06v1+64o99HWrQhrRksbgK+bZzVBn3mULFUx+k4ZQLlM/QSDY+T5IEWEAqHlrGO38HGNdFgwC9Tr4nfJ+OuD0gXbsRZFCFNSnLrAE2MdVosW0bApzeX9cuLV8cUeK8+BIDid4+qac/ipI1pIQUQAqC5SxJgIn2/pZoK/Y/dnH9/me0VtvCl9ENON8371opy114yXDURE6nvLsu7t9zQZdTI5MAi2c3RqQ4ZxI2vRER9zjSgUGP5lZHfV06eU5a5gnIcCp1gvqNVoEizbJMAmzAMYBIyYf2GnHPIyfnwcku6axf54huqcmUHbmAJCxJgOqe46iZbMjLTMDoDlqs+xfp0WiodNeKtM4LpSr4DJDn30kCDCCGzP3hkJ7Ib/whfdvtSr8ZtYBCjNufPRGZC5tWxkyY5CVxkSRAxA/snNYDnLH73SWJaLHSfFN8hQ5wy3b4TYqBVVOxySscRkRG1EMmcf6qdKEnRmup46AS37TldSs04rRAgqO5UBeli6b8TipA5Lfcw0Td2x9pyHJeikuHdLlGOKTeciumLEmg71Y4ZpCYyyTJU6CQZHp2e3DRqsXiLbcnkwDR992JFBhv2gYJ6qLfGFiWcpkE2ASJ/+OcvUUDI2W5wjtbasVrfMZbU267D5riW8xr9PUfaIbcVndKHX886HH+rXKmV8OInH9dX+yX/gVFgFpEoEAJCwAAAABJRU5ErkJggg==" alt="">Inventário</h2>
-      <span class="dir">mostrando 8 de 80</span></div>
+      <span class="dir" id="ctMostrando"></span></div>
     <div class="rolo"><table>
       <thead><tr><th>Conta</th><th>E-mail de acesso</th><th>Perfil (AdsPower)</th>
         <th>Última entrada</th><th>Sessão</th><th class="dir">Pedidos lidos</th></tr></thead>
       <tbody id="tbContas"></tbody></table></div>
-    <p class="nota">O e-mail é derivado do número: abaixo de 200 usa <code>chompspee</code>,
-      de 200 para cima usa <code>Brushopee</code>. Sem zero à esquerda — a conta 76 é
-      <code>chompspee76</code>.</p>
+    <p class="nota">O e-mail de cada conta é montado a partir do número, seguindo o padrão
+      de <b>Ajustes → Contas da Shopee</b>.</p>
   </div>
 </section>
 
@@ -879,6 +1174,14 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
       </div>
 
       <div class="bloco">
+        <div class="rotulo"><h2>Primeiros passos</h2></div>
+        <div class="op"><div><div class="t">O guia de configuração</div>
+          <div class="d">O passo a passo que abre na primeira vez: AdsPower, contas da Shopee,
+            Shopify e como a esteira anda.</div></div>
+          <button class="btn" id="bAbrirGuia">Abrir o guia</button></div>
+      </div>
+
+      <div class="bloco">
         <div class="rotulo"><h2>Aparência</h2></div>
         <div class="op"><div><div class="t">Tema</div>
           <div class="d">Segue o sistema se você não escolher.</div></div>
@@ -934,10 +1237,10 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
 
         <div class="par-campos">
           <label class="campo"><span>1 · Começo do e-mail</span>
-            <input id="shPrefixo" spellcheck="false" placeholder="ex.: chompspee">
+            <input id="shPrefixo" spellcheck="false" placeholder="ex.: minhaloja">
             <em>O que vem antes do número da conta.</em></label>
           <label class="campo"><span>Domínio</span>
-            <input id="shDominio" spellcheck="false" placeholder="ex.: givmail.com"></label>
+            <input id="shDominio" spellcheck="false" placeholder="ex.: gmail.com"></label>
         </div>
 
         <div class="par-campos">
@@ -945,7 +1248,7 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
             <input id="shFaixa" class="curto" inputmode="numeric" placeholder="200">
             <em>Deixe em branco se todas as contas usam o mesmo.</em></label>
           <label class="campo"><span>Esse outro começo</span>
-            <input id="shPrefixoAlto" spellcheck="false" placeholder="ex.: Brushopee"></label>
+            <input id="shPrefixoAlto" spellcheck="false" placeholder="ex.: outraloja"></label>
         </div>
 
         <p class="nota" id="shExemplo" style="margin-top:4px"></p>
@@ -1110,9 +1413,16 @@ function pintaTrilha(){
       ? '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>' : i;
   }
   $("s1").textContent = arquivos.length ? TOTAL+" pedidos" : "";
-  $("s2").textContent = rodando ? "rodando" : (coletou ? prontos+" lidos" : "");
+  var pl=function(n,um,varios){ return n+" "+(n===1?um:varios); };
+  $("s2").textContent = rodando ? "rodando" : (coletou ? pl(prontos,"lido","lidos") : "");
   $("s3").textContent = coletou ? (pendencias() ? pendencias()+" para decidir" : "sem pendência") : "";
-  $("s4").textContent = escrito ? escritos+" escritos" : (coletou ? prontos+" prontos" : "");
+  $("s4").textContent = escrito ? pl(escritos,"escrito","escritos") : (coletou ? pl(prontos,"pronto","prontos") : "");
+  // Sem nada ainda, cada etapa diz o que ela é — a barra lateral não fica muda.
+  ["a planilha do dia","abrir as contas","o que teve dúvida","escrever os rastreios"]
+    .forEach(function(t,i){ var el=$("s"+(i+1)); if(!el.textContent) el.textContent=t; });
+  var feitas=feita.filter(Boolean).length;
+  $("ladoProg").style.width=(feitas===4?100:Math.round(Math.max(feitas,atual-1)/4*100+6))+"%";
+  $("ladoProgT").textContent=feitas===4?"Rodada concluída":"Etapa "+atual+" de 4";
 }
 
 /* ── Avisos ── */
@@ -1169,6 +1479,13 @@ function pintaArquivos(){
   TOTAL=t.p;
   $("blLeitura").hidden=!arquivos.length;
   $("lePed").textContent=t.p; $("leCont").textContent=Object.keys(t.c).length; $("leJa").textContent=t.j;
+  // Linhas que o robô não sabe onde procurar. Era um "1 · linha 31" fixo,
+  // que aparecia em qualquer planilha; agora vem da leitura de verdade.
+  var sem=[]; arquivos.forEach(function(a){ (a.semConta||[]).forEach(function(x){
+    sem.push((arquivos.length>1?a.nome+" ":"")+"linha "+x.linha); }); });
+  $("leSemBloco").hidden=!sem.length; $("leSem").textContent=sem.length;
+  $("leSemRot").firstChild.textContent=sem.length===1?"linha sem conta":"linhas sem conta";
+  $("leSemOnde").textContent=sem.slice(0,3).join(", ")+(sem.length>3?" e mais "+(sem.length-3):"");
   $("bRodar").disabled=rodando||!arquivos.length;
   $("rLidos").textContent=TOTAL?("de "+TOTAL+" rastreios lidos"):"rastreios lidos";
   pintaCtrl(); if(!rodando&&!coletou) pintaColeta();
@@ -1178,7 +1495,7 @@ function somar(nome,real){
   if(escrito) comecarProxima();   // planilha nova = rodada nova
   if(real){
     arquivos.push({nome:nome,caminho:real.caminho,linhas:real.linhas,pedidos:real.pedidos,
-      contas:real.contas,ja:real.ja,hora:hora(),lista:real.lista});
+      contas:real.contas,ja:real.ja,hora:hora(),lista:real.lista,semConta:real.semConta||[]});
     pintaArquivos(); return;
   }
   var e=exemplos[Math.min(arquivos.length,exemplos.length-1)];
@@ -1291,10 +1608,15 @@ var estadoConta={}; CONTAS_RODADA.forEach(function(c){estadoConta[c.n]="fila";})
 
 function est(cls,txt){ return '<span class="est '+cls+'"><span class="pt"></span>'+txt+'</span>'; }
 
-// O e-mail muda de prefixo a partir da conta 200 — errar aqui vira
-// "senha inválida" na cara do cliente, então é regra, não enfeite.
+// O e-mail de cada conta segue o padrão de Ajustes → Contas da Shopee. Era
+// "chompspee/Brushopee@givmail.com" escrito aqui — certo só para a Chomps, e
+// errado na tela de qualquer outro cliente. Sem padrão configurado, "—".
+var PADRAO_EMAIL={prefixo:"",alto:"",faixa:0,dominio:""};
 function emailDaConta(n){
-  return (n < 200 ? "chompspee" : "Brushopee") + n + "@givmail.com";
+  var p=PADRAO_EMAIL;
+  if(!p.prefixo||!p.dominio) return "—";
+  var usaAlto=p.alto&&p.faixa>0&&n>=p.faixa;
+  return (usaAlto?p.alto:p.prefixo)+n+"@"+p.dominio;
 }
 function linhaConta(c){
   var e=estadoConta[c.n], entrada="—", pedidos="—", tempo="—", situacao;
@@ -2265,6 +2587,12 @@ window.TELA = {
                  ("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+", ")+hm };
     });
     pintaContasInv();
+    var conta=function(f){ return CONTAS_INV.filter(f).length; };
+    $("ctTotal").textContent=CONTAS_INV.length;
+    $("ctViva").textContent=conta(function(c){ return c.sessao==="viva"; });
+    $("ctLogou").textContent=conta(function(c){ return c.sessao==="logou"; });
+    $("ctDup").textContent=dup.length; $("ctDup").style.color=dup.length?"var(--erro)":"";
+    $("ctMostrando").textContent=CONTAS_INV.length?CONTAS_INV.length+(CONTAS_INV.length===1?" conta":" contas"):"";
   },
   // Os ajustes guardados chegam aqui quando o app abre.
   ajustes: function(a){
@@ -2279,7 +2607,9 @@ window.TELA = {
     if(a.emailPrefixo!=null) $("shPrefixo").value=a.emailPrefixo;
     if(a.emailPrefixoAlto!=null) $("shPrefixoAlto").value=a.emailPrefixoAlto;
     if(a.emailDominio!=null) $("shDominio").value=a.emailDominio;
-    if(a.emailFaixa!=null) $("shFaixa").value=a.emailFaixa;
+    if(a.emailFaixa!=null) $("shFaixa").value=Number(a.emailFaixa)>0?a.emailFaixa:"";
+    PADRAO_EMAIL={prefixo:a.emailPrefixo||"",alto:a.emailPrefixoAlto||"",
+                  faixa:Number(a.emailFaixa)||0,dominio:a.emailDominio||""};
     if(a.loginAutomatico!=null)
       $("chLogin").setAttribute("aria-pressed",String(a.loginAutomatico!==false));
     pintaExemploEmail();
@@ -2370,5 +2700,6 @@ ir(TELAS.indexOf(h)>=0?h:"1");
 })();
 </script>
 <script src="real.js"></script>
+<script src="guia.js"></script>
 </body>
 </html>

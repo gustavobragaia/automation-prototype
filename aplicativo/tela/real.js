@@ -33,6 +33,26 @@ async function pedir(acao, carga){
 
 var trocou = [], falhou = [];
 
+/* ── O estado das conexões, no pé da barra lateral ── */
+// Só aparece depois de um teste de verdade: o do AdsPower roda sozinho ao
+// abrir (e de novo a cada "Testar conexão"), o da Shopify vem da loja salva.
+// null = ainda não testou; nada é dito antes disso.
+var conexao = { ads: null, shop: null };
+function pintaConexao(){
+  var el = document.getElementById("ladoStatus");
+  if (!el || (conexao.ads === null && conexao.shop === null)) return;
+  var falta = [];
+  if (conexao.ads === false) falta.push("AdsPower não responde");
+  if (conexao.shop === false) falta.push("Shopify não conectada");
+  var tudo = conexao.ads === true && !!conexao.shop;
+  el.hidden = false;
+  el.className = "lado-status " + (falta.length ? "at" : tudo ? "ok" : "");
+  el.innerHTML = '<span class="pt"></span><span>' + (falta.length
+    ? "<b>Falta conectar</b><br>" + falta.join(" · ")
+    : tudo ? "<b>Tudo conectado</b><br>AdsPower · " + String(conexao.shop).replace(/[<>&]/g, "")
+    : "Conferindo as conexões…") + "</span>";
+}
+
 /* ── Esta máquina ── */
 async function maquina(){ TELA.maquina(await pedir("maquina:ler")); }
 
@@ -57,6 +77,8 @@ async function ajustes(){
   simples.forEach(function(par){
     if (a[par[1]] != null) $(par[0]).value = a[par[1]];
   });
+  // "0" não é uma faixa: quer dizer que não há segundo começo de e-mail.
+  if (!(Number(a.emailFaixa) > 0)) $("shFaixa").value = "";
   TELA.ajustes(a);
 
   var gravar = function(){
@@ -94,6 +116,7 @@ function adspower(){
       var d = await Promise.race([pedir("adspower:diagnosticar", {
         base:  (document.getElementById("adsBase") ||{}).value,
       }), prazo]);
+      conexao.ads = !!d.ok; pintaConexao();
       TELA.diagnostico({
         ok: d.ok, titulo: d.titulo, provado: d.verificado,
         passos: d.comoResolver, abertaSemChave: d.abertaSemChave,
@@ -147,6 +170,7 @@ function esperarShopify(){
 }
 async function mostrarShopify(){
   var e = await pedir("shopify:estado");
+  conexao.shop = e.conectada ? (e.loja || e.dominio) : false; pintaConexao();
   if (!e.conectada) return TELA.shopify("desconectada");
   TELA.shopify("conectada", {
     loja: e.loja || e.dominio, dominio: e.dominio,
@@ -186,6 +210,7 @@ async function ler(caminho){
       linhas: r.total, pedidos: r.pendentes, contas: r.contas.length,
       ja: Math.max(0, r.total - r.pendentes - (r.ignorados||0)),
       lista: r.contas.map(function(c){ return c.conta; }),
+      semConta: r.semConta || [],
     });
   } catch (e) {
     console.error("[esteira] planilha " + nome + ":", e.message);
@@ -381,6 +406,13 @@ function avisos(){
     catch (e) { falhou.push(partes[i][0] + ": " + e.message); }
   }
   console.info("[esteira] de verdade: " + trocou.join(", "));
+  // O AdsPower é testado em segundo plano: a tela já está de pé.
+  pedir("adspower:diagnosticar", {})
+    .then(function(d){ conexao.ads = !!d.ok; pintaConexao();
+      // o mesmo resultado vai para o cartão do AdsPower em Ajustes
+      TELA.diagnostico({ ok: d.ok, titulo: d.titulo, provado: d.verificado,
+        passos: d.comoResolver, abertaSemChave: d.abertaSemChave }); })
+    .catch(function(){ conexao.ads = false; pintaConexao(); });
   var selo = document.querySelector(".selo-proto");
   if (!selo) return;
   if (falhou.length) {

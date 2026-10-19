@@ -44,6 +44,9 @@ const PADRAO = {
   escreverDireto: false,
   notificarCliente: false,    // a Shopify manda "pedido enviado" ao comprador
   tema: "sistema",
+
+  // O guia da primeira vez (tela/guia.js) abre enquanto isto for false.
+  guiaConcluido: false,
 };
 
 // O que é credencial: nunca volta inteiro para a tela, e a tela nunca

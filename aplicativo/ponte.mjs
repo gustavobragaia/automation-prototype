@@ -205,6 +205,8 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
         aba: r.aba, total: r.total, pendentes: r.pendentes.length,
         contas: r.contas.map((c) => ({ conta: c.conta, pedidos: c.pedidos.length })),
         ignorados: r.ignorados.length,
+        // quais linhas, para a tela poder dizer onde olhar
+        semConta: r.ignorados.map((i) => ({ linha: i.linha, motivo: i.motivo })),
       };
     }),
     "pendentes:listar": async () => pendentesAbertos(),

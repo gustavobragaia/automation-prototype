@@ -37,6 +37,9 @@ const escritas = fingirShopify({ pedidos: {
   "#1004": { nome: "Marta Fictícia Lins", valor: 13.00, cep: "13485020" },
 } });
 
+// Pasta de dados própria: com ela a trava de instância única é outra, e o
+// ensaio roda mesmo com o Esteira de verdade aberto (antes ele saía calado).
+app.setPath("userData", join(dir, "dados-electron"));
 await import("./principal.mjs");
 
 app.whenReady().then(async () => {

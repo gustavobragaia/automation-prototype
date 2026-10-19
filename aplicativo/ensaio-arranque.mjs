@@ -19,6 +19,9 @@ const dir = mkdtempSync(join(tmpdir(), "esteira-arranque-"));
 process.env.ESTADO_DIR = join(dir, "estado");
 process.env.TRABALHO_DIR = join(dir, "trabalho");
 
+// Pasta de dados própria: com ela a trava de instância única é outra, e o
+// ensaio roda mesmo com o Esteira de verdade aberto (antes ele saía calado).
+app.setPath("userData", join(dir, "dados-electron"));
 await import("./principal.mjs");
 
 const ok = (c, m) => { console.log(c ? `  \x1b[32m✓\x1b[0m ${m}` : `  \x1b[31m✗ ${m}\x1b[0m`); return c; };
@@ -69,9 +72,17 @@ app.whenReady().then(async () => {
     histVazio: document.getElementById("tbHist").innerText,
     selo: !!document.querySelector(".selo-proto"),
   })`);
-  tudo &= ok(!/Conectado ao AdsPower/.test(fatos.ads),
-    "o AdsPower NÃO diz 'Conectado' antes de alguém testar");
-  tudo &= ok(/não testado/i.test(fatos.ads), "diz que ainda não foi testado");
+  // O app testa o AdsPower sozinho ao abrir. A regra continua a mesma: o
+  // cartão só pode dizer o que um teste de verdade disse. Então o ensaio
+  // roda o mesmo teste pela ponte e compara — "Conectado" só vale se o
+  // AdsPower desta máquina de fato respondeu.
+  const real = await w.webContents.executeJavaScript(`(async () => {
+    const r = await window.esteira.pedir("adspower:diagnosticar", {});
+    const d = r.dado && r.dado.dado !== undefined ? r.dado.dado : r.dado; return d; })()`);
+  tudo &= ok(fatos.ads.includes(real.titulo),
+    `o cartão do AdsPower diz o que o teste de verdade disse ("${real.titulo}")`);
+  tudo &= ok(real.ok || !/Conectado ao AdsPower/.test(fatos.ads),
+    "e só diz 'Conectado' se o AdsPower respondeu mesmo");
   tudo &= ok(/Nenhuma conta visitada/.test(fatos.contasVazio),
     "a aba Contas vazia diz que está vazia");
   tudo &= ok(/Nenhuma rodada ainda/.test(fatos.histVazio),

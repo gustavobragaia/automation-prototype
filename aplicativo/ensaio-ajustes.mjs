@@ -21,6 +21,9 @@ process.env.SHOPEE_SENHA = "senha-do-env";
 process.env.SHOPEE_PREFIXO = "doenv";
 process.env.SHOPEE_EMAIL_DOMINIO = "env.com";
 
+// Pasta de dados própria: com ela a trava de instância única é outra, e o
+// ensaio roda mesmo com o Esteira de verdade aberto (antes ele saía calado).
+app.setPath("userData", join(dir, "dados-electron"));
 await import("./principal.mjs");
 
 const ok = (c, m) => { console.log(c ? `  \x1b[32m✓\x1b[0m ${m}` : `  \x1b[31m✗ ${m}\x1b[0m`); return c; };
