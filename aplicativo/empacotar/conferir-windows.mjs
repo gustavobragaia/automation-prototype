@@ -23,18 +23,23 @@ let tudo = true;
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ── 1. instala com o instalador de verdade ──
-const instalador = readdirSync(DIST).find((f) => /^Esteira-Setup-.*\.exe$/.test(f));
-tudo &= ok(!!instalador, `o instalador existe (${instalador})`);
-execFileSync(join(DIST, instalador), ["/S"], { stdio: "inherit" });   // /S = sem perguntas
-await dormir(5000);
-const programas = join(process.env.LOCALAPPDATA, "Programs");
-const pasta = readdirSync(programas).find((d) => existsSync(join(programas, d, "Esteira.exe")));
-const exe = pasta && join(programas, pasta, "Esteira.exe");
-tudo &= ok(!!exe, `instalou em ${exe ?? "(lugar nenhum)"}`);
+// ESTEIRA_EXE aponta para um app já instalado e pula a instalação — é como o
+// mesmo roteiro confere o .app que sai do .dmg no Mac.
+let exe = process.env.ESTEIRA_EXE;
+if (!exe) {
+  const instalador = readdirSync(DIST).find((f) => /^Esteira-Setup-.*\.exe$/.test(f));
+  tudo &= ok(!!instalador, `o instalador existe (${instalador})`);
+  execFileSync(join(DIST, instalador), ["/S"], { stdio: "inherit" });   // /S = sem perguntas
+  await dormir(5000);
+  const programas = join(process.env.LOCALAPPDATA, "Programs");
+  const pasta = readdirSync(programas).find((d) => existsSync(join(programas, d, "Esteira.exe")));
+  exe = pasta && join(programas, pasta, "Esteira.exe");
+}
+tudo &= ok(!!exe && existsSync(exe), `instalou em ${exe ?? "(lugar nenhum)"}`);
 
 // ── 2. abre o Esteira instalado, como instalação nova ──
 const estado = mkdtempSync(join(tmpdir(), "esteira-win-"));
-const app = spawn(exe, ["--remote-debugging-port=9555"], {
+const app = spawn(exe, ["--remote-debugging-port=9555", `--user-data-dir=${join(estado, "dados")}`], {
   env: { ...process.env, ESTADO_DIR: join(estado, "estado"), TRABALHO_DIR: join(estado, "trabalho") },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -97,6 +102,7 @@ tudo &= ok(!existsSync(join(estado, "estado", "conexao-shopify.json")) ||
 tudo &= ok(!excecoes.length, "nenhuma exceção na tela" + (excecoes.length ? `: ${excecoes[0]}` : ""));
 
 ws.close(); app.kill();
-console.log(tudo ? "\nO ESTEIRA FUNCIONA NO WINDOWS\n" : "\nO ESTEIRA TEM PROBLEMA NO WINDOWS\n");
+const so = { win32: "WINDOWS", darwin: "MAC" }[process.platform] ?? process.platform;
+console.log(tudo ? `\nO ESTEIRA FUNCIONA NO ${so}\n` : `\nO ESTEIRA TEM PROBLEMA NO ${so}\n`);
 if (!tudo) console.log("--- log do app ---\n" + log);
 process.exit(tudo ? 0 : 1);
