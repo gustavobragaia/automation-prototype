@@ -1,0 +1,55 @@
+# O instalador do Windows, gerado e TESTADO numa máquina Windows de verdade.
+#
+# Do Mac não dá: falta o Wine para gravar ícone e versão no .exe, e — mais
+# importante — não há como saber se o app abre no Windows. Aqui ele:
+#   1. roda a suíte inteira do robô no Windows
+#   2. empacota (a conferência de imports roda e PARA o build se faltar arquivo)
+#   3. instala com o próprio instalador, abre o app e confere (conferir-windows.mjs)
+#   4. guarda o .exe para ser publicado — só se tudo acima passou
+name: Instalador Windows
+
+on:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            aplicativo/package-lock.json
+
+      - name: Dependências
+        run: |
+          npm ci
+          npm ci --prefix aplicativo
+
+      # Os scripts de teste usam "VAR=valor comando", que o cmd do Windows
+      # não entende. O Git Bash do runner entende.
+      - name: Testes do robô, no Windows
+        shell: bash
+        run: |
+          npm config set script-shell "C:\\Program Files\\git\\bin\\bash.exe"
+          npm test
+
+      - name: Empacotar
+        working-directory: aplicativo
+        run: |
+          node empacotar/montar-vendor.mjs
+          npx electron-builder --win nsis --x64 --publish never
+
+      - name: Instalar, abrir e conferir o app no Windows
+        run: node aplicativo/empacotar/conferir-windows.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: esteira-windows
+          path: aplicativo/dist/Esteira-Setup-*.exe
+          if-no-files-found: error

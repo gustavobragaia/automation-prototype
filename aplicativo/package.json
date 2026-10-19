@@ -93,7 +93,12 @@
     },
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "marca/icon.png"
     },
@@ -101,7 +106,7 @@
       {
         "provider": "github",
         "owner": "gustavobragaia",
-        "repo": "automation-prototype"
+        "repo": "esteira-releases"
       }
     ],
     "artifactName": "${productName}-${version}-${arch}.${ext}",
@@ -111,6 +116,13 @@
     "dmg": {
       "title": "Esteira ${version}"
     },
-    "afterPack": "empacotar/assinar-adhoc.cjs"
+    "afterPack": "empacotar/assinar-adhoc.cjs",
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "Esteira-Setup-${version}.${ext}",
+      "shortcutName": "Esteira",
+      "createDesktopShortcut": true
+    }
   }
 }

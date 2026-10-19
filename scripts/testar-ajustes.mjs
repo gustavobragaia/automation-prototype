@@ -49,8 +49,16 @@ tudo &= ok(doArquivo.comandoPraRodar === undefined, "o campo estranho não chega
 tudo &= ok(doArquivo.escreverDireto === true, "e o campo conhecido chega");
 
 sec("arquivo fechado: só o dono lê");
-const modo = statSync(process.env.AJUSTES_ARQUIVO).mode & 0o777;
-tudo &= ok(modo === 0o600, `o arquivo ficou ${modo.toString(8)}, esperado 600`);
+if (process.platform === "win32") {
+  // No Windows não existe "600": a proteção é por ACL, e a pasta do usuário
+  // (AppData), onde o Esteira guarda os ajustes, já é restrita àquele
+  // usuário pelo próprio sistema. O chmod do Node lá só liga/desliga
+  // "somente leitura" — conferir 600 seria testar algo que não existe.
+  console.log("  · no Windows a proteção é a da pasta do usuário (AppData), não o 600");
+} else {
+  const modo = statSync(process.env.AJUSTES_ARQUIVO).mode & 0o777;
+  tudo &= ok(modo === 0o600, `o arquivo ficou ${modo.toString(8)}, esperado 600`);
+}
 
 sec("arquivo corrompido não derruba o app");
 writeFileSync(process.env.AJUSTES_ARQUIVO, "{ isto não é json");
