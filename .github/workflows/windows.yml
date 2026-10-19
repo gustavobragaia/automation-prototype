@@ -54,6 +54,9 @@ jobs:
       # instalado acima acha, baixa e instala sozinho uma versão nova.
       - name: Montar a versão seguinte (para o teste de atualização)
         working-directory: aplicativo
+        # bash: o PowerShell parte "-c.directories.output=…" no ponto e o
+        # electron-builder tenta abrir isso como arquivo de configuração
+        shell: bash
         run: npx electron-builder --win nsis --x64 --publish never -c.extraMetadata.version=9.9.9 -c.directories.output=dist-proxima
 
       - name: Atualização automática, do começo ao fim
