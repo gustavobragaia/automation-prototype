@@ -1,7 +1,7 @@
 {
   "name": "esteira",
   "productName": "Esteira",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "Rastreios da Shopee para a Shopify, na máquina do operador",
