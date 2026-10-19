@@ -418,7 +418,12 @@ const c23 = ponte23["adspower:diagnosticar"]({});
 tudo &= ok(c23 !== a23, "e depois que termina, um teste novo pode começar");
 await c23;
 
-rmSync(dir, { recursive: true, force: true });
+// No Windows um arquivo aberto não pode ser apagado: o SQLite segura o .db
+// até alguém fechar. Fecha o banco antes, e a pasta temporária que sobrar não
+// derruba a suíte — limpar /tmp não é o que este teste está provando.
+(await import(`${RAIZ_URL}src/armazenamento/index.mjs`)).fechar();
+try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+catch (e) { console.log(`  (pasta temporária ficou para trás: ${e.code})`); }
 console.log(tudo ? "\n\x1b[32m\x1b[1m  o fluxo fecha de ponta a ponta\x1b[0m\n"
                  : "\n\x1b[31m\x1b[1m  o fluxo tem furo\x1b[0m\n");
 process.exit(tudo ? 0 : 1);
