@@ -41,3 +41,6 @@ extensao/sessao.js
 
 # exceljs montado num arquivo único na hora de empacotar — gerado, não versionado
 src/vendor/
+
+# o electron-updater montado (empacotar/montar-vendor.mjs)
+aplicativo/vendor/

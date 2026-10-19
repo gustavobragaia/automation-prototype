@@ -699,6 +699,15 @@ h1{font-size:26px;letter-spacing:-.03em}
 details.cred{margin-top:16px;border-top:1px solid var(--linha);padding-top:12px}
 details.cred summary{cursor:pointer;font-size:12.5px;color:var(--tinta-2);font-weight:500}
 details.cred summary:hover{color:var(--tinta)}
+
+/* aviso de versão nova, no pé da barra lateral */
+.lado-atualiza{margin-top:12px;padding:12px;border-radius:10px;display:grid;gap:6px;
+  background:color-mix(in srgb,var(--marca) 12%,var(--canvas));border:1px solid color-mix(in srgb,var(--marca) 35%,var(--linha))}
+.lado-atualiza .t{font-size:12.5px;font-weight:600;color:var(--tinta)}
+.lado-atualiza .d{font-size:12px;line-height:1.45;color:var(--tinta-2)}
+.lado-atualiza .btn{justify-content:center;margin-top:2px}
+.barra-atu{height:4px;border-radius:4px;background:var(--sup-3);overflow:hidden}
+.barra-atu i{display:block;height:100%;width:0;background:var(--marca);transition:width .3s}
 </style>
 </head>
 <body>
@@ -745,6 +754,13 @@ details.cred summary:hover{color:var(--tinta)}
   <button data-tela="historico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Histórico</button>
   <button data-tela="ajustes"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Ajustes</button>
 </nav>
+<!-- Atualização automática (só aparece no Windows, com versão nova baixada) -->
+<div class="lado-atualiza" id="ladoAtualiza" hidden>
+  <div class="t" id="atuTitulo"></div>
+  <div class="d" id="atuTexto"></div>
+  <div class="barra-atu" id="atuBarra" hidden><i id="atuProgresso"></i></div>
+  <button class="btn pri" id="bAtualizar" hidden>Reiniciar e atualizar</button>
+</div>
 <button class="lado-status" id="ladoStatus" data-tela="ajustes" hidden></button>
 </aside>
 

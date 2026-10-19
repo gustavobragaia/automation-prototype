@@ -31,6 +31,16 @@ contextBridge.exposeInMainWorld("esteira", {
     ipcRenderer.on("evento", ouvir);
     return () => ipcRenderer.removeListener("evento", ouvir);
   },
+  /** Atualização automática (só no Windows): o estado, a escuta e o botão. */
+  atualizacao: {
+    estado: () => ipcRenderer.invoke("atualizacao:estado"),
+    reiniciar: () => ipcRenderer.invoke("atualizacao:reiniciar"),
+    aoMudar: (fn) => {
+      const ouvir = (_e, estado) => fn(estado);
+      ipcRenderer.on("atualizacao", ouvir);
+      return () => ipcRenderer.removeListener("atualizacao", ouvir);
+    },
+  },
   /** Log ao vivo da rodada. Devolve a função que cancela a escuta. */
   aoLog: (fn) => {
     const ouvir = (_e, linha) => fn(linha);

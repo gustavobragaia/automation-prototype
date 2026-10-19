@@ -8,7 +8,7 @@ Deixe o AdsPower aberto. O Esteira conversa com ele.
 
 1. INSTALAR NO WINDOWS
 
-  1. Baixe o Esteira-Setup-0.1.3.exe
+  1. Baixe o Esteira-Setup-0.1.4.exe
   2. Abra o arquivo baixado
   3. O Windows vai mostrar uma tela azul: "O Windows protegeu o computador".
      Isso é esperado: o Esteira ainda não tem assinatura digital.
@@ -16,7 +16,7 @@ Deixe o AdsPower aberto. O Esteira conversa com ele.
   4. O Esteira instala sozinho, sem perguntas, e abre.
      Também cria um atalho na Área de Trabalho.
 
-  (Se for num Mac: abra o Esteira-0.1.3-universal.dmg, arraste o Esteira
+  (Se for num Mac: abra o Esteira-0.1.4-universal.dmg, arraste o Esteira
   para Aplicativos, e na primeira vez libere em Ajustes do Sistema →
   Privacidade e Segurança → "Abrir Mesmo Assim".)
 
@@ -83,6 +83,14 @@ Deixe o AdsPower aberto. O Esteira conversa com ele.
   Etapa 2 · clique em "Iniciar coleta" e acompanhe as contas
   Etapa 3 · decida o que o robô não conseguiu resolver sozinho
   Etapa 4 · confira a lista e clique em "Escrever na Shopify"
+
+
+ATUALIZAÇÕES (Windows)
+  A partir desta versão, o Esteira se atualiza sozinho: quando sai versão
+  nova, ele baixa em segundo plano e mostra, embaixo da barra da esquerda,
+  "Versão X pronta" com o botão "Reiniciar e atualizar". Se preferir não
+  clicar, a versão nova entra na próxima vez que você fechar o Esteira.
+  Durante uma rodada ele não reinicia.
 
 
 SE ALGO DER ERRADO

@@ -80,6 +80,7 @@ const PORTA = Number(process.env.COLETOR_PORTA ?? 3000);
 let PORTA_EM_USO = PORTA;
 
 let janela = null, coletor = null, ponte = null;
+let atualizacao = null;
 const logs = [];
 
 function registrar(msg) {
@@ -220,6 +221,16 @@ app.whenReady().then(async () => {
     });
     return r.canceled ? [] : r.filePaths;
   });
+
+  // Só no Windows faz alguma coisa (ver atualizacao.mjs).
+  const { ligarAtualizacao } = await import("./atualizacao.mjs");
+  atualizacao = ligarAtualizacao({
+    enviar: (e) => janela?.webContents.send("atualizacao", e),
+    registrar,
+    rodadaEmCurso: async () => !!(await ponte["rodada:emCurso"]?.()),
+  });
+  ipcMain.handle("atualizacao:estado", async () => atualizacao.estado());
+  ipcMain.handle("atualizacao:reiniciar", async () => atualizacao.reiniciar());
 
   criarJanela();
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) criarJanela(); });

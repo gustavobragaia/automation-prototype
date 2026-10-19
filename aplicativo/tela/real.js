@@ -395,6 +395,35 @@ function arquivos(){
   };
 }
 
+/* ── Versão nova (atualização automática, só no Windows) ── */
+function atualizacao(){
+  var api = window.esteira.atualizacao; if (!api) return;
+  var $ = function(i){ return document.getElementById(i); };
+  var pinta = function(e){
+    var caixa = $("ladoAtualiza"); if (!caixa || !e) return;
+    if (e.estado !== "baixando" && e.estado !== "pronta") { caixa.hidden = true; return; }
+    caixa.hidden = false;
+    var pronta = e.estado === "pronta";
+    $("atuTitulo").textContent = pronta ? "Versão " + e.versao + " pronta" : "Baixando a versão " + e.versao;
+    $("atuTexto").textContent = pronta
+      ? "Reinicie para usar. Se preferir, ela entra sozinha quando você fechar o Esteira."
+      : "Em segundo plano — dá para continuar usando.";
+    $("atuBarra").hidden = pronta;
+    $("atuProgresso").style.width = (e.porcento || 0) + "%";
+    $("bAtualizar").hidden = !pronta;
+  };
+  api.aoMudar(pinta);
+  api.estado().then(pinta).catch(function(){});
+  $("bAtualizar").onclick = async function(){
+    var b = this; b.disabled = true; b.textContent = "Reiniciando…";
+    var r = await api.reiniciar().catch(function(e){ return { ok:false, erro:e.message }; });
+    if (!r || !r.ok) {
+      b.disabled = false; b.textContent = "Reiniciar e atualizar";
+      TELA.avisar("Ainda não dá para atualizar", (r && r.erro) || "tente de novo em instantes");
+    }
+  };
+}
+
 /* ── Aviso pelo sistema operacional, não pelo navegador ── */
 function avisos(){
   var doNavegador = TELA.avisar;
@@ -410,7 +439,7 @@ function avisos(){
     // só ligam botões: instantâneos, rodam todos no mesmo instante, antes
     // que qualquer clique ou arrastar consiga acontecer
     ["AdsPower",adspower],["arquivos",arquivos],["planilha",planilha],["rodada",rodada],
-    ["conferência",conferencia],["escrita",escrita],["avisos",avisos],
+    ["conferência",conferencia],["escrita",escrita],["avisos",avisos],["atualização",atualizacao],
     // carregam: vão à ponte e esperam
     ["arranque",arranque],["ajustes",ajustes],["máquina",maquina],["Shopify",shopify]];
   for (var i = 0; i < partes.length; i++) {

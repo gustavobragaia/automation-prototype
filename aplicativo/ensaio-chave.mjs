@@ -24,6 +24,7 @@ const FOTOS = process.env.FOTOS;   // opcional: pasta para guardar as telas
 
 const ID = "0123456789abcdef0123456789abcdef", CHAVE = "shpss_" + "c".repeat(32);
 const { fingirShopify } = await import(`${raiz}scripts/cenario-conferencia.mjs`);
+const { ESCOPOS } = await import(`${raiz}src/shopify-conexao.mjs`);
 fingirShopify({});
 const fingido = globalThis.fetch;
 const trocas = [];
@@ -36,6 +37,9 @@ globalThis.fetch = async (url, o) => {
     return new Response(JSON.stringify({ access_token: "shpat_fingido", scope: "read_orders", expires_in: 86399 }));
   }
   if (String(url).endsWith("/status")) return new Response(JSON.stringify({ code: 0 }));
+  // como a Shopify de verdade respondeu no teste real: os 8 escopos concedidos
+  if (String(url).endsWith("/admin/oauth/access_scopes.json"))
+    return new Response(JSON.stringify({ access_scopes: ESCOPOS.map((handle) => ({ handle })) }));
   return fingido(url, o);
 };
 
@@ -115,6 +119,8 @@ app.whenReady().then(async () => {
   if (!(await js(`(() => { const d = document.getElementById("shopCred"); if (!d) return false; d.open = true; return true; })()`)))
     throw new Error("o \"Ou conecte com a chave do app\" não está no cartão");
   await escreve("#shopCliId", ID); await escreve("#shopCliChave", "shpss_" + "e".repeat(32));
+  await js(`document.getElementById("shopCred").scrollIntoView({ block: "center" })`);
+  await foto("3b-ajustes-preenchido");
   await clica("#bConectarCred");
   tudo &= ok(await espera(`/recusou o ID ou a chave/.test(document.getElementById("shopCredRes").innerText)`),
     "chave errada: o cartão diz que a Shopify recusou e o que fazer");
@@ -124,6 +130,10 @@ app.whenReady().then(async () => {
   await clica("#bConectarCred");
   tudo &= ok(await espera(`/está conectada/.test(document.getElementById("shopCorpo").innerText)`),
     "chave certa: conecta pelo cartão de Ajustes");
+  tudo &= ok(/os 8 escopos foram concedidos/.test(await texto("#shopCorpo")),
+    "e confere que os 8 escopos foram concedidos");
+  await js(`document.getElementById("shopCorpo").scrollIntoView({ block: "center" })`);
+  await foto("4b-ajustes-conectado");
 
   console.log("\n\x1b[1m3 · o resto da tela\x1b[0m");
   await clica('[data-etapa="4"]'); await dorme(400);

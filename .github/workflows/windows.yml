@@ -5,7 +5,9 @@
 #   1. roda a suíte inteira do robô no Windows
 #   2. empacota (a conferência de imports roda e PARA o build se faltar arquivo)
 #   3. instala com o próprio instalador, abre o app e confere (conferir-windows.mjs)
-#   4. guarda o .exe para ser publicado — só se tudo acima passou
+#   4. prova a atualização automática: monta uma versão 9.9.9 e vê o app
+#      instalado achar, baixar, instalar e reabrir sozinho
+#   5. guarda o .exe (e o latest.yml) para publicar — só se tudo acima passou
 name: Instalador Windows
 
 on:
@@ -14,7 +16,7 @@ on:
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -48,8 +50,22 @@ jobs:
       - name: Instalar, abrir e conferir o app no Windows
         run: node aplicativo/empacotar/conferir-windows.mjs
 
+      # Uma "versão seguinte" de mentira (9.9.9), só para provar que o app
+      # instalado acima acha, baixa e instala sozinho uma versão nova.
+      - name: Montar a versão seguinte (para o teste de atualização)
+        working-directory: aplicativo
+        run: npx electron-builder --win nsis --x64 --publish never -c.extraMetadata.version=9.9.9 -c.directories.output=dist-proxima
+
+      - name: Atualização automática, do começo ao fim
+        run: node aplicativo/empacotar/conferir-atualizacao.mjs
+
+      # O latest.yml e o .blockmap vão junto: é o que o Esteira instalado
+      # lê na página de versões para saber que existe versão nova.
       - uses: actions/upload-artifact@v4
         with:
           name: esteira-windows
-          path: aplicativo/dist/Esteira-Setup-*.exe
+          path: |
+            aplicativo/dist/Esteira-Setup-*.exe
+            aplicativo/dist/Esteira-Setup-*.exe.blockmap
+            aplicativo/dist/latest.yml
           if-no-files-found: error
