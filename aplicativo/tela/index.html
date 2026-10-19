@@ -597,7 +597,7 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
         <div class="item-cab">
           <span class="est er"><span class="pt"></span>não achado na conta</span>
           <span class="t mono">#165091</span>
-          <span class="ter" style="font-size:12.5px">conta 152 · José Alves Tolentino</span>
+          <span class="ter" style="font-size:12.5px">conta 152 · Cliente Fictício 12</span>
           <span class="dias velho">pena há 6 dias</span>
         </div>
         <p class="motivo"><b>Nenhum pedido com esse cliente na conta indicada pela planilha.</b>
@@ -605,7 +605,7 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
         <div class="esperando" style="margin-top:11px">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
           <span class="texto">Esse cliente aparece na <b>conta 161</b>, com rastreio
-            <span class="mono">BR264983069926O</span>.</span>
+            <span class="mono">BR200000000007X</span>.</span>
           <button class="btn pri" data-acao="usar-sugestao" data-det="passou a usar a conta 161">Usar esse</button>
         </div>
       </div>
@@ -622,13 +622,13 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
           Costuma ser número digitado errado na planilha. Confira antes de escrever.</p>
         <div class="lado">
           <div class="caixinha"><h4>Na Shopee · conta 128</h4><dl>
-            <div class="par"><dt>Cliente</dt><dd class="difere">Juliana Carla de Souza Oliveira</dd></div>
-            <div class="par"><dt>CEP</dt><dd class="mono">35634040</dd></div>
+            <div class="par"><dt>Cliente</dt><dd class="difere">Cliente Fictício 01</dd></div>
+            <div class="par"><dt>CEP</dt><dd class="mono">00000002</dd></div>
             <div class="par"><dt>Valor</dt><dd class="num">R$ 58,90</dd></div>
-            <div class="par"><dt>Rastreio</dt><dd class="mono">BR260810072086Y</dd></div></dl></div>
+            <div class="par"><dt>Rastreio</dt><dd class="mono">BR200000000002X</dd></div></dl></div>
           <div class="caixinha"><h4>Na Shopify · #164903</h4><dl>
-            <div class="par"><dt>Entrega</dt><dd class="difere">Charles Silva</dd></div>
-            <div class="par"><dt>CEP</dt><dd class="mono">66645020</dd></div>
+            <div class="par"><dt>Entrega</dt><dd class="difere">Cliente Fictício 34</dd></div>
+            <div class="par"><dt>CEP</dt><dd class="mono">00000003</dd></div>
             <div class="par"><dt>Valor</dt><dd class="num">R$ 31,33</dd></div>
             <div class="par"><dt>Situação</dt><dd>sem rastreio</dd></div></dl></div>
         </div>
@@ -638,7 +638,7 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
         <div class="item-cab">
           <span class="est at"><span class="pt"></span>dois candidatos</span>
           <span class="t mono">#164915</span>
-          <span class="ter" style="font-size:12.5px">conta 130 · Maria Aparecida Santos</span>
+          <span class="ter" style="font-size:12.5px">conta 130 · Cliente Fictício 07</span>
           <span class="a"><button class="btn" data-acao="ver-dois">Ver os dois</button></span>
         </div>
         <p class="motivo"><b>Dois pedidos do mesmo cliente na conta, e o valor não desempatou.</b>
@@ -1217,17 +1217,17 @@ $("bModelo").onclick=function(){ GANCHOS.baixarModelo(); };
 
 /* ── Vindos de dias anteriores ── */
 var SOZINHO=[
-  {p:"#164904",c:"Everaldo Mamprim da Silva",ct:124,h:"3 h",s:"pagamento confirmado",d:1},
-  {p:"#164907",c:"Roseneri Prust",ct:124,h:"3 h",s:"pagamento confirmado",d:1},
-  {p:"#164911",c:"Odirlei Chempe",ct:128,h:"5 h",s:"preparando envio",d:1},
-  {p:"#164918",c:"Eber Rossi",ct:130,h:"1 d",s:"preparando envio",d:2},
-  {p:"#164921",c:"Célia de Fátima Teixeira",ct:130,h:"1 d",s:"preparando envio",d:2},
-  {p:"#164926",c:"Wedemar Marques",ct:133,h:"2 d",s:"preparando envio",d:3},
-  {p:"#164933",c:"Manoel Carlos Sousa Silva",ct:133,h:"4 d",s:"preparando envio",d:5},
-  {p:"#165094",c:"Alcídes Gomes",ct:152,h:"11 h",s:"preparando envio",d:1}];
+  {p:"#164904",c:"Cliente Fictício 02",ct:124,h:"3 h",s:"pagamento confirmado",d:1},
+  {p:"#164907",c:"Cliente Fictício 30",ct:124,h:"3 h",s:"pagamento confirmado",d:1},
+  {p:"#164911",c:"Cliente Fictício 27",ct:128,h:"5 h",s:"preparando envio",d:1},
+  {p:"#164918",c:"Cliente Fictício 35",ct:130,h:"1 d",s:"preparando envio",d:2},
+  {p:"#164921",c:"Cliente Fictício 04",ct:130,h:"1 d",s:"preparando envio",d:2},
+  {p:"#164926",c:"Cliente Fictício 23",ct:133,h:"2 d",s:"preparando envio",d:3},
+  {p:"#164933",c:"Cliente Fictício 03",ct:133,h:"4 d",s:"preparando envio",d:5},
+  {p:"#165094",c:"Cliente Fictício 33",ct:152,h:"11 h",s:"preparando envio",d:1}];
 var ATRASADOS=SOZINHO.filter(function(x){return x.d>1;})
   .map(function(x){return {p:x.p,c:x.c,ct:x.ct,d:x.d,m:"Shopee ainda não despachou"};})
-  .concat([{p:"#165091",c:"José Alves Tolentino",ct:152,d:6,m:"não achado na conta"}]);
+  .concat([{p:"#165091",c:"Cliente Fictício 12",ct:152,d:6,m:"não achado na conta"}]);
 
 function diasTxt(d){ return (d===1?"1º dia":d+" dias"); }
 function pintaAtrasados(){
@@ -1583,8 +1583,8 @@ $("listaTratados").addEventListener("click",function(e){
 });
 
 var CANDIDATOS=[
-  {r:"BR261528918393K",v:"R$ 13,00",cep:"13485020",q:"comprado em 14/10"},
-  {r:"BR260326966602Y",v:"R$ 13,00",cep:"13485020",q:"comprado em 16/10"}];
+  {r:"BR200000000003X",v:"R$ 13,00",cep:"00000001",q:"comprado em 14/10"},
+  {r:"BR200000000001X",v:"R$ 13,00",cep:"00000001",q:"comprado em 16/10"}];
 
 $("cxPrecisa").addEventListener("click",function(e){
   var it=e.target.closest(".item[data-rev]"); if(!it) return;
@@ -1725,12 +1725,12 @@ $("bRecolhe").onclick=function(){
 
 /* ── Etapa 4 ── */
 var A_ESCREVER=[
-  {p:"#164891",c:"Sônia Aparecida Pinto",ct:124,r:"BR263500935831Z",tr:"Correios"},
-  {p:"#164892",c:"Antônio Paulo Borges",ct:124,r:"BR262357370052B",tr:"Correios"},
-  {p:"#164895",c:"Leonardo José de Freitas",ct:128,r:"BR2680955831364",tr:"Correios"},
-  {p:"#164896",c:"Rosemeire Morais",ct:130,r:"SPXLM17485496",tr:"Shopee Xpress"},
-  {p:"#164897",c:"Janice Maria Klein",ct:133,r:"BR262830792298I",tr:"Correios"},
-  {p:"#164899",c:"Juliana Carla Oliveira",ct:152,r:"BR260810072086Y",tr:"Correios"}];
+  {p:"#164891",c:"Cliente Fictício 09",ct:124,r:"BR200000000006X",tr:"Correios"},
+  {p:"#164892",c:"Cliente Fictício 10",ct:124,r:"BR200000000004X",tr:"Correios"},
+  {p:"#164895",c:"Cliente Fictício 05",ct:128,r:"BR200000000008X",tr:"Correios"},
+  {p:"#164896",c:"Cliente Fictício 18",ct:130,r:"SPXFIC000001",tr:"Shopee Xpress"},
+  {p:"#164897",c:"Cliente Fictício 14",ct:133,r:"BR200000000005X",tr:"Correios"},
+  {p:"#164899",c:"Cliente Fictício 06",ct:152,r:"BR200000000002X",tr:"Correios"}];
 function pintaEscrita(){
   var pl=$("plEsc");
   if(escrito){
@@ -1880,10 +1880,10 @@ function rnd(){ semente=(semente+0x6d2b79f5)>>>0; var t=semente;
   return ((t^(t>>>14))>>>0)/4294967296; }
 var pegue=function(a){return a[Math.floor(rnd()*a.length)];};
 var inteiro=function(a,b){return a+Math.floor(rnd()*(b-a+1));};
-var NOMES=["Ana Paula Ribeiro","Carlos Eduardo Nunes","Marcos Vinícius Dias","Fernanda Lopes",
-"Roberto Nunes Barreto","Juliana Carla Oliveira","Patrícia Gomes","Sérgio Tavares",
-"Luciana Moreira","Rafael Andrade","Beatriz Cardoso","Thiago Medeiros","Sandra Figueiredo",
-"Everton Machado","Camila Peixoto","Douglas Siqueira","Vanessa Duarte","Leandro Bastos"];
+var NOMES=["Cliente Fictício 15","Cliente Fictício 11","Cliente Fictício 13","Cliente Fictício 25",
+"Cliente Fictício 08","Cliente Fictício 06","Cliente Fictício 28","Cliente Fictício 31",
+"Cliente Fictício 21","Cliente Fictício 29","Cliente Fictício 19","Cliente Fictício 22","Cliente Fictício 16",
+"Cliente Fictício 20","Cliente Fictício 24","Cliente Fictício 17","Cliente Fictício 32","Cliente Fictício 26"];
 var CONTAS_EX=[76,124,128,130,133,152,161,173,207,214,231,260];
 var SITS=["escrito","escrito","escrito","escrito","escrito","escrito","escrito","escrito",
           "escrito","escrito","escrito","escrito","revisao","semcod"];

@@ -177,6 +177,7 @@ app.whenReady().then(async () => {
     // enquanto a rodada corre. `?.` porque o coletor pode emitir depois de
     // a janela ter sido fechada.
     aoEvento: (e) => janela?.webContents.send("evento", e),
+    abrirNoNavegador: (url) => shell.openExternal(url),
     porta: PORTA_EM_USO,
   });
 

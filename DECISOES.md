@@ -514,7 +514,7 @@ são todos recusados — os três primeiros antes de tocar na rede.
 
 Contra a loja de teste: as cinco recusas com mensagem própria, e a escrita
 real de `#1007` a partir do texto solto *"peguei no app da shopee:
-BR268507789509M"*, confirmada como `FULFILLED` na Shopify.
+BR260000000007X"*, confirmada como `FULFILLED` na Shopify.
 
 ### Três defeitos achados na auditoria da própria feature (2026-10-18)
 

@@ -7,10 +7,10 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const PEDIDOS = {
-  casado:    { pedido: "#1001", nome: "Sônia Aparecida Pinto",   conta: 124, valor: 88.30 },
-  semCodigo: { pedido: "#1002", nome: "Antônio Paulo Borges",    conta: 124, valor: 31.33 },
-  outraConta:{ pedido: "#1003", nome: "Leonardo José de Freitas",conta: 124, valor: 57.65 },
-  empate:    { pedido: "#1004", nome: "Maria Aparecida Santos",  conta: 128, valor: 13.00 },
+  casado:    { pedido: "#1001", nome: "Sílvia Fictícia Mota",   conta: 124, valor: 88.30 },
+  semCodigo: { pedido: "#1002", nome: "Otávio Fictício Reis",    conta: 124, valor: 31.33 },
+  outraConta:{ pedido: "#1003", nome: "Lívia Fictícia Prado",conta: 124, valor: 57.65 },
+  empate:    { pedido: "#1004", nome: "Marta Fictícia Lins",  conta: 128, valor: 13.00 },
 };
 
 // Os perfis do AdsPower, nomeados como o cliente nomeia: o número da conta
@@ -61,23 +61,23 @@ export async function montarCenario(dir) {
 
   gravar(124, [
     // casa redondo: nome bate, tem código
-    { orderId: "S-1", nome: "Sônia Aparecida Pinto", valor: 88.30,
-      cep: "80000000", codigos: ["BR263500935831Z"] },
+    { orderId: "S-1", nome: "Sílvia Fictícia Mota", valor: 88.30,
+      cep: "80000000", codigos: ["BR260000000005X"] },
     // o nome bate mas a Shopee ainda não despachou -> se resolve sozinho
-    { orderId: "S-2", nome: "Antônio Paulo Borges", valor: 31.33,
+    { orderId: "S-2", nome: "Otávio Fictício Reis", valor: 31.33,
       cep: "80000111", codigos: [] },
     // o #1003 NÃO está aqui: a planilha aponta a conta errada
   ]);
 
   gravar(128, [
     // o cliente do #1003, na conta que a planilha não indicou
-    { orderId: "S-3", nome: "Leonardo José de Freitas", valor: 57.65,
-      cep: "80000222", codigos: ["BR264983069926O"] },
+    { orderId: "S-3", nome: "Lívia Fictícia Prado", valor: 57.65,
+      cep: "80000222", codigos: ["BR260000000006X"] },
     // dois do mesmo cliente, mesmo valor: nada desempata
-    { orderId: "S-4", nome: "Maria Aparecida Santos", valor: 13.00,
-      cep: "13485020", codigos: ["BR261528918393K"] },
-    { orderId: "S-5", nome: "Maria Aparecida Santos", valor: 13.00,
-      cep: "13485020", codigos: ["BR260326966602Y"] },
+    { orderId: "S-4", nome: "Marta Fictícia Lins", valor: 13.00,
+      cep: "13485020", codigos: ["BR260000000002X"] },
+    { orderId: "S-5", nome: "Marta Fictícia Lins", valor: 13.00,
+      cep: "13485020", codigos: ["BR260000000001X"] },
   ]);
 
   return { planilha };

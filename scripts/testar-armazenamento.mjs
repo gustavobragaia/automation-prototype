@@ -118,7 +118,7 @@ async function exercitar(nomeImpl, mod) {
   mod.guardarPendentes([
     { pedido: "#164891", conta: 124, nome: "Ana Lima", valor: 37.89,
       motivo: { codigo: "sem-rastreio-ainda", grupo: "sozinho" } },
-    { pedido: "#165091", conta: 152, nome: "José Tolentino", valor: 23.99,
+    { pedido: "#165091", conta: 152, nome: "José Fictício Teles", valor: 23.99,
       motivo: { codigo: "nao-achado-na-conta", grupo: "precisa" } },
   ], { em: d1 });
   let abertos = mod.pendentesAbertos({ hoje: "2026-10-18" });

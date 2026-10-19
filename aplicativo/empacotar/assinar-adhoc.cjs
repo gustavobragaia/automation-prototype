@@ -15,21 +15,26 @@ const { execFileSync } = require("node:child_process");
 const { join } = require("node:path");
 
 exports.default = async function (contexto) {
-  if (contexto.electronPlatformName !== "darwin") return;
   // O universal é montado juntando um app x64 e um arm64 temporários.
-  // Assinar os temporários atrapalharia a junção; só o final importa.
+  // Conferir ou assinar os temporários não adianta; só o final importa.
   if (/-temp$/.test(contexto.appOutDir)) return;
+  const mac = contexto.electronPlatformName === "darwin";
+  const nome = contexto.packager.appInfo.productFilename;
+  const app = join(contexto.appOutDir, `${nome}.app`);
 
-  const app = join(contexto.appOutDir, `${contexto.packager.appInfo.productFilename}.app`);
-
-  // Antes de assinar: todo import tem que existir dentro do pacote. Ver
+  // Em TODO sistema: todo import tem que existir dentro do pacote. Ver
   // conferir-imports.cjs — um módulo faltando faz o app travar sem abrir.
+  // (Antes isto só rodava no Mac, e o Windows ficava sem a proteção.)
+  const asar = mac ? join(app, "Contents", "Resources", "app.asar")
+                   : join(contexto.appOutDir, "resources", "app.asar");
   const { conferir } = require("./conferir-imports.cjs");
-  const r = conferir(join(app, "Contents", "Resources", "app.asar"));
+  const r = conferir(asar);
   if (r.faltando.length)
     throw new Error("o pacote tem imports que não encontram o arquivo — o app não abriria:\n  " +
                     r.faltando.join("\n  "));
   console.log(`  • ${r.modulos} módulos, todo import encontra o seu arquivo dentro do pacote`);
+
+  if (!mac) return;   // a assinatura ad-hoc abaixo é coisa de Mac
 
   execFileSync("codesign", ["--force", "--deep", "--sign", "-", app], { stdio: "inherit" });
   execFileSync("codesign", ["--verify", "--deep", "--strict", app], { stdio: "inherit" });

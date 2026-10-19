@@ -9,7 +9,7 @@ const sec = (t) => console.log(`\n\x1b[1m${t}\x1b[0m`);
 let tudo = true;
 
 sec("recusa antes de tocar na rede");
-const r1 = await prepararManual("entregue", "BR263500935831Z");
+const r1 = await prepararManual("entregue", "BR260000000005X");
 tudo &= ok(r1.ok === false && /número de pedido/.test(r1.erro), "número de pedido ilegível");
 
 const r2 = await prepararManual("#1008", "entregue ontem");
@@ -28,9 +28,9 @@ tudo &= ok(r5.ok === false && /simula/.test(r5.erro),
 sec("aceita o código no meio de texto solto");
 // o operador cola o que recebeu, não um campo limpo
 const { parseTracking } = await import("../src/tracking.mjs");
-const t = parseTracking("oi, segue o rastreio BR263500935831Z obrigado");
+const t = parseTracking("oi, segue o rastreio BR260000000005X obrigado");
 tudo &= ok(t.codes?.length === 1, "extrai o código de uma mensagem inteira");
-const t2 = parseTracking("BR263500935831Z e também SPXLM17485496");
+const t2 = parseTracking("BR260000000005X e também SPXLM10000001");
 tudo &= ok(t2.codes?.length === 2, "e pega os dois quando o pedido veio em duas encomendas");
 
 console.log(tudo ? "\n\x1b[32m\x1b[1m  a saída manual é tão rigorosa quanto o robô\x1b[0m\n" : "\n\x1b[31m  FALHOU\x1b[0m\n");

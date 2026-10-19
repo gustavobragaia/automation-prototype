@@ -31,10 +31,10 @@ writeFileSync(process.env.SHOPIFY_CONEXAO_ARQUIVO, JSON.stringify({
 const { montarCenario, fingirShopify } = await import(`${raiz}/scripts/cenario-conferencia.mjs`);
 const { planilha } = await montarCenario(dir);
 const escritas = fingirShopify({ pedidos: {
-  "#1001": { nome: "Sônia Aparecida Pinto", valor: 88.30, cep: "80000000" },
+  "#1001": { nome: "Sílvia Fictícia Mota", valor: 88.30, cep: "80000000" },
   // o destinatário que a Shopify devolve para o #1004 — é este nome que a
   // pessoa tem que ver antes de colar um rastreio nele
-  "#1004": { nome: "Maria Aparecida Santos", valor: 13.00, cep: "13485020" },
+  "#1004": { nome: "Marta Fictícia Lins", valor: 13.00, cep: "13485020" },
 } });
 
 await import("./principal.mjs");
@@ -81,7 +81,7 @@ app.whenReady().then(async () => {
   await w.webContents.executeJavaScript(`(() => {
     const it = document.querySelector('[data-pedido="#1004"]');
     it.querySelector('.saidas button[data-saida="colar"]').click();
-    it.querySelector('.painelito input').value = "segue o rastreio BR261528918393K";
+    it.querySelector('.painelito input').value = "segue o rastreio BR260000000002X";
     it.querySelector('[data-conferir]').click();
   })()`);
   await new Promise((r) => setTimeout(r, 1500));
@@ -170,7 +170,7 @@ app.whenReady().then(async () => {
   tudo &= ok(ligacoes.preferenciaLigada, "som, notificação e escrita direta são guardados");
   tudo &= ok(ligacoes.proximaLigada, "'Começar próxima rodada' limpa as planilhas no robô");
   tudo &= ok(ligacoes.segredoLigado, "e as senhas e chaves são guardadas pelo robô");
-  tudo &= ok(/Na Shopify/.test(conferido) && /Maria Aparecida Santos/.test(conferido),
+  tudo &= ok(/Na Shopify/.test(conferido) && /Marta Fictícia Lins/.test(conferido),
     "'Conferir' mostra o destinatário que está NA SHOPIFY, não 'o cliente deste pedido'");
   tudo &= ok(escritasAntesDeConfirmar === 0, "e conferir não escreve nada — só mostra");
   tudo &= ok(direto === true,

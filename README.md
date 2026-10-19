@@ -51,7 +51,7 @@ Rodado contra a planilha de controle do cliente, março a setembro de 2026.
 | Não reconhecido → revisão | 0,07% (13) |
 
 107 células tinham o código dos Correios colado no da Shopee Xpress sem
-separador (`BR260300793540JSPXLM17485496`) — todas separadas corretamente.
+separador (`BR260300793540JSPXLM10000001`) — todas separadas corretamente.
 
 **Casamento Shopee → Shopify**, simulando dia a dia com janela de 21 dias:
 

@@ -38,7 +38,11 @@ export function iniciarConexao(lojaBruta, { porta = 3000, abrir = true } = {}) {
     }, ESPERA_MS).unref?.();
   });
 
-  if (abrir) abrirNavegador(url);
+  // `abrir` pode ser uma função: o app passa o shell.openExternal do Electron,
+  // que abre o endereço inteiro em qualquer sistema. Sem ela (terminal), o
+  // jeito de cada sistema.
+  if (typeof abrir === "function") abrir(url);
+  else if (abrir) abrirNavegador(url);
   return { url, loja, state, pronto: promessa };
 }
 
@@ -78,9 +82,17 @@ export function receberToken(campos = {}) {
 export const conexaoEmAndamento = () => (pendente ? { loja: pendente.loja } : null);
 export const cancelarConexao = () => { pendente = null; };
 
+export function argumentosDoNavegador(url, plataforma = process.platform) {
+  // No Windows quem abre é o cmd, e para o cmd "&" SEPARA COMANDOS: o
+  // endereço "...?loja=X&state=Y" chegava ao navegador cortado no "&", sem o
+  // state, e a Shopify voltava com "state inválido". O Matheus nunca
+  // conseguiria conectar a loja. Escapar com ^ entrega o endereço inteiro.
+  if (plataforma === "win32")
+    return ["cmd", ["/c", "start", "", url.replace(/[&^|<>]/g, "^$&")]];
+  return [plataforma === "darwin" ? "open" : "xdg-open", [url]];
+}
+
 function abrirNavegador(url) {
-  const cmd = process.platform === "darwin" ? "open"
-    : process.platform === "win32" ? "cmd" : "xdg-open";
-  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
+  const [cmd, args] = argumentosDoNavegador(url);
   try { spawn(cmd, args, { detached: true, stdio: "ignore" }).unref(); } catch {}
 }

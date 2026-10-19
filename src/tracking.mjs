@@ -2,9 +2,9 @@
 // Lida com: código único, múltiplos códigos na mesma célula, códigos colados
 // sem separador (Correios + Shopee Xpress), e texto que não é rastreio.
 
-const CORREIOS = /[A-Z]{2}\d{9}BR/g;            // AN939151363BR
-const SHOPEE_BR = /BR\d{12}[A-Z0-9]/g;          // BR268454876848M  (BR + 12 dígitos + 1 alfanum)
-const SPX = /SPX[A-Z]{0,3}\d{6,}/g;             // SPXLM17485496
+const CORREIOS = /[A-Z]{2}\d{9}BR/g;            // AN900000001BR
+const SHOPEE_BR = /BR\d{12}[A-Z0-9]/g;          // BR260000000001M  (BR + 12 dígitos + 1 alfanum)
+const SPX = /SPX[A-Z]{0,3}\d{6,}/g;             // SPXLM10000001
 
 const NAO_RASTREIO = new Set([
   "entregue", "cancelado", "enviado", "ainda sem rastreio",

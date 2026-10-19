@@ -69,5 +69,18 @@ tudo &= ok(destinoLocal(st) === "http://127.0.0.1:3000/shopify/pronto",
 tudo &= ok(destinoLocal("3000.xyz") === null, "state inválido não gera destino");
 tudo &= ok(!/esteira|https/.test(destinoLocal(st)), "o token nunca volta para a nuvem");
 
+
+sec("o navegador recebe o endereço INTEIRO também no Windows");
+// No Windows quem abre é o cmd, e "&" separa comandos para ele: o endereço
+// chegava cortado, sem o state, e "Conectar Shopify" falhava sempre.
+const { argumentosDoNavegador } = await import("../src/shopify-oauth.mjs");
+const urlTeste = "https://esteira.cloud/shopify/instalar?loja=x.myshopify.com&state=3000.abc";
+const [cmdW, argsW] = argumentosDoNavegador(urlTeste, "win32");
+tudo &= ok(cmdW === "cmd", "no Windows abre pelo cmd");
+tudo &= ok(argsW.at(-1).includes("^&state="), "com o & escapado (^&), que o cmd devolve como & ao navegador");
+tudo &= ok(!/[^^]&/.test(argsW.at(-1)), "e nenhum & solto sobrando para o cmd cortar");
+const [cmdM, argsM] = argumentosDoNavegador(urlTeste, "darwin");
+tudo &= ok(cmdM === "open" && argsM[0] === urlTeste, "no Mac o endereço segue intacto, sem escape");
+
 console.log(tudo ? "\n\x1b[32m\x1b[1m  link forjado não vira token\x1b[0m\n" : "\n\x1b[31m  FALHOU\x1b[0m\n");
 process.exit(tudo ? 0 : 1);

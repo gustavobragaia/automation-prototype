@@ -44,7 +44,7 @@ const tentar = async (fn) => {
   catch (e) { return { ok: false, erro: e.message }; }
 };
 
-export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } = {}) {
+export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, abrirNoNavegador } = {}) {
   // Os eventos do robô viram eventos da janela. Inscreve uma vez, no
   // arranque: o coletor sobe antes da rodada e emite por conta própria.
   if (enviar) aoEvento(enviar);
@@ -187,7 +187,9 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000 } =
     }),
 
     "shopify:conectar": ({ loja }) => tentar(async () => {
-      const c = iniciarConexao(loja, { porta, abrir: true });
+      // No app, o navegador é aberto pelo Electron (abrirNoNavegador): é o
+      // que entrega o endereço inteiro também no Windows.
+      const c = iniciarConexao(loja, { porta, abrir: abrirNoNavegador ?? true });
       c.pronto.catch(() => {});   // o resultado chega por evento, não aqui
       return { url: c.url, loja: c.loja };
     }),

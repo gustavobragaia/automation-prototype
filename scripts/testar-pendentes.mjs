@@ -23,7 +23,7 @@ tudo &= ok(b[0].pedidos[1].deDiasAnteriores === 2, "e carrega há quantos dias e
 
 sec("atrasado de uma conta que NÃO ia ser aberta hoje");
 const c = juntarPendentes(hoje, [
-  { pedido: "#165091", conta: 152, nome: "José Tolentino", valor: 23.99, dias: 4 }]);
+  { pedido: "#165091", conta: 152, nome: "José Fictício Teles", valor: 23.99, dias: 4 }]);
 tudo &= ok(c.length === 2, "a conta 152 passa a ser aberta por causa dele");
 tudo &= ok(c.find((x) => x.conta === 152).pedidos[0].pedido === "#165091", "com o pedido certo dentro");
 
@@ -39,8 +39,8 @@ sec("correção de conta sobrevive à planilha de amanhã");
 // O operador corrigiu sabendo que a planilha estava errada. Sem isto, a
 // planilha do dia seguinte reverteria e a correção duraria um dia.
 const corr = juntarPendentes(
-  [{ conta: 124, pedidos: [{ pedido: "#165091", nome: "José Tolentino", valor: 23.99 }] }],
-  [{ pedido: "#165091", conta: 161, nome: "José Tolentino", valor: 23.99, dias: 6,
+  [{ conta: 124, pedidos: [{ pedido: "#165091", nome: "José Fictício Teles", valor: 23.99 }] }],
+  [{ pedido: "#165091", conta: 161, nome: "José Fictício Teles", valor: 23.99, dias: 6,
      contaCorrigida: true }]);
 tudo &= ok(!corr.find((c) => c.conta === 124)?.pedidos.length,
            "sai da conta errada que a planilha repetiu");

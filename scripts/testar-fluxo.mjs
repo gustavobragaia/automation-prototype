@@ -34,10 +34,10 @@ const { montarCenario, fingirShopify, PEDIDOS } = await import("./cenario-confer
 const { planilha } = await montarCenario(dir);
 
 const escritas = fingirShopify({ pedidos: {
-  "#1001": { nome: "Sônia Aparecida Pinto", valor: 88.30, cep: "80000000" },
-  "#1002": { nome: "Antônio Paulo Borges", valor: 31.33, cep: "80000111" },
-  "#1003": { nome: "Leonardo José de Freitas", valor: 57.65, cep: "80000222" },
-  "#1004": { nome: "Maria Aparecida Santos", valor: 13.00, cep: "13485020" },
+  "#1001": { nome: "Sílvia Fictícia Mota", valor: 88.30, cep: "80000000" },
+  "#1002": { nome: "Otávio Fictício Reis", valor: 31.33, cep: "80000111" },
+  "#1003": { nome: "Lívia Fictícia Prado", valor: 57.65, cep: "80000222" },
+  "#1004": { nome: "Marta Fictícia Lins", valor: 13.00, cep: "13485020" },
 } });
 
 const { construir } = await import("../aplicativo/ponte.mjs");
@@ -91,7 +91,7 @@ tudo &= ok(naoAchado?.motivo.codigo === "nao-achado-na-conta",
   `#1003 veio como não achado na conta (veio ${naoAchado?.motivo.codigo})`);
 tudo &= ok(naoAchado?.sugestoes?.[0]?.conta === 128,
   `e o robô achou o cliente na conta 128 (sugeriu ${naoAchado?.sugestoes?.[0]?.conta})`);
-tudo &= ok(naoAchado?.sugestoes?.[0]?.codigos?.includes("BR264983069926O"),
+tudo &= ok(naoAchado?.sugestoes?.[0]?.codigos?.includes("BR260000000006X"),
   "com o rastreio que está lá, para a pessoa decidir olhando");
 
 const empate = porPedido["#1004"];
@@ -106,7 +106,7 @@ sec("4 · a pessoa escolhe um dos dois e manda escrever");
 const escolhido = empate.candidatos[0].codigos[0];
 const antes = await chamar("manual:conferir", { pedido: "#1004", texto: escolhido });
 tudo &= ok(antes.ok === true, "antes de escrever, o robô mostra o lado da Shopify");
-tudo &= ok(antes.alvo?.nome === "Maria Aparecida Santos",
+tudo &= ok(antes.alvo?.nome === "Marta Fictícia Lins",
   `e é o cliente certo (${antes.alvo?.nome})`);
 
 const dec = await chamar("conferencia:decidir",
@@ -163,15 +163,15 @@ tudo &= ok(escritas.length === 1, "e nenhuma escrita a mais saiu por causa disso
 /* ───────────────────── 9. o que a Shopify recusar não some ───────────── */
 sec("9 · quando a Shopify recusa, o pedido continua na sua lista");
 const escritas2 = fingirShopify({
-  pedidos: { "#1002": { nome: "Antônio Paulo Borges", valor: 31.33, cep: "80000111" } },
+  pedidos: { "#1002": { nome: "Otávio Fictício Reis", valor: 31.33, cep: "80000111" } },
   recusar: "fulfillment order is closed",
 });
-guardarPendentes([{ pedido: "#1002", conta: 124, nome: "Antônio Paulo Borges",
+guardarPendentes([{ pedido: "#1002", conta: 124, nome: "Otávio Fictício Reis",
                     motivo: { codigo: "sem-rastreio-ainda", grupo: "sozinho" } }]);
 let falhou = false;
 try {
   await chamar("conferencia:decidir",
-    { pedido: "#1002", decisao: "colar", texto: "BR263500935831Z" });
+    { pedido: "#1002", decisao: "colar", texto: "BR260000000005X" });
 } catch (e) { falhou = /closed|recus/i.test(e.message); }
 tudo &= ok(falhou, "a recusa da Shopify chega como erro, não como sucesso");
 tudo &= ok(!!pendentesAbertos().find((p) => p.pedido === "#1002"),
@@ -192,13 +192,13 @@ tudo &= ok(semPedido, "e decisão sem número de pedido também");
 /* ───────────────────── 11. a etapa 4: o lote ───────────────────── */
 sec("11 · a etapa 4 mostra o que vai sair, antes de sair");
 const escritas3 = fingirShopify({ pedidos: {
-  "#1001": { nome: "Sônia Aparecida Pinto", valor: 88.30, cep: "80000000" },
+  "#1001": { nome: "Sílvia Fictícia Mota", valor: 88.30, cep: "80000000" },
 } });
 const lote = await chamar("escrita:listar");
 tudo &= ok(lote.itens.length === 1,
   `1 pedido pronto para escrever (veio ${lote.itens.length}: ${lote.itens.map((i) => i.pedido).join(", ")})`);
 tudo &= ok(lote.itens[0]?.pedido === "#1001", "e é o que casou redondo, o #1001");
-tudo &= ok(lote.itens[0]?.codigos?.includes("BR263500935831Z"),
+tudo &= ok(lote.itens[0]?.codigos?.includes("BR260000000005X"),
   "com o rastreio que a Shopee tinha");
 tudo &= ok(lote.itens[0]?.transportadora === "Correios", "e a transportadora resolvida pelo código");
 tudo &= ok(escritas3.length === 0, "e NADA foi escrito só por listar");
@@ -208,7 +208,7 @@ const feito = await chamar("escrita:executar", {});
 tudo &= ok(feito.escritos === 1, `1 escrito (deu ${feito.escritos})`);
 tudo &= ok(feito.falhas === 0, "sem falhas");
 tudo &= ok(escritas3.length === 1, "a Shopify recebeu exatamente 1 escrita");
-tudo &= ok(escritas3[0]?.codigos?.includes("BR263500935831Z"), "com o código certo");
+tudo &= ok(escritas3[0]?.codigos?.includes("BR260000000005X"), "com o código certo");
 
 sec("13 · escrever duas vezes não escreve duas vezes");
 const denovo = await chamar("escrita:executar", {});
@@ -239,7 +239,7 @@ const wb2 = new ExcelJS2.Workbook();
 const ws2 = wb2.addWorksheet("PEDIDOS");
 ws2.addRow(["DATA","NÚMERO DO PEDIDO","NOME DO CLIENTE","VALOR PAGO","CÓDIGO DE RASTREIO","ONDE FOI FEITO O PEDIDO"]);
 // a planilha diz Sônia; a loja vai responder com outro destinatário
-ws2.addRow(["2026-10-18", "#1099", "Sônia Aparecida Pinto", 88.30, "", "shopee 124"]);
+ws2.addRow(["2026-10-18", "#1099", "Sílvia Fictícia Mota", 88.30, "", "shopee 124"]);
 const planilha2 = join(dir, "divergente.xlsx");
 await wb2.xlsx.writeFile(planilha2);
 
@@ -257,7 +257,7 @@ tudo &= ok(!!barrado, "o pedido barrado APARECE na conferência");
 tudo &= ok(barrado?.motivo.codigo === "nome-nao-confere",
   `com o motivo certo (${barrado?.motivo.codigo})`);
 tudo &= ok(barrado?.motivo.rotulo === "nome não confere", "e com rótulo legível, não o código cru");
-tudo &= ok(barrado?.lados?.shopee?.nome === "Sônia Aparecida Pinto",
+tudo &= ok(barrado?.lados?.shopee?.nome === "Sílvia Fictícia Mota",
   `mostrando o nome da Shopee (${barrado?.lados?.shopee?.nome})`);
 tudo &= ok(barrado?.lados?.shopify?.nome === "Outra Pessoa Entrega",
   `e o da Shopify ao lado (${barrado?.lados?.shopify?.nome})`);

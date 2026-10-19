@@ -26,8 +26,8 @@ tudo &= ok(normalizarNumero(undefined) === null, "indefinido não vira pedido");
 
 sec("nunca escrever sob dúvida");
 const colhidos = [
-  { nome: "Maria Silva", valor: 37.89, codigos: ["BR263500935831Z"], cep: "14647020" },
-  { nome: "Maria Silva", valor: 13.0, codigos: ["BR262357370052B"], cep: "15800040" },
+  { nome: "Maria Silva", valor: 37.89, codigos: ["BR260000000005X"], cep: "14647020" },
+  { nome: "Maria Silva", valor: 13.0, codigos: ["BR260000000003X"], cep: "15800040" },
   { nome: "Joao Souza", valor: 21.9, codigos: [], cep: "18903066" },
 ];
 const c1 = conciliarPedido({ nome: "João Souza", valor: 21.9 }, colhidos);
@@ -38,7 +38,7 @@ const c3 = conciliarPedido({ nome: "maria  silva", valor: null }, colhidos);
 tudo &= ok(c3.estado === "ambiguo" && c3.candidatos === 2 && !c3.achado,
            "nome repetido sem valor para desempatar vira ambíguo, sem palpite");
 const c4 = conciliarPedido({ nome: "MARIA SILVA", valor: 13.0 }, colhidos);
-tudo &= ok(c4.estado === "ok-valor" && c4.codigo === "BR262357370052B",
+tudo &= ok(c4.estado === "ok-valor" && c4.codigo === "BR260000000003X",
            "nome repetido com valor diferente desempata no pedido certo");
 const c5 = conciliarPedido({ nome: "Maria Silva", valor: 99.0 }, colhidos);
 tudo &= ok(c5.estado === "ambiguo", "valor que não bate com nenhum não desempata");
@@ -47,12 +47,12 @@ sec("pedido da Shopify comprado em duas vezes na Shopee");
 // caso real: #164925 valia R$ 88,30 e virou duas compras de R$ 58,41 e R$ 29,89,
 // mesmo destinatário, mesmo CEP. Não são dois pedidos — são duas encomendas.
 const duas = [
-  { nome: "Jose Ernesto Camargo", valor: 58.41, cep: "01448010", codigos: ["BR262981565516C"] },
-  { nome: "Jose Ernesto Camargo", valor: 29.89, cep: "01448010", codigos: ["BR269462194730E"] },
+  { nome: "Joel Fictício Campos", valor: 58.41, cep: "01448010", codigos: ["BR260000000004X"] },
+  { nome: "Joel Fictício Campos", valor: 29.89, cep: "01448010", codigos: ["BR260000000008X"] },
 ];
-const d1 = conciliarPedido({ nome: "Jose Ernesto Camargo", valor: 88.3 }, duas);
+const d1 = conciliarPedido({ nome: "Joel Fictício Campos", valor: 88.3 }, duas);
 tudo &= ok(d1.estado === "ok-partes" && resolvido(d1.estado), "soma exata resolve como um pedido só");
-tudo &= ok(d1.partes?.length === 2 && d1.codigo.includes("BR262981565516C") && d1.codigo.includes("BR269462194730E"),
+tudo &= ok(d1.partes?.length === 2 && d1.codigo.includes("BR260000000004X") && d1.codigo.includes("BR260000000008X"),
            "os dois códigos vão juntos, nenhum fica para trás");
 
 tudo &= ok(pedidoDividido({ valor: 88.3 }, [
@@ -77,24 +77,24 @@ tudo &= ok(pedidoDividido({ valor: 88.3 }, [
            "CEP vazio nos dois não serve de prova");
 
 sec("montagem do fulfillment");
-const um = montarEntrada({ fulfillmentOrderId: "gid://1", codigos: ["BR263500935831Z"], transportadora: "Correios", notificar: false });
-tudo &= ok(um.trackingInfo.number === "BR263500935831Z" && !um.trackingInfo.numbers, "um código usa 'number'");
+const um = montarEntrada({ fulfillmentOrderId: "gid://1", codigos: ["BR260000000005X"], transportadora: "Correios", notificar: false });
+tudo &= ok(um.trackingInfo.number === "BR260000000005X" && !um.trackingInfo.numbers, "um código usa 'number'");
 tudo &= ok(um.notifyCustomer === false, "notificar falso é respeitado");
-const dois = montarEntrada({ fulfillmentOrderId: "gid://1", codigos: ["BR263500935831Z", "SPXLM17485496"], transportadora: "Outros" });
+const dois = montarEntrada({ fulfillmentOrderId: "gid://1", codigos: ["BR260000000005X", "SPXLM10000001"], transportadora: "Outros" });
 tudo &= ok(dois.trackingInfo.numbers?.length === 2 && dois.trackingInfo.urls?.length === 2, "dois códigos usam 'numbers' + 'urls'");
 let errou = false;
-try { montarEntrada({ fulfillmentOrderId: null, codigos: ["BR263500935831Z"] }); } catch { errou = true; }
+try { montarEntrada({ fulfillmentOrderId: null, codigos: ["BR260000000005X"] }); } catch { errou = true; }
 tudo &= ok(errou, "sem fulfillment order, falha antes de chamar a Shopify");
 errou = false;
 try { montarEntrada({ fulfillmentOrderId: "gid://1", codigos: [] }); } catch { errou = true; }
 tudo &= ok(errou, "sem código, falha antes de chamar a Shopify");
 
 sec("transportadora e link de rastreio");
-tudo &= ok(transportadoraDe(["SPXLM17485496"]) === "Shopee Xpress", "código SPX é Shopee Xpress");
-tudo &= ok(transportadoraDe(["BR263500935831Z"]) === "Correios", "código BR é Correios");
-tudo &= ok(transportadoraDe(["BR263500935831Z", "SPXLM17485496"]) === "Outros", "misturado é Outros");
-tudo &= ok(urlRastreio("SPXLM17485496").includes("spx.com.br"), "link do SPX aponta para a Shopee Xpress");
-tudo &= ok(urlRastreio("BR263500935831Z").includes("correios"), "link do BR aponta para os Correios");
+tudo &= ok(transportadoraDe(["SPXLM10000001"]) === "Shopee Xpress", "código SPX é Shopee Xpress");
+tudo &= ok(transportadoraDe(["BR260000000005X"]) === "Correios", "código BR é Correios");
+tudo &= ok(transportadoraDe(["BR260000000005X", "SPXLM10000001"]) === "Outros", "misturado é Outros");
+tudo &= ok(urlRastreio("SPXLM10000001").includes("spx.com.br"), "link do SPX aponta para a Shopee Xpress");
+tudo &= ok(urlRastreio("BR260000000005X").includes("correios"), "link do BR aponta para os Correios");
 
 sec("uma implementação só");
 // O bug que isto previne: o ciclo de produção tinha a PRÓPRIA função de

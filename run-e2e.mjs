@@ -53,22 +53,22 @@ const ads = await import("./src/adspower.mjs");
 
 // ─── O que a Shopee mostraria na tela de "Minhas Compras" ────────────────
 const telaShopee = [
-  { nome: "Marcos francisco da cruz", produto: "faca feng",      valor: 55.8,  rastreioTexto: "BR268454876848M" },
-  { nome: "Francisco Barbalho",       produto: "lamina samurai", valor: 288.0, rastreioTexto: "BR2653672961207" },
-  { nome: "Carlos Tadeu",             produto: "Faca Feng",      valor: 90.0,  rastreioTexto: "BR263710806199L- BR268757990099S - BR2603244787522" },
-  { nome: "Rogerio Gama Peres",       produto: "Stella",         valor: 33.95, rastreioTexto: "BR260300793540JSPXLM17485496" },
-  { nome: "Ana Paula Souza",          produto: "yang",           valor: 19.99, rastreioTexto: "BR2654785161859" },
-  { nome: "Jurandir Antero da Silva", produto: "Yang Pro",       valor: 19.99, rastreioTexto: "ainda sem rastreio" },
+  { nome: "Marcos francisco da cruz", produto: "faca feng",      valor: 55.8,  rastreioTexto: "BR290000000005Z" },
+  { nome: "Fábio Fictício Brito",       produto: "lamina samurai", valor: 288.0, rastreioTexto: "BR2900000000003" },
+  { nome: "Caio Fictício Tadeu",             produto: "Faca Feng",      valor: 90.0,  rastreioTexto: "BR290000000002Z- BR290000000006Z - BR2900000000001" },
+  { nome: "Rogério Fictício Paz",       produto: "Stella",         valor: 33.95, rastreioTexto: "BR260300793540JSPXLM10000001" },
+  { nome: "Ana Fictícia Souto",          produto: "yang",           valor: 19.99, rastreioTexto: "BR2900000000004" },
+  { nome: "Juliano Fictício Dutra", produto: "Yang Pro",       valor: 19.99, rastreioTexto: "ainda sem rastreio" },
 ];
 
 // Pedidos abertos na Shopify (dois homônimos de propósito)
 const abertosShopify = [
   { pedido: "#142587", fulfillmentOrderId: "gid://shopify/FulfillmentOrder/1", nome: "Marcos francisco da cruz", produto: "faca feng", valor: 55.8 },
-  { pedido: "#142593", fulfillmentOrderId: "gid://shopify/FulfillmentOrder/2", nome: "Francisco Barbalho", produto: "lamina samurai", valor: 288.0 },
-  { pedido: "#142526", fulfillmentOrderId: "gid://shopify/FulfillmentOrder/3", nome: "Carlos Tadeu", produto: "Faca Feng", valor: 90.0 },
-  { pedido: "#143788", fulfillmentOrderId: "gid://shopify/FulfillmentOrder/4", nome: "ROGERIO GAMA PERES", produto: "Stella (Cor:1)", valor: 33.95 },
-  { pedido: "#144001", fulfillmentOrderId: "gid://shopify/FulfillmentOrder/5", nome: "Ana Paula Souza", produto: "yang", valor: 19.99 },
-  { pedido: "#144002", fulfillmentOrderId: "gid://shopify/FulfillmentOrder/6", nome: "Ana Paula Souza", produto: "yang", valor: 19.99 }, // homônimo idêntico
+  { pedido: "#142593", fulfillmentOrderId: "gid://shopify/FulfillmentOrder/2", nome: "Fábio Fictício Brito", produto: "lamina samurai", valor: 288.0 },
+  { pedido: "#142526", fulfillmentOrderId: "gid://shopify/FulfillmentOrder/3", nome: "Caio Fictício Tadeu", produto: "Faca Feng", valor: 90.0 },
+  { pedido: "#143788", fulfillmentOrderId: "gid://shopify/FulfillmentOrder/4", nome: "ROGÉRIO FICTÍCIO PAZ", produto: "Stella (Cor:1)", valor: 33.95 },
+  { pedido: "#144001", fulfillmentOrderId: "gid://shopify/FulfillmentOrder/5", nome: "Ana Fictícia Souto", produto: "yang", valor: 19.99 },
+  { pedido: "#144002", fulfillmentOrderId: "gid://shopify/FulfillmentOrder/6", nome: "Ana Fictícia Souto", produto: "yang", valor: 19.99 }, // homônimo idêntico
 ];
 
 // ─── 1. AdsPower ──────────────────────────────────────────────────────────
