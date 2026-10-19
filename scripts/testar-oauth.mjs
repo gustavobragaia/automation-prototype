@@ -4,6 +4,8 @@
 
 import { lojaValida, hmacValido, novoEstado, lerEstado, destinoLocal }
   from "../servidor/lib/validar.js";
+import { appDaLoja } from "../servidor/lib/apps.js";
+import worker from "../servidor/src/worker.js";
 
 const ok = (c, m) => console.log(c ? `  \x1b[32m✓\x1b[0m ${m}` : `  \x1b[31m✗ ${m}\x1b[0m`) || c;
 const sec = (t) => console.log(`\n\x1b[1m${t}\x1b[0m`);
@@ -81,6 +83,65 @@ tudo &= ok(argsW.at(-1).includes("^&state="), "com o & escapado (^&), que o cmd 
 tudo &= ok(!/[^^]&/.test(argsW.at(-1)), "e nenhum & solto sobrando para o cmd cortar");
 const [cmdM, argsM] = argumentosDoNavegador(urlTeste, "darwin");
 tudo &= ok(cmdM === "open" && argsM[0] === urlTeste, "no Mac o endereço segue intacto, sem escape");
+
+
+sec("cada loja vai para o app que pode ser instalado nela");
+const ENV = {
+  BASE_URL: "https://esteira.cloud",
+  SHOPIFY_CLIENT_ID: "app-principal", SHOPIFY_CLIENT_SECRET: "segredo-principal",
+  SHOPIFY_LOJAS: '{"loja-sparta-store.myshopify.com": "SPARTA"}',
+  SHOPIFY_CLIENT_ID_SPARTA: "app-sparta", SHOPIFY_CLIENT_SECRET_SPARTA: "segredo-sparta",
+};
+tudo &= ok(appDaLoja("loja-sparta-store.myshopify.com", ENV)?.clientId === "app-sparta",
+           "a loja da Sparta usa o app dela");
+tudo &= ok(appDaLoja("testeloja-4ajtpkll.myshopify.com", ENV)?.clientId === "app-principal",
+           "loja fora da lista usa o app principal");
+const semSegredo = { ...ENV }; delete semSegredo.SHOPIFY_CLIENT_SECRET_SPARTA;
+tudo &= ok(appDaLoja("loja-sparta-store.myshopify.com", semSegredo) === null,
+           "faltando o segredo do app dela, RECUSA — não cai no app principal");
+tudo &= ok(appDaLoja("x.myshopify.com", { ...ENV, SHOPIFY_LOJAS: "{quebrado" }) === null,
+           "lista malformada: ninguém passa");
+tudo &= ok(appDaLoja("x.myshopify.com", { ...ENV, SHOPIFY_LOJAS: '{"x.myshopify.com": "../X"}' }) === null,
+           "nome de app esquisito é recusado");
+tudo &= ok(appDaLoja("__proto__", ENV)?.clientId === "app-principal" &&
+           appDaLoja("constructor", ENV)?.clientId === "app-principal",
+           "chaves herdadas do objeto não viram app");
+
+// pelo Worker de verdade, do jeito que o navegador chama
+const estado = novoEstado(3000);
+const ir = async (loja, env) => worker.fetch(new Request(
+  `https://esteira.cloud/shopify/instalar?loja=${loja}&state=${estado}`), env);
+const r1 = await ir("loja-sparta-store.myshopify.com", ENV);
+tudo &= ok(r1.status === 302 && new URL(r1.headers.get("location")).searchParams.get("client_id") === "app-sparta",
+           "/shopify/instalar manda a Sparta para a tela de permissão do app dela");
+const r2 = await ir("testeloja-4ajtpkll.myshopify.com", ENV);
+tudo &= ok(new URL(r2.headers.get("location")).searchParams.get("client_id") === "app-principal",
+           "e a loja de teste para o app principal");
+const r3 = await ir("loja-sparta-store.myshopify.com", semSegredo);
+tudo &= ok(r3.status === 503, "sem o segredo da Sparta, a página diz que a loja não está configurada");
+
+// o retorno da Shopify é conferido com o segredo do app DAQUELA loja
+const cb = async (params, env) => worker.fetch(new Request(
+  "https://esteira.cloud/shopify/callback?" + new URLSearchParams(params)), env);
+const assinarCom = async (p, segredo) => {
+  const base = Object.keys(p).sort().map((k) => `${k}=${p[k]}`).join("&");
+  const chave = await crypto.subtle.importKey("raw", new TextEncoder().encode(segredo),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const a = await crypto.subtle.sign("HMAC", chave, new TextEncoder().encode(base));
+  return [...new Uint8Array(a)].map((b) => b.toString(16).padStart(2, "0")).join("");
+};
+const ret = { code: "abcdef123456", shop: "loja-sparta-store.myshopify.com", state: estado, timestamp: "1700000000" };
+const comPrincipal = await cb({ ...ret, hmac: await assinarCom(ret, "segredo-principal") }, ENV);
+tudo &= ok(comPrincipal.status === 400,
+           "retorno da Sparta assinado com o segredo do app PRINCIPAL é recusado");
+const fetchReal = globalThis.fetch; let pedido = null;
+globalThis.fetch = async (url, o) => { pedido = { url: String(url), corpo: JSON.parse(o.body) };
+  return new Response(JSON.stringify({ access_token: "shpat_teste", scope: "read_orders" })); };
+const certo = await cb({ ...ret, hmac: await assinarCom(ret, "segredo-sparta") }, ENV);
+globalThis.fetch = fetchReal;
+tudo &= ok(certo.status === 200 && pedido?.corpo.client_id === "app-sparta" &&
+           pedido?.corpo.client_secret === "segredo-sparta",
+           "assinado com o segredo dela, troca o code usando as credenciais do app dela");
 
 console.log(tudo ? "\n\x1b[32m\x1b[1m  link forjado não vira token\x1b[0m\n" : "\n\x1b[31m  FALHOU\x1b[0m\n");
 process.exit(tudo ? 0 : 1);

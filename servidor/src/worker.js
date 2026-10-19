@@ -9,6 +9,7 @@
 
 import { lojaValida, hmacValido, destinoLocal, lerEstado } from "../lib/validar.js";
 import { pagina, escapar } from "../lib/pagina.js";
+import { appDaLoja } from "../lib/apps.js";
 
 const ESCOPOS = [
   "read_orders", "write_orders",
@@ -61,8 +62,14 @@ function instalar(u, env) {
     return erro(400, "Pedido de conexão inválido",
       "Comece pelo botão Conectar Shopify dentro do aplicativo.");
 
+  // Cada loja vai para o app que pode ser instalado nela (ver lib/apps.js).
+  const app = appDaLoja(loja, env);
+  if (!app)
+    return erro(503, "Esta loja ainda não está configurada",
+      "A conexão com esta loja ainda não foi liberada do nosso lado. Avise o suporte.");
+
   const alvo = new URL(`https://${loja}/admin/oauth/authorize`);
-  alvo.searchParams.set("client_id", env.SHOPIFY_CLIENT_ID ?? "");
+  alvo.searchParams.set("client_id", app.clientId);
   alvo.searchParams.set("scope", ESCOPOS);
   alvo.searchParams.set("redirect_uri", `${env.BASE_URL}/shopify/callback`);
   alvo.searchParams.set("state", state);
@@ -72,14 +79,21 @@ function instalar(u, env) {
 
 async function callback(u, env) {
   const q = Object.fromEntries(u.searchParams);
-  const segredo = env.SHOPIFY_CLIENT_SECRET ?? "";
 
-  // A ordem importa: confere a assinatura ANTES de usar qualquer parâmetro.
+  // A loja escolhe COM QUAL segredo a assinatura é conferida — não a
+  // dispensa. Trocar o `shop` só faz a conferência usar outro segredo, que
+  // quem forjou também não tem. Nada além disso é usado antes do HMAC.
+  if (!lojaValida(q.shop))
+    return erro(400, "Endereço de loja inválido", "Comece de novo pelo aplicativo.");
+  const app = appDaLoja(q.shop, env);
+  if (!app)
+    return erro(503, "Esta loja ainda não está configurada",
+      "A conexão com esta loja ainda não foi liberada do nosso lado. Avise o suporte.");
+  const segredo = app.segredo;
+
   if (!(await hmacValido(q, segredo)))
     return erro(400, "Não consegui confirmar que esse retorno veio da Shopify",
       "Comece de novo pelo aplicativo. Se repetir, avise o suporte.");
-  if (!lojaValida(q.shop))
-    return erro(400, "Endereço de loja inválido", "Comece de novo pelo aplicativo.");
 
   const destino = destinoLocal(q.state);
   if (!destino)
@@ -94,7 +108,7 @@ async function callback(u, env) {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
-        client_id: env.SHOPIFY_CLIENT_ID,
+        client_id: app.clientId,
         client_secret: segredo,
         code: q.code,
       }),
