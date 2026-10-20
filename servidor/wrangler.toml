@@ -13,10 +13,13 @@ SHOPIFY_CLIENT_ID = "d278ab9bc83df201d73436fb29b70f9d"   # público, não é seg
 # Ex.: '{"loja.myshopify.com": "CHOMPS"}' + SHOPIFY_CLIENT_ID_CHOMPS aqui
 # + SHOPIFY_CLIENT_SECRET_CHOMPS como secret.
 SHOPIFY_LOJAS = '{"loja-sparta-store.myshopify.com": "SPARTA"}'
-# App "Esteira Sparta", organização Cbx Media, distribuição personalizada
-# para a loja acima (não dá para trocar). O segredo: wrangler secret put
+# App "Esteira Esparta", organização Partner GBS Media (gustavobragaia12),
+# distribuição personalizada para a loja acima — instalado em 21/10/2026
+# pelo link de instalação personalizado (o único caminho que funciona: o
+# botão "Instalar app" do Dev Dashboard e o authorize antes de instalar dão
+# "link de instalação inválido"). O segredo: wrangler secret put
 # SHOPIFY_CLIENT_SECRET_SPARTA
-SHOPIFY_CLIENT_ID_SPARTA = "69d26574b2edf370f54462055c141d67"
+SHOPIFY_CLIENT_ID_SPARTA = "25cb4e5865af9f0f1cdc438c091d8f10"
 # SHOPIFY_CLIENT_ID entra como var pelo painel ou por `wrangler secret`
 # SHOPIFY_CLIENT_SECRET entra SÓ como secret: é com ele que o HMAC é
 # conferido, e com ele vazado qualquer um forja um retorno da Shopify.
