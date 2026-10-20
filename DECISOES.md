@@ -661,3 +661,37 @@ se as validações estivessem espalhadas pelos handlers.
 Mover os nameservers do domínio para a Cloudflare (a rota `esteira.cloud/*`
 exige a zona lá), subir o worker, criar o app com distribuição pública e
 exercitar contra a Shopify de verdade.
+
+## Incidente 21/10/2026 — contas 125 e 150: "não achado na conta" que era sessão caída
+
+**O que se viu:** na primeira rodada real da Esparta, os 12 pedidos das contas
+125 e 150 apareceram como "não achado na conta". Os pedidos estavam lá (ex.:
+#164902, R$ 20,99, conta 125).
+
+**O que aconteceu de verdade** (pelos arquivos de coleta da máquina do Matheus):
+a sessão da Shopee das duas contas tinha caído.
+- 125: a página parou em `/verify/traffic/error?is_logged_in=false` ("Login
+  Necessário"); toda lista respondeu `error: 90309999`.
+- 150: toda lista respondeu **403** com `{ is_login: false, error: 90309999 }`,
+  a página parada em `/user/purchase`.
+
+**Três falhas em cadeia:**
+1. O coletor só reconhecia "não logado" por `error: 19` ou pela URL de login. As
+   formas novas passaram como **coleta com zero pedidos** — e ninguém foi ao
+   login (o login automático só age em `/buyer/login`).
+2. Coleta sem nenhuma lista respondendo era tratada como "a conta não tem
+   pedidos", e a conferência acusou cada pedido de "não achado".
+3. Conta **sem** coleta sumia da rodada (nem escrita, nem conferência, nem
+   carteira), e a coleta de um dia antigo podia responder pela de hoje.
+
+**O que mudou:** o coletor reconhece as formas novas e vai ao login (uma vez por
+aba; se continuar bloqueado, "precisa de você"); "nenhuma lista respondeu" vira
+`coleta-falhou`; conta não lida vira o motivo **"conta não foi lida"** para cada
+pedido dela; a rodada apaga a coleta anterior das contas que vai abrir; a fila
+espera o login e desiste na hora quando a conta já disse que não vai dar. Nome
+grudado na planilha ("EduardoMafraCavalcanti") passa a casar.
+
+**Prova:** `scripts/testar-sessao-caida.mjs` usa as respostas REAIS da Shopee
+daquela rodada (`scripts/fixtures/coleta-sessao-caida-*.json`) e roda o
+`extensao/coleta.js` de verdade. Contra o código antigo, falha exatamente nos
+pontos do incidente; contra o novo, 34/34.

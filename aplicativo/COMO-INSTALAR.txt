@@ -8,7 +8,7 @@ Deixe o AdsPower aberto. O Esteira conversa com ele.
 
 1. INSTALAR NO WINDOWS
 
-  1. Baixe o Esteira-Setup-0.1.4.exe
+  1. Baixe o Esteira-Setup-0.1.5.exe
   2. Abra o arquivo baixado
   3. O Windows vai mostrar uma tela azul: "O Windows protegeu o computador".
      Isso é esperado: o Esteira ainda não tem assinatura digital.
@@ -16,7 +16,7 @@ Deixe o AdsPower aberto. O Esteira conversa com ele.
   4. O Esteira instala sozinho, sem perguntas, e abre.
      Também cria um atalho na Área de Trabalho.
 
-  (Se for num Mac: abra o Esteira-0.1.4-universal.dmg, arraste o Esteira
+  (Se for num Mac: abra o Esteira-0.1.5-universal.dmg, arraste o Esteira
   para Aplicativos, e na primeira vez libere em Ajustes do Sistema →
   Privacidade e Segurança → "Abrir Mesmo Assim".)
 

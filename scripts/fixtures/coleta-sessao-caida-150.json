@@ -1,0 +1,103 @@
+{
+  "tipo": "coleta",
+  "conta": "150",
+  "listasBrutas": [],
+  "pagina": "https://shopee.com.br/user/purchase?type=7",
+  "duracaoMs": 3739,
+  "listas": [
+    {
+      "tipo": 6,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_all_order_and_checkout_list?limit=20&offset=0&list_type=6",
+      "status": 403,
+      "ok": false,
+      "corpo": {
+        "is_customized": false,
+        "is_login": false,
+        "action_type": 2,
+        "error": 90309999,
+        "tracking_id": "2241d0ec6ee-ba80-4b26-b188-98d5907efc0b",
+        "redirect_to_error_page": true
+      }
+    },
+    {
+      "tipo": 6,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_order_list?limit=20&offset=0&list_type=6",
+      "status": 403,
+      "ok": false,
+      "corpo": {
+        "is_customized": false,
+        "is_login": false,
+        "action_type": 2,
+        "error": 90309999,
+        "tracking_id": "57098cd2389-f38e-45aa-9256-c3d10b84f834",
+        "redirect_to_error_page": true
+      }
+    },
+    {
+      "tipo": 8,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_all_order_and_checkout_list?limit=20&offset=0&list_type=8",
+      "status": 403,
+      "ok": false,
+      "corpo": {
+        "is_customized": false,
+        "is_login": false,
+        "action_type": 2,
+        "error": 90309999,
+        "tracking_id": "9810ce1f174-c2ce-4d1a-8523-a5bc31878ee8",
+        "redirect_to_error_page": true
+      }
+    },
+    {
+      "tipo": 8,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_order_list?limit=20&offset=0&list_type=8",
+      "status": 403,
+      "ok": false,
+      "corpo": {
+        "is_customized": false,
+        "is_login": false,
+        "action_type": 2,
+        "error": 90309999,
+        "tracking_id": "307fbcc6f5-e4f0-4ec2-bd22-c9be72da6573",
+        "redirect_to_error_page": true
+      }
+    },
+    {
+      "tipo": 7,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_all_order_and_checkout_list?limit=20&offset=0&list_type=7",
+      "status": 403,
+      "ok": false,
+      "corpo": {
+        "is_customized": false,
+        "is_login": false,
+        "action_type": 2,
+        "error": 90309999,
+        "tracking_id": "574fc2d5d91-2ce5-4943-9540-468fee6a0af5",
+        "redirect_to_error_page": true
+      }
+    },
+    {
+      "tipo": 7,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_order_list?limit=20&offset=0&list_type=7",
+      "status": 403,
+      "ok": false,
+      "corpo": {
+        "is_customized": false,
+        "is_login": false,
+        "action_type": 2,
+        "error": 90309999,
+        "tracking_id": "7545457fb43-2a46-44a4-8bd0-a130465b20fa",
+        "redirect_to_error_page": true
+      }
+    }
+  ],
+  "pedidos": [],
+  "texto": "",
+  "aba": 1271549632,
+  "em": 1792524698159
+}

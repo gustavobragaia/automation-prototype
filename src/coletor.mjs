@@ -116,7 +116,7 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
 
         // A fila lê este arquivo para saber se vale esperar mais: login em
         // andamento merece prazo; login falhado merece desistir na hora.
-        if (/^(login-|otp-|precisa-humano|nao-autenticado)/.test(m.tipo ?? "")) {
+        if (/^(login-|otp-|precisa-humano|nao-autenticado|coleta-falhou|sessao-caida)/.test(m.tipo ?? "")) {
           writeFileSync(loginDaConta(conta),
             JSON.stringify({ tipo: m.tipo, motivo: m.motivo ?? null, em: Date.now() }, null, 2));
 
@@ -125,7 +125,8 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
           // pessoa. O segundo é o único que merece som e notificação.
           if (/^precisa-humano/.test(m.tipo))
             emitir("conta:humano", { conta, motivo: m.motivo ?? null });
-          else
+          // falhas: quem avisa a tela é a fila, ao desistir da conta
+          else if (!/^(coleta-falhou|login-falhou|sessao-caida)/.test(m.tipo))
             emitir("conta:logando", { conta });
         }
       } catch (e) {

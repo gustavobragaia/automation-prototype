@@ -1,7 +1,8 @@
 // Uma rodada completa: coleta -> consolida -> casa -> escreve -> planilha.
 // É o que o agendador dispara e o que o painel mostra.
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, rmSync } from "node:fs";
+import { coletaDaConta } from "./caminhos.mjs";
 import { rodarFila } from "./fila.mjs";
 import { extrairPedido } from "./shopee.mjs";
 import { carregar, salvar, registrar, historico, registrarRodada, gravarMotivos,
@@ -140,6 +141,12 @@ export async function rodarCiclo({ contas, escrever = true, simular = false,
   emitir("rodada:inicio", {
     contas: contas.map((c) => ({ conta: c.conta, perfil: c.serial ?? c.userId ?? null })),
   });
+  // A coleta de ontem não pode responder pela de hoje. Conta cuja coleta
+  // falha hoje ficava com o arquivo do último dia em que funcionou — e a
+  // conferência lia aquilo como se fosse de agora. Sem arquivo, a conta
+  // aparece como "não foi lida", que é a verdade.
+  for (const c of contas) rmSync(coletaDaConta(c.conta), { force: true });
+
   const resultados = await rodarFila(contas, {
     concorrencia: Number(process.env.CONCORRENCIA ?? 3),
     aoLog,

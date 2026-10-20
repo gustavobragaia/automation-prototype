@@ -6,6 +6,10 @@
 export function normNome(s) {
   if (!s) return "";
   return String(s)
+    // nome grudado na planilha: "Carlos EduardoMafraCavalcanti" — a Shopee
+    // tem "Carlos Eduardo Mafra Cavalcanti". Minúscula seguida de maiúscula
+    // é fronteira de palavra (antes de tirar acento e caixa).
+    .replace(/([a-zà-ÿ])([A-ZÀ-Þ])/g, "$1 $2")
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // tira acento
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, " ")

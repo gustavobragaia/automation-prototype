@@ -19,12 +19,25 @@ export function lerColetas(dir = DIR_COLETAS) {
     const d = JSON.parse(readFileSync(join(dir, f), "utf8"));
     const conta = Number(d.conta);
     if (!Number.isFinite(conta)) continue;
-    coletas.set(
-      conta,
-      (d.pedidos ?? []).filter((p) => p.bruto).map((p) => extrairPedido(p.bruto, { orderId: p.orderId })),
-    );
+    const pedidos = (d.pedidos ?? []).filter((p) => p.bruto)
+      .map((p) => extrairPedido(p.bruto, { orderId: p.orderId }));
+    // Coleta em que NENHUMA lista de pedidos respondeu não é "a conta não
+    // tem pedidos": é "a conta não foi lida". Tratar como lida foi o que fez
+    // a conferência de 21/10 acusar 12 pedidos de "não achado na conta"
+    // nas contas 125 e 150, cuja sessão da Shopee tinha caído.
+    if (!pedidos.length && !colecaoRespondeu(d)) {
+      pedidos.falhou = true;
+      pedidos.pagina = d.pagina ?? null;
+    }
+    coletas.set(conta, pedidos);
   }
   return coletas;
+}
+
+/** Alguma lista de pedidos respondeu de verdade nesta coleta? */
+export function colecaoRespondeu(d) {
+  if ((d.listasBrutas ?? []).length) return true;
+  return (d.listas ?? []).some((l) => l.ok === true);
 }
 
 /**
@@ -186,6 +199,13 @@ export const MOTIVOS = {
     texto: "A Shopify recusou a escrita.",
     acao: "Nada foi gravado. Tente de novo; se repetir, veja a mensagem da Shopify.",
   },
+  "conta-nao-lida": {
+    rotulo: "conta não foi lida",
+    grupo: "precisa",
+    texto: "A coleta não conseguiu ler os pedidos desta conta — a sessão da Shopee caiu ou a " +
+      "página foi bloqueada. Os pedidos dela NÃO foram procurados.",
+    acao: "Rode a coleta de novo. Se repetir, abra o perfil da conta no AdsPower e entre na Shopee.",
+  },
   "verificacao-humana": {
     rotulo: "a Shopee pediu você",
     grupo: "precisa",
@@ -236,7 +256,19 @@ export function conciliar(contas, coletas) {
   const porConta = new Map(contas.map((c) => [c.conta, c.pedidos]));
   const linhas = [];
 
-  for (const [conta, colhidos] of [...coletas].sort((a, b) => a[0] - b[0]))
+  // Conta da planilha que não foi lida: cada pedido dela vira pendência com
+  // o motivo certo. Antes, conta sem coleta simplesmente sumia da rodada —
+  // nem escrita, nem conferência, nem carteira.
+  for (const [conta, pedidos] of [...porConta].sort((a, b) => a[0] - b[0])) {
+    const c = coletas.get(conta);
+    if (c && !c.falhou) continue;
+    for (const p of pedidos ?? [])
+      linhas.push({ conta, p, estado: "nao-lida", achado: null, codigo: "", candidatos: 0,
+        motivo: motivoDe("conta-nao-lida", c?.pagina ? { pagina: c.pagina } : {}) });
+  }
+
+  for (const [conta, colhidos] of [...coletas].sort((a, b) => a[0] - b[0])) {
+    if (colhidos.falhou) continue;   // já virou "conta não foi lida" acima
     for (const p of porConta.get(conta) ?? []) {
       const r = conciliarPedido(p, colhidos);
       const codigo = MOTIVO_DO_ESTADO[r.estado];
@@ -256,6 +288,7 @@ export function conciliar(contas, coletas) {
       }
       linhas.push(linha);
     }
+  }
 
   const resumo = { total: linhas.length, casados: 0, ambiguos: 0, semCodigo: 0, naoAchados: 0,
                    precisaDeVoce: 0, seResolveSozinho: 0 };

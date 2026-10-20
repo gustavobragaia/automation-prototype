@@ -1,0 +1,115 @@
+{
+  "tipo": "coleta",
+  "conta": "125",
+  "listasBrutas": [],
+  "pagina": "https://shopee.com.br/verify/traffic/error?home_url=https%3A%2F%2Fshopee.com.br&is_logged_in=false&next=https%3A%2F%2Fshopee.com.br%2Fuser%2Fpurchase%3Ftype%3D7&tracking_id=45441f8e329-452a-48d6-a6d0-56e629af8b56&type=4",
+  "duracaoMs": 7481,
+  "listas": [
+    {
+      "tipo": 6,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_all_order_and_checkout_list?limit=20&offset=0&list_type=6",
+      "status": 200,
+      "ok": false,
+      "corpo": {
+        "0": 3,
+        "1": "45441f8e329-452a-48d6-a6d0-56e629af8b56",
+        "2": false,
+        "3": 90309999,
+        "4": 2,
+        "5": false,
+        "9": true,
+        "error": 90309999
+      }
+    },
+    {
+      "tipo": 6,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_order_list?limit=20&offset=0&list_type=6",
+      "status": 200,
+      "ok": false,
+      "corpo": {
+        "0": 3,
+        "1": "725f6552d99-3445-4478-a012-ce5b02b7407d",
+        "2": false,
+        "3": 90309999,
+        "4": 2,
+        "5": false,
+        "9": true,
+        "error": 90309999
+      }
+    },
+    {
+      "tipo": 8,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_all_order_and_checkout_list?limit=20&offset=0&list_type=8",
+      "status": 200,
+      "ok": false,
+      "corpo": {
+        "0": 3,
+        "1": "342ba0e69c-e342-4adb-9782-6cb107898d9b",
+        "2": false,
+        "3": 90309999,
+        "4": 2,
+        "5": false,
+        "9": true,
+        "error": 90309999
+      }
+    },
+    {
+      "tipo": 8,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_order_list?limit=20&offset=0&list_type=8",
+      "status": 200,
+      "ok": false,
+      "corpo": {
+        "0": 3,
+        "1": "92843333e0b-5d51-4568-a990-c8596546372a",
+        "2": false,
+        "3": 90309999,
+        "4": 2,
+        "5": false,
+        "9": true,
+        "error": 90309999
+      }
+    },
+    {
+      "tipo": 7,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_all_order_and_checkout_list?limit=20&offset=0&list_type=7",
+      "status": 200,
+      "ok": false,
+      "corpo": {
+        "0": 3,
+        "1": "5722db17853-12e9-4189-ab1f-19e42a2e3142",
+        "2": false,
+        "3": 90309999,
+        "4": 2,
+        "5": false,
+        "9": true,
+        "error": 90309999
+      }
+    },
+    {
+      "tipo": 7,
+      "pagina": 0,
+      "caminho": "/api/v4/order/get_order_list?limit=20&offset=0&list_type=7",
+      "status": 200,
+      "ok": false,
+      "corpo": {
+        "0": 3,
+        "1": "148b777ad79-86e0-47a5-81c6-2e079f9fb534",
+        "2": false,
+        "3": 90309999,
+        "4": 2,
+        "5": false,
+        "9": true,
+        "error": 90309999
+      }
+    }
+  ],
+  "pedidos": [],
+  "texto": "Ir para o conteúdo principal\nPrecisa de ajuda?\nLogin Necessário\nParece que você ainda não está logado. Faça login para continuar ou volte para a página inicial.\nEntrarVoltar à Página Inicial\nID: 45441f8e329-452a-48d6-a6d0-56e629af8b56\nUsamos cookies para melhorar sua experiência na Shopee. Para mais informações consulte nossa Política de privacidade.\nConfigurações de cookies\nAceitar todos os cookies",
+  "aba": 1252423292,
+  "em": 1792524168728
+}

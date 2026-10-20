@@ -134,11 +134,56 @@
 
     // Sessão caída não é coleta vazia: é outra coisa. Reportar como coleta
     // fazia a fila dar a conta por concluída no meio do login.
+    //
+    // A Shopee tem mais de um jeito de dizer "não está logado", e o antigo
+    // (error 19, ou cair em /buyer/login) não é mais o único. Na rodada de
+    // 21/10 as contas 125 e 150 voltaram assim — e viraram "coleta com zero
+    // pedidos", que a conferência mostrou como 12 "não achado na conta":
+    //   - 403 com { is_login: false, error: 90309999 } em todas as listas,
+    //     a página parada em /user/purchase (conta 150);
+    //   - página /verify/traffic/error?is_logged_in=false, "Login Necessário"
+    //     (conta 125).
+    const semSessao = (l) =>
+      l.corpo?.error === 19 || l.corpo?.error === 90309999 || l.corpo?.is_login === false ||
+      l.status === 401 || l.status === 403 || /authenticate/i.test(l.corpo?.error_msg ?? "");
+    const nenhumaListaRespondeu = !listas.some((l) => l.ok);
     const naoAutenticado =
-      /\/buyer\/login/.test(location.pathname) ||
-      listas.some((l) => l.corpo?.error === 19 || /authenticate/i.test(l.corpo?.error_msg ?? ""));
+      /\/buyer\/login/.test(location.pathname) || /\/verify\//.test(location.pathname) ||
+      (nenhumaListaRespondeu && listas.some(semSessao));
     if (naoAutenticado) {
-      publicar({ tipo: "nao-autenticado", pagina: location.href });
+      const motivo = /\/verify\//.test(location.pathname)
+        ? "a Shopee mostrou a página de verificação de tráfego (sessão caiu)"
+        : "a Shopee respondeu que a conta não está logada";
+      // Uma ida ao login por aba. Se voltou do login e AINDA não tem
+      // sessão, não é caso de tentar de novo: é bloqueio, e precisa de uma
+      // pessoa — insistir é o que faz a Shopee endurecer com a conta.
+      let jaFoi = false;
+      try { jaFoi = sessionStorage.getItem("esteira-foi-ao-login") === "1"; } catch {}
+      if (jaFoi) {
+        publicar({ tipo: "precisa-humano", motivo: `${motivo}, mesmo depois de entrar`, pagina: location.href });
+        return;
+      }
+      publicar({ tipo: "nao-autenticado", motivo, pagina: location.href });
+      if (/\/buyer\/login/.test(location.pathname)) return;   // o login.js já está aqui
+      try { sessionStorage.setItem("esteira-foi-ao-login", "1"); } catch {}
+      // O login automático (login.js) só age em /buyer/login. Sem ir até lá,
+      // ninguém tentava entrar e a conta ficava "sem pedidos".
+      setTimeout(() => {
+        location.href = "https://shopee.com.br/buyer/login?next=" +
+          encodeURIComponent("https://shopee.com.br/user/purchase?type=7");
+      }, 1500);
+      return;
+    }
+    // Coleta boa: a próxima queda de sessão nesta aba pode tentar o login.
+    try { sessionStorage.removeItem("esteira-foi-ao-login"); } catch {}
+
+    // Nenhuma lista respondeu, mas também não foi sessão: não é "zero
+    // pedidos". Publicar isso como coleta faz a conferência acusar todos os
+    // pedidos da conta de "não achado".
+    if (nenhumaListaRespondeu) {
+      publicar({ tipo: "coleta-falhou",
+        motivo: `nenhuma lista de pedidos respondeu (${[...new Set(listas.map((l) => l.status ?? l.erro))].join(", ")})`,
+        pagina: location.href });
       return;
     }
 

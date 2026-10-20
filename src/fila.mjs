@@ -111,16 +111,48 @@ export async function processarConta({ serial, userId, conta }, {
 
     emitir("conta:lendo", { conta });
 
-    const limite = Date.now() + timeoutMs;
-    while (Date.now() < limite) {
+    const comecou = Date.now();
+    for (;;) {
       await dormir(2000);
       if (existsSync(arq) && statSync(arq).mtimeMs > antes) return arq;
+      const p = prazoDaConta({ comecou, agora: Date.now(), timeoutMs, marca: lerMarca(conta) });
+      if (p.desistir) throw new Error(`conta ${conta}: ${p.desistir}`);
+      if (Date.now() >= p.limite)
+        throw new Error(`conta ${conta}: nada chegou ao coletor em ${Math.round((p.limite - comecou) / 1000)}s`);
     }
-    throw new Error(`conta ${conta}: nada chegou ao coletor em ${timeoutMs / 1000}s`);
   } finally {
     await fecharPerfil(ref).catch(() => {}); // nunca desloga
     abertosAgora.delete(ref);
   }
+}
+
+/** O que a conta avisou sobre login nesta rodada (o arquivo do coletor). */
+function lerMarca(conta) {
+  try { return JSON.parse(readFileSync(loginDaConta(conta), "utf8")); } catch { return null; }
+}
+
+/**
+ * Até quando esperar a coleta de uma conta, e se já dá para desistir.
+ *
+ * O prazo fixo de 150s cortava o login automático no meio (abrir o login,
+ * pedir o código no e-mail, voltar, coletar de novo). E quando a conta já
+ * tinha dito que não ia dar — precisa de pessoa, login falhou, nenhuma lista
+ * respondeu — a fila esperava os 150s inteiros à toa.
+ *
+ * Só vale aviso desta rodada: a marca é um arquivo que nunca é apagado.
+ */
+export function prazoDaConta({ comecou, agora, timeoutMs, marca }) {
+  const base = { limite: comecou + timeoutMs, desistir: null };
+  if (!marca || !(marca.em >= comecou)) return base;
+  const motivo = marca.motivo ? ` — ${marca.motivo}` : "";
+  if (/^precisa-humano/.test(marca.tipo)) return { ...base, desistir: `a Shopee pediu uma pessoa${motivo}` };
+  if (/^login-falhou/.test(marca.tipo)) return { ...base, desistir: `o login automático falhou${motivo}` };
+  if (/^coleta-falhou/.test(marca.tipo)) return { ...base, desistir: `a coleta não leu nenhum pedido${motivo}` };
+  if (/^sessao-caida/.test(marca.tipo))
+    return { ...base, desistir: "a sessão da Shopee caiu e o login automático está desligado" };
+  // login em andamento (nao-autenticado, login-*, otp-*): mais prazo, a
+  // partir do último aviso — cada passo do login renova a espera
+  return { limite: Math.max(base.limite, marca.em + ESPERA_LOGIN_MS), desistir: null };
 }
 
 // Quantos pedidos entraram e se a sessão estava viva. Sai do que o coletor
