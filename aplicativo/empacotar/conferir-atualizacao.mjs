@@ -28,7 +28,9 @@ tudo &= ok(existsSync(yml) && /version: 9\.9\.9/.test(readFileSync(yml, "utf8"))
 const programas = join(process.env.LOCALAPPDATA, "Programs");
 const pasta = readdirSync(programas).find((d) => existsSync(join(programas, d, "Esteira.exe")));
 const exe = join(programas, pasta, "Esteira.exe");
-const versaoDe = (f) => execFileSync("powershell", ["-NoProfile", "-Command", `(Get-Item '${f}').VersionInfo.ProductVersion`]).toString().trim();
+// O Windows grava a versão com quatro números ("9.9.9.0"); o app usa três.
+const versaoDe = (f) => execFileSync("powershell", ["-NoProfile", "-Command", `(Get-Item '${f}').VersionInfo.ProductVersion`])
+  .toString().trim().replace(/^(\d+\.\d+\.\d+)\.0$/, "$1");
 const antes = versaoDe(exe);
 tudo &= ok(!!antes && antes !== "9.9.9", `o Esteira instalado está na versão atual (${antes})`);
 tudo &= ok(existsSync(join(programas, pasta, "resources", "app-update.yml")),
@@ -79,7 +81,7 @@ await js(`document.getElementById("bAtualizar").click()`);
 let depois = antes;
 for (let i = 0; i < 120 && depois !== "9.9.9"; i++) {
   await dormir(2000);
-  try { depois = versaoDe(exe); } catch {}
+  try { depois = versaoDe(exe); } catch {}   // some por instantes enquanto o instalador troca os arquivos
 }
 tudo &= ok(depois === "9.9.9", `o Esteira instalado agora é o 9.9.9 (era ${antes})`);
 let voltou = false;
