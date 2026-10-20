@@ -240,6 +240,8 @@ td.dir,th.dir{text-align:right;font-variant-numeric:tabular-nums}
 .segredo .guardado{display:flex;align-items:center;gap:12px;padding:7px 0}
 .segredo .digitar{display:flex;gap:8px;align-items:center}
 .segredo .digitar input{flex:1;min-width:0}
+.segredo .olho{padding:6px 9px;display:inline-flex}
+.segredo .olho svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .segredo em{display:block;font-size:11.5px;color:var(--tinta-3);font-style:normal;
   margin-top:6px;line-height:1.55}
 .par-campos{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
@@ -480,6 +482,10 @@ img.ads{width:14px;height:14px;border-radius:3px;flex:none}
 .g-exemplo b{color:var(--tinta);font-weight:500}
 .g-exemplo code,.nota code{font-family:var(--mono);font-size:11.5px;color:var(--tinta)}
 .g-guardada{color:var(--ok);font-weight:500}
+.g-com-olho{display:flex;gap:8px;align-items:center}
+.g-com-olho input{flex:1;min-width:0}
+.btn.olho{padding:6px 9px;display:inline-flex}
+.btn.olho svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .g-res{margin-top:14px;font-size:12.5px}
 .g-res:empty{display:none}
 .g-res .nota{margin-top:6px}
@@ -1225,14 +1231,14 @@ details.cred summary:hover{color:var(--tinta)}
         <div class="segredo" data-segredo="adspowerChave">
           <span class="rot">Chave da API</span>
           <div class="guardado" hidden>
-            <span class="est ok"><span class="pt"></span>Guardada neste computador</span>
-            <button class="btn peq" data-trocar>Trocar</button>
+            <span class="est ok"><span class="pt"></span>Guardada neste computador — não precisa digitar de novo</span>
           </div>
           <div class="digitar">
             <input type="password" spellcheck="false" autocomplete="off"
                    placeholder="cole aqui a chave do AdsPower">
+            <button class="btn olho" data-olho type="button" aria-label="Mostrar" title="Mostrar"></button>
             <button class="btn pri" data-salvar>Salvar</button>
-            <button class="btn" data-desistir hidden>Cancelar</button>
+            <button class="btn" data-desistir hidden>Desfazer</button>
           </div>
           <em>No AdsPower: Configurações → API local → copiar a chave. É ela que deixa
             o Esteira abrir os perfis.</em>
@@ -1287,30 +1293,30 @@ details.cred summary:hover{color:var(--tinta)}
         <div class="segredo" data-segredo="shopeeSenha">
           <span class="rot">2 · A senha</span>
           <div class="guardado" hidden>
-            <span class="est ok"><span class="pt"></span>Guardada neste computador</span>
-            <button class="btn peq" data-trocar>Trocar</button>
+            <span class="est ok"><span class="pt"></span>Guardada neste computador — não precisa digitar de novo</span>
           </div>
           <div class="digitar">
             <input type="password" autocomplete="off"
                    placeholder="a mesma senha de todas as contas">
+            <button class="btn olho" data-olho type="button" aria-label="Mostrar" title="Mostrar"></button>
             <button class="btn pri" data-salvar>Salvar</button>
-            <button class="btn" data-desistir hidden>Cancelar</button>
+            <button class="btn" data-desistir hidden>Desfazer</button>
           </div>
           <em>Fica num arquivo que só o seu usuário deste computador consegue abrir.
-            Ela nunca sai daqui, e nunca volta para esta tela depois de salva.</em>
+            Ela nunca sai daqui. Fica guardada mesmo quando o Esteira atualiza.</em>
         </div>
 
         <div class="segredo" data-segredo="codigoChave">
           <span class="rot">3 · O código que a Shopee manda por e-mail</span>
           <div class="guardado" hidden>
-            <span class="est ok"><span class="pt"></span>Guardada neste computador</span>
-            <button class="btn peq" data-trocar>Trocar</button>
+            <span class="est ok"><span class="pt"></span>Guardada neste computador — não precisa digitar de novo</span>
           </div>
           <div class="digitar">
             <input type="password" spellcheck="false" autocomplete="off"
                    placeholder="chave da RapidAPI">
+            <button class="btn olho" data-olho type="button" aria-label="Mostrar" title="Mostrar"></button>
             <button class="btn pri" data-salvar>Salvar</button>
-            <button class="btn" data-desistir hidden>Cancelar</button>
+            <button class="btn" data-desistir hidden>Desfazer</button>
           </div>
           <em>Ao entrar, a Shopee manda um código para o e-mail da conta. O robô precisa
             abrir essa caixa de entrada para ler o código — e quem faz isso é um serviço
@@ -2424,34 +2430,54 @@ GANCHOS.testarAds=function(){   // o de verdade troca isto por uma chamada à po
     rapido?0:700);
 };
 /* ── Os três segredos ──
-   Nada de pontinhos falsos no lugar do valor: eles são iguais a um campo
-   vazio, e a pessoa fica sem saber se tem alguma coisa guardada. O estado
-   é dito com todas as letras, e trocar é um ato deliberado. */
-function pintaSegredo(cx, guardada){
-  cx.dataset.guardada = guardada ? "1" : "";
-  cx.querySelector(".guardado").hidden = !guardada;
-  cx.querySelector(".digitar").hidden = guardada;
-  cx.querySelector("[data-desistir]").hidden = !guardada;
-  var campo = cx.querySelector("input");
-  campo.value = "";
-  campo.type = "password";
+   O que está guardado APARECE no campo, escondido em pontinhos, com o
+   olho para conferir. Antes o campo voltava vazio a cada atualização, com
+   "guardada" em cinza, e quem atualizava achava que tinha perdido tudo e
+   digitava de novo. Salvar só aparece quando o campo muda. */
+var ICO_OLHO='<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>';
+var ICO_OLHO_X='<path d="M3 3l18 18M10.6 5.1A10.6 10.6 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/>';
+function pintaOlho(cx){
+  var campo = cx.querySelector("input"), b = cx.querySelector("[data-olho]");
+  var aberto = campo.type === "text";
+  b.innerHTML = '<svg viewBox="0 0 24 24">'+(aberto?ICO_OLHO_X:ICO_OLHO)+'</svg>';
+  b.title = b.ariaLabel = aberto ? "Esconder" : "Mostrar";
 }
+function pintaMudou(cx){
+  var mudou = cx.querySelector("input").value.trim() !== (cx._valor || "");
+  cx.querySelector("[data-salvar]").hidden = !mudou;
+  cx.querySelector("[data-desistir]").hidden = !(mudou && cx._valor);
+}
+function pintaSegredo(cx, guardada, valor){
+  cx.dataset.guardada = guardada ? "1" : "";
+  cx._valor = guardada ? (valor || "") : "";
+  cx.querySelector(".guardado").hidden = !guardada;
+  cx.querySelector(".digitar").hidden = false;
+  var campo = cx.querySelector("input");
+  campo.value = cx._valor;
+  campo.type = "password";
+  pintaOlho(cx); pintaMudou(cx);
+  // a tela recebe só "guardada"; o valor vem à parte, campo por campo
+  if (guardada && valor == null) GANCHOS.lerSegredo(cx.dataset.segredo, function(v){
+    if (cx.dataset.guardada && campo.value === "") pintaSegredo(cx, true, v || "");
+  });
+}
+GANCHOS.lerSegredo = function(qual, pronto){ pronto("chave-de-exemplo-"+qual); };
 document.querySelectorAll(".segredo").forEach(function(cx){
   pintaSegredo(cx, false);
   cx.addEventListener("click", function(e){
-    if(e.target.closest("[data-trocar]")){
-      cx.querySelector(".guardado").hidden = true;
-      cx.querySelector(".digitar").hidden = false;
-      cx.querySelector("input").focus();
-      return;
+    if(e.target.closest("[data-olho]")){
+      var campo = cx.querySelector("input");
+      campo.type = campo.type === "password" ? "text" : "password";
+      return pintaOlho(cx);
     }
-    if(e.target.closest("[data-desistir]")) return pintaSegredo(cx, true);
+    if(e.target.closest("[data-desistir]")) return pintaSegredo(cx, true, cx._valor);
     if(e.target.closest("[data-salvar]")){
       var v = cx.querySelector("input").value.trim();
       if(!v) return;
-      GANCHOS.salvarSegredo(cx.dataset.segredo, v, function(){ pintaSegredo(cx, true); });
+      GANCHOS.salvarSegredo(cx.dataset.segredo, v, function(){ pintaSegredo(cx, true, v); });
     }
   });
+  cx.querySelector("input").addEventListener("input", function(){ pintaMudou(cx); });
   cx.querySelector("input").addEventListener("keydown", function(e){
     if(e.key === "Enter"){ e.preventDefault(); cx.querySelector("[data-salvar]").click(); }
   });
@@ -2664,7 +2690,10 @@ window.TELA = {
     liga("chNot", a.notificacao, function(v){ notif=v; });
     liga("chDireto", a.escreverDireto, function(v){ direto=v; pintaEscrita(); });
     document.querySelectorAll(".segredo").forEach(function(cx){
-      pintaSegredo(cx, a[cx.dataset.segredo] === "guardada");
+      var g = a[cx.dataset.segredo] === "guardada";
+      // não repinta o que já está certo nem o que a pessoa está digitando
+      if (g === !!cx.dataset.guardada || cx.querySelector("input").value.trim() !== (cx._valor || "")) return;
+      pintaSegredo(cx, g);
     });
     if(a.emailPrefixo!=null) $("shPrefixo").value=a.emailPrefixo;
     if(a.emailPrefixoAlto!=null) $("shPrefixoAlto").value=a.emailPrefixoAlto;

@@ -55,12 +55,25 @@ app.whenReady().then(async () => {
   })()`);
   await new Promise((r) => setTimeout(r, 900));
 
-  // a tela nunca pode ter o segredo de volta
+  // ── "atualizou o Esteira": abre de novo, só com o que está em disco ──
+  await w.webContents.executeJavaScript(`window.esteira.pedir("ajustes:salvar", { adspowerChave: "chave-do-ads" })`);
+  w.webContents.reload();
+  await new Promise((r) => setTimeout(r, 3000));
+  await w.webContents.executeJavaScript(`document.querySelector('[data-tela="ajustes"]')?.click()`);
+  await new Promise((r) => setTimeout(r, 800));
   const estadoSegredo = await w.webContents.executeJavaScript(`(() => {
+    const ver = (q) => { const cx = document.querySelector('.segredo[data-segredo="' + q + '"]');
+      const i = cx.querySelector("input");
+      return { valor: i.value, escondido: i.type === "password",
+               diz: !cx.querySelector(".guardado").hidden &&
+                    /não precisa digitar de novo/.test(cx.querySelector(".guardado").innerText),
+               salvarEscondido: cx.querySelector("[data-salvar]").hidden }; };
     const cx = document.querySelector('.segredo[data-segredo="shopeeSenha"]');
-    return { guardada: !cx.querySelector(".guardado").hidden &&
-                       /Guardada neste computador/.test(cx.querySelector(".guardado").innerText),
-             campoVazio: cx.querySelector("input").value === "" };
+    cx.querySelector("[data-olho]").click();
+    const aberto = cx.querySelector("input").type === "text";
+    cx.querySelector("[data-olho]").click();
+    const fechado = cx.querySelector("input").type === "password";
+    return { ads: ver("adspowerChave"), senha: ver("shopeeSenha"), codigo: ver("codigoChave"), aberto, fechado };
   })()`);
   const naTela = await w.webContents.executeJavaScript(`(async () => {
     const r = await window.esteira.pedir("ajustes:ler", {});
@@ -71,9 +84,15 @@ app.whenReady().then(async () => {
   console.log("");
   tudo &= ok(/minhaloja124@meudominio\.com/.test(digitado.exemplo),
     `a tela mostra o e-mail que será usado (${digitado.exemplo.trim()})`);
-  tudo &= ok(naTela.senha === "guardada", "a senha NUNCA volta inteira para a tela");
-  tudo &= ok(estadoSegredo.guardada, "e o campo diz, com todas as letras, 'Guardada neste computador'");
-  tudo &= ok(estadoSegredo.campoVazio, "sem pontinhos falsos no lugar do valor");
+  tudo &= ok(naTela.senha === "guardada", "a leitura geral dos ajustes não carrega a senha");
+  const { ads, senha, codigo } = estadoSegredo;
+  tudo &= ok(ads.valor === "chave-do-ads" && senha.valor === "senha-que-eu-digitei" &&
+             codigo.valor === "chave-que-eu-digitei",
+    "reaberto, os 3 campos voltam PREENCHIDOS com o que foi guardado");
+  tudo &= ok(ads.escondido && senha.escondido && codigo.escondido, "escondidos em pontinhos");
+  tudo &= ok(ads.diz && senha.diz && codigo.diz, "e dizem 'não precisa digitar de novo'");
+  tudo &= ok(estadoSegredo.aberto && estadoSegredo.fechado, "o olho mostra e esconde");
+  tudo &= ok(ads.salvarEscondido && senha.salvarEscondido, "sem botão Salvar enquanto nada mudou");
   tudo &= ok(naTela.prefixo === "minhaloja", "mas o que não é segredo, sim");
 
   // ── fecha o app: a partir daqui, só o que está em disco vale ──

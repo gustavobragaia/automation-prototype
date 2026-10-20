@@ -71,6 +71,10 @@ async function ajustes(){
       .catch(function(e){ TELA.avisar("Não consegui guardar", e.message); });
   };
 
+  GANCHOS.lerSegredo = function(qual, pronto){
+    pedir("ajustes:verSegredo", qual).then(pronto).catch(function(){ pronto(""); });
+  };
+
   var simples = [["shPrefixo","emailPrefixo"],["shPrefixoAlto","emailPrefixoAlto"],
                  ["shDominio","emailDominio"],["shFaixa","emailFaixa"],
                  ["adsBase","adspowerBase"]];

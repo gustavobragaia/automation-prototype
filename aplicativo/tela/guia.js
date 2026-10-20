@@ -176,10 +176,10 @@ var TELAS = {
       '<li><span>Vá em <b>Configurações → API local</b> e deixe a opção <b>ligada</b>.</span></li>' +
       '<li><span>Na mesma tela, <b>copie a chave</b> (API Key) e cole aqui embaixo.</span></li>' +
     '</ol>' +
-    '<label class="campo"><span>Chave da API do AdsPower' + (guardada ? ' <b class="g-guardada">· guardada</b>' : '') + '</span>' +
+    '<label class="campo"><span>Chave da API do AdsPower' + (guardada ? ' <b class="g-guardada">· guardada, não precisa digitar de novo</b>' : '') + '</span>' +
       '<input id="gAdsChave" type="password" spellcheck="false" autocomplete="off" placeholder="' +
-        (guardada ? "já guardada — cole outra só se quiser trocar" : "cole aqui a chave") + '">' +
-      '<em>Fica só neste computador, e não aparece de novo depois de guardada.</em></label>' +
+        "cole aqui a chave" + '">' +
+      '<em>Fica só neste computador, e continua guardada quando o Esteira atualiza.</em></label>' +
     '<button class="btn pri" id="gAdsTestar">Testar conexão</button>' +
     '<div id="gAdsRes" class="g-res" aria-live="polite"></div>' +
     '<p class="nota">O AdsPower precisa estar <b>aberto</b> sempre que o Esteira for rodar — ' +
@@ -192,9 +192,9 @@ var TELAS = {
     var segredo = function(id, rot, ph, campo, ajuda){
       var g = a[campo] === "guardada";
       return '<label class="campo"><span>' + rot +
-        (g ? ' <b class="g-guardada">· guardada</b>' : '') + '</span>' +
+        (g ? ' <b class="g-guardada">· guardada, não precisa digitar de novo</b>' : '') + '</span>' +
         '<input id="' + id + '" type="password" spellcheck="false" autocomplete="off" placeholder="' +
-          (g ? "já guardada — digite só se quiser trocar" : ph) + '">' +
+          ph + '">' +
         '<em>' + ajuda + '</em></label>';
     };
     return cabecalho("shopee", "Configuração 2 de 3", "Contas da Shopee") +
@@ -342,10 +342,40 @@ function pintaTour(){
   raiz.querySelector("#gSeguir").textContent = tour < 3 ? "Próximo" : "Continuar";
 }
 
+/* ── Segredo guardado aparece no campo ──
+   Escondido, com o olho para conferir. Com o campo vazio, quem atualizava
+   o Esteira achava que tinha perdido a chave e digitava de novo. */
+var CAMPO_SEGREDO = { gAdsChave: "adspowerChave", gSenha: "shopeeSenha", gCodigo: "codigoChave" };
+var OLHO = '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>';
+var OLHO_X = '<path d="M3 3l18 18M10.6 5.1A10.6 10.6 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/>';
+function preencherSegredos(c){
+  Object.keys(CAMPO_SEGREDO).forEach(function(id){
+    var inp = c.querySelector("#" + id);
+    if (!inp) return;
+    if (!inp.parentNode.classList.contains("g-com-olho")) {
+      var caixa = document.createElement("div");
+      caixa.className = "g-com-olho";
+      inp.parentNode.insertBefore(caixa, inp); caixa.appendChild(inp);
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "btn olho"; caixa.appendChild(b);
+      var pinta = function(){ var aberto = inp.type === "text";
+        b.innerHTML = '<svg viewBox="0 0 24 24">' + (aberto ? OLHO_X : OLHO) + '</svg>';
+        b.title = b.ariaLabel = aberto ? "Esconder" : "Mostrar"; };
+      b.onclick = function(e){ e.preventDefault(); inp.type = inp.type === "password" ? "text" : "password"; pinta(); };
+      pinta();
+    }
+    if (!ajustes || ajustes[CAMPO_SEGREDO[id]] !== "guardada") return;
+    pedir("ajustes:verSegredo", CAMPO_SEGREDO[id])
+      .then(function(v){ if (v && !inp.value) inp.value = v; })
+      .catch(function(){});
+  });
+}
+
 /* ── O que cada passo faz depois de aparecer ── */
 var lista = function(xs){ return '<ul class="g-resolver">' + xs.map(function(x){ return "<li>" + esc(x) + "</li>"; }).join("") + '</ul>'; };
 var DEPOIS = {
   ads: function(c){
+    preencherSegredos(c);
     var botao = c.querySelector("#gAdsTestar"), res = c.querySelector("#gAdsRes");
     if (feito.ads) resultado(res, "ok", '<span class="est ok"><span class="pt"></span>Conectado ao AdsPower</span>');
     botao.onclick = async function(){
@@ -354,7 +384,7 @@ var DEPOIS = {
       try {
         var chave = c.querySelector("#gAdsChave").value.trim();
         if (chave) { ajustes = await pedir("ajustes:salvar", { adspowerChave: chave }); mexeu = true;
-                     c.querySelector("#gAdsChave").value = ""; }
+                     preencherSegredos(c); }
         var d = await comPrazo(pedir("adspower:diagnosticar", {}), 20000);
         feito.ads = !!d.ok;
         if (d.ok) resultado(res, "ok", '<span class="est ok"><span class="pt"></span>' + esc(d.titulo) + '</span>' +
@@ -372,6 +402,7 @@ var DEPOIS = {
 
   contas: function(c){
     var $ = function(i){ return c.querySelector("#" + i); };
+    preencherSegredos(c);
     var res = $("gContasRes");
     var exemplo = function(){
       var pre = $("gPrefixo").value.trim(), dom = $("gDominio").value.trim().replace(/^@/, "");
@@ -401,7 +432,6 @@ var DEPOIS = {
       if ($("gCodigo").value.trim()) m.codigoChave = $("gCodigo").value.trim();
       try {
         ajustes = await pedir("ajustes:salvar", m); mexeu = true;
-        $("gSenha").value = ""; $("gCodigo").value = "";
         var falta = ajustes.falta || [];
         feito.contas = !falta.length;
         if (feito.contas) resultado(res, "ok", '<span class="est ok"><span class="pt"></span>Guardado. Nada faltando.</span>');
@@ -410,9 +440,8 @@ var DEPOIS = {
         ["shopeeSenha","codigoChave"].forEach(function(k, i){
           var inp = $(i ? "gCodigo" : "gSenha");
           if (ajustes[k] !== "guardada") return;
-          inp.placeholder = "já guardada — digite só se quiser trocar";
           var span = inp.parentNode.querySelector("span");
-          if (!span.querySelector(".g-guardada")) span.insertAdjacentHTML("beforeend", ' <b class="g-guardada">· guardada</b>');
+          if (!span.querySelector(".g-guardada")) span.insertAdjacentHTML("beforeend", ' <b class="g-guardada">· guardada, não precisa digitar de novo</b>');
         });
       } catch (e) {
         resultado(res, "er", '<span class="est er"><span class="pt"></span>Não consegui guardar</span>' + lista([e.message]));

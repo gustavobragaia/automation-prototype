@@ -172,13 +172,17 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
 
   return {
     // ── ajustes que o cliente escolhe uma vez ─────────────────────────
-    // Nenhum segredo volta inteiro para a tela — nem a senha da Shopee, nem
-    // as chaves. Ela recebe só "guardada", o bastante para mostrar que
-    // existe um valor salvo. Quem precisa do valor é o robô, aqui dentro.
+    // A leitura geral leva só "guardada" no lugar de cada segredo; o valor,
+    // para preencher o campo, vem por "ajustes:verSegredo".
     "ajustes:ler": async () => {
       const a = lerAjustes();
       return { ...semSegredos(a), falta: faltaConfigurar(a) };
     },
+    // O valor de UM segredo, quando a tela vai mostrá-lo no campo (escondido,
+    // com o olho). Fica fora do "ajustes:ler" para nunca ir junto em log ou
+    // em diagnóstico; só sai o que for pedido pelo nome.
+    "ajustes:verSegredo": async (qual) =>
+      SEGREDOS.includes(qual) ? String(lerAjustes()[qual] ?? "") : "",
     "ajustes:salvar": (mudancas) => tentar(async () => {
       const a = salvarAjustes(limparGuardados(mudancas ?? {}));
       aplicarNoAmbiente(a);
