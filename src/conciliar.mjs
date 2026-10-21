@@ -88,11 +88,124 @@ export function conciliarPedido(pedido, colhidos) {
            candidatos: iguais.length, iguais };
 }
 
+// ── Pareamento pelo total do cliente ────────────────────────────────────
+//
+// Um cliente com DOIS pedidos na Shopify na mesma conta (EDESIO, conta 162:
+// #165172 R$ 36,56 e #165173 R$ 12,90) e duas compras na Shopee (R$ 34,80 e
+// R$ 14,66). Nenhum valor bate sozinho — as compras foram feitas juntas e a
+// Shopee rateia frete e desconto de outro jeito —, mas a SOMA bate exata
+// (49,46). Antes os dois viravam "dois candidatos" na conferência.
+//
+// O robô pareia quando dá para ter certeza:
+//   - o total da planilha bate com o total das compras (até R$ 0,05);
+//   - toda compra tem rastreio, e todo pedido fica com pelo menos uma;
+//   - o melhor pareamento é CLARAMENTE melhor que o segundo (R$ 0,50 de
+//     folga). Valores iguais (HAROLDO: 31,99 + 31,99) empatam e ficam para
+//     a pessoa — escrever o rastreio no pedido errado é pior que perguntar.
+// Mais compras que pedidos (pedido de 2 produtos comprados separados) entra
+// no mesmo cálculo, exigindo também o mesmo CEP nas compras.
+const FOLGA_PAREAMENTO = 0.5;
+const MAX_COMPRAS_PAREAMENTO = 7;
+
+const numeroDo = (p) => String(p?.pedido ?? "").match(/(\d{3,})/)?.[1] ?? String(p?.pedido ?? "");
+
+/**
+ * O melhor jeito de dividir as compras entre os pedidos, se for claro.
+ * @param pedidos [{ valor }]   @param compras [{ valor }]
+ * @returns null | number[]  (para cada compra, o índice do pedido)
+ */
+export function pareamentoClaro(pedidos, compras) {
+  const n = pedidos.length, m = compras.length;
+  if (!n || m < n || m > MAX_COMPRAS_PAREAMENTO) return null;
+  if (pedidos.some((p) => p.valor == null) || compras.some((c) => c.valor == null)) return null;
+  const total = (xs) => xs.reduce((t, x) => t + Number(x.valor), 0);
+  if (Math.abs(total(pedidos) - total(compras)) > TOLERANCIA_SOMA) return null;
+
+  let melhor = null, custoMelhor = Infinity, custoSegundo = Infinity;
+  const atual = new Array(m).fill(0);
+  const avaliar = () => {
+    const somas = new Array(n).fill(0), qtd = new Array(n).fill(0);
+    atual.forEach((i, k) => { somas[i] += Number(compras[k].valor); qtd[i]++; });
+    if (qtd.some((q) => q === 0)) return;              // todo pedido fica com alguma
+    const custo = somas.reduce((t, s, i) => t + Math.abs(s - Number(pedidos[i].valor)), 0);
+    if (custo < custoMelhor - 1e-9) { custoSegundo = custoMelhor; custoMelhor = custo; melhor = [...atual]; }
+    else if (custo < custoSegundo) custoSegundo = custo;
+  };
+  const percorrer = (k) => {
+    if (k === m) return avaliar();
+    for (let i = 0; i < n; i++) { atual[k] = i; percorrer(k + 1); }
+  };
+  percorrer(0);
+  if (!melhor) return null;
+  if (custoSegundo - custoMelhor < FOLGA_PAREAMENTO) return null;   // empate ou quase
+  return melhor;
+}
+
+function parearPorCliente(linhas, coletas) {
+  const grupos = new Map();
+  for (const l of linhas) {
+    if (!(l.estado === "ambiguo" || RESOLVIDO.has(l.estado))) continue;
+    const chave = `${l.conta}|${normNome(l.p.nome)}`;
+    if (!grupos.has(chave)) grupos.set(chave, []);
+    grupos.get(chave).push(l);
+  }
+  for (const doGrupo of grupos.values()) {
+    const temDuvida = doGrupo.some((l) => l.estado === "ambiguo");
+    // o mesmo rastreio em dois pedidos diferentes também precisa ser refeito
+    const donoDe = new Map(); let conflito = false;
+    for (const l of doGrupo) for (const c of String(l.codigo || "").split(" · ").filter(Boolean)) {
+      if (donoDe.has(c) && donoDe.get(c) !== numeroDo(l.p)) conflito = true;
+      donoDe.set(c, numeroDo(l.p));
+    }
+    if (!temDuvida && !conflito) continue;
+
+    const { conta, p } = doGrupo[0];
+    const compras = (coletas.get(conta) ?? []).filter((c) => normNome(c.nome) === normNome(p.nome));
+    if (!compras.length || !compras.every((c) => c.codigos?.length)) { if (conflito) emDuvida(doGrupo, compras); continue; }
+    // pedido em várias linhas (2 produtos) é um pedido só
+    const porNumero = new Map();
+    for (const l of doGrupo) {
+      const num = numeroDo(l.p);
+      if (!porNumero.has(num)) porNumero.set(num, { valor: l.p.valor ?? null, linhas: [] });
+      porNumero.get(num).linhas.push(l);
+    }
+    const pedidos = [...porNumero.values()];
+    if (compras.length > pedidos.length) {
+      const ceps = new Set(compras.map((c) => String(c.cep ?? "").replace(/\D/g, "")));
+      if (ceps.size !== 1 || [...ceps][0] === "") { if (conflito) emDuvida(doGrupo, compras); continue; }
+    }
+    const par = pareamentoClaro(pedidos, compras);
+    if (!par) { if (conflito) emDuvida(doGrupo, compras); continue; }
+    pedidos.forEach((ped, i) => {
+      const minhas = compras.filter((_, k) => par[k] === i);
+      for (const l of ped.linhas) {
+        l.estado = minhas.length > 1 ? "ok-partes" : "ok-total";
+        l.achado = minhas[0];
+        l.partes = minhas.length > 1 ? minhas : undefined;
+        l.codigo = minhas.flatMap((c) => c.codigos).join(" · ");
+        l.candidatos = compras.length;
+        delete l.motivo;
+      }
+    });
+  }
+}
+
+// Conflito sem pareamento claro: vira dúvida, com os candidatos para escolher.
+function emDuvida(doGrupo, compras) {
+  for (const l of doGrupo) {
+    l.estado = "ambiguo"; l.achado = null; l.codigo = "";
+    l.motivo = motivoDe("ambiguo", { candidatos: compras.map((c) => ({
+      codigos: c.codigos ?? [], valor: c.valor ?? null, cep: c.cep ?? null, orderId: c.orderId ?? null })) });
+  }
+}
+
 /**
  * Os candidatos são partes de um pedido só?
  * Exige os três ao mesmo tempo, porque qualquer um sozinho erra:
  * mesmo CEP, todos com código, e a soma batendo com a planilha.
  */
+const TOLERANCIA_SOMA = 0.05;
+
 export function pedidoDividido(pedido, candidatos) {
   if (candidatos.length < 2 || pedido.valor == null) return null;
 
@@ -101,7 +214,9 @@ export function pedidoDividido(pedido, candidatos) {
   if (!candidatos.every((c) => c.codigos?.length)) return null;
 
   const soma = candidatos.reduce((t, c) => t + Number(c.valor ?? 0), 0);
-  if (Math.abs(soma - Number(pedido.valor)) > 0.01) return null;
+  // Até R$ 0,05: a Shopee arredonda o rateio de frete e desconto entre as
+  // compras, e um centavo a mais jogava o pedido para a conferência.
+  if (Math.abs(soma - Number(pedido.valor)) > TOLERANCIA_SOMA) return null;
 
   return candidatos;
 }
@@ -244,7 +359,7 @@ export function sugerirContas(nome, coletas, exceto) {
   return achados;
 }
 
-const RESOLVIDO = new Set(["ok", "ok-valor", "ok-partes"]);
+const RESOLVIDO = new Set(["ok", "ok-valor", "ok-partes", "ok-total"]);
 export const resolvido = (estado) => RESOLVIDO.has(estado);
 
 /**
@@ -289,6 +404,8 @@ export function conciliar(contas, coletas) {
       linhas.push(linha);
     }
   }
+
+  parearPorCliente(linhas, coletas);
 
   const resumo = { total: linhas.length, casados: 0, ambiguos: 0, semCodigo: 0, naoAchados: 0,
                    precisaDeVoce: 0, seResolveSozinho: 0 };

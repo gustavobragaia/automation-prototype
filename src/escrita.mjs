@@ -81,8 +81,14 @@ export async function escreverRastreios(contas, coletas, {
 
   const planejado = [];
   let pulados = 0;
+  // Pedido com 2 produtos vem em 2 linhas da planilha (19 em 200 na planilha
+  // da Chomps de 21/10). Uma escrita por PEDIDO: a segunda linha mandava o
+  // mesmo rastreio de novo, a Shopify recusava ("já enviado") e o pedido ia
+  // parar na conferência como falha.
+  const jaPlanejado = new Set();
   for (const l of prontos) {
     const num = normalizarNumero(l.p.pedido);
+    if (jaPlanejado.has(num)) continue;
     const alvo = naShopify.get(num);
 
     if (!alvo) { anotar(l, "nao-existe-na-loja"); continue; }
@@ -104,6 +110,7 @@ export async function escreverRastreios(contas, coletas, {
     }
 
     planejado.push({ num, l, alvo, codigos: t.codes });
+    jaPlanejado.add(num);
   }
 
   if (!escrever)

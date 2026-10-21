@@ -84,12 +84,12 @@ ws.getRow(1).font = { bold: true };
 const ordem = [...linhas].sort((a, b) => a.conta - b.conta || String(a.p.pedido).localeCompare(String(b.p.pedido)));
 for (const l of ordem) {
   const m = l.motivo ?? {};
-  const ok = ["ok", "ok-valor", "ok-partes"].includes(l.estado);
+  const ok = ["ok", "ok-valor", "ok-partes", "ok-total"].includes(l.estado);
   ws.addRow({ conta: l.conta, pedido: l.p.pedido ?? "", nome: l.p.nome ?? "", valor: l.p.valor ?? "",
-    rastreio: ok ? l.codigo : "", situacao: ok ? (l.estado === "ok-partes" ? "rastreio encontrado (2 compras)" : "rastreio encontrado") : (m.rotulo ?? MOTIVOS[m.codigo]?.rotulo ?? l.estado),
+    rastreio: ok ? l.codigo : "", situacao: ok ? (l.estado === "ok-partes" ? "rastreio encontrado (2 compras)" : l.estado === "ok-total" ? "rastreio encontrado (pelo total do cliente)" : "rastreio encontrado") : (m.rotulo ?? MOTIVOS[m.codigo]?.rotulo ?? l.estado),
     porque: ok ? "" : (m.texto ?? MOTIVOS[m.codigo]?.texto ?? "") });
 }
-const okN = ordem.filter((l) => ["ok", "ok-valor", "ok-partes"].includes(l.estado)).length;
+const okN = ordem.filter((l) => ["ok", "ok-valor", "ok-partes", "ok-total"].includes(l.estado)).length;
 const saida = join(DIR, `resultado-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.xlsx`);
 await wb.xlsx.writeFile(saida);
 log(`planilha do resultado: ${saida} · ${okN} de ${ordem.length} pedidos com rastreio`);

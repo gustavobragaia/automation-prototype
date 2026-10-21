@@ -745,6 +745,10 @@ details.cred summary:hover{color:var(--tinta)}
 .pa-vazio{padding:30px 20px;text-align:center;font-size:12.5px;color:var(--tinta-2);line-height:1.55}
 .pa-vazio b{display:block;color:var(--tinta);font-size:13.5px;font-weight:500;margin-bottom:3px}
 
+/* conferência: o que acontece com o outro pedido, e "usar os dois" */
+.cand-irmao{font-size:12px;margin-left:auto;margin-right:10px}
+.cand-todos{border-top:1px dashed var(--linha-forte)}
+
 /* progresso da escrita (etapa 4) */
 .esc-prog{display:grid;gap:8px;margin:-6px 0 18px}
 .ver-todos{background:none;border:none;color:var(--tinta);text-decoration:underline;text-underline-offset:2px;cursor:pointer;font:inherit}
@@ -1863,6 +1867,9 @@ function itemDaConferencia(x){
   var el=document.createElement("div");
   el.className="item"; el.setAttribute("data-rev","");
   el.dataset.pedido=x.pedido; el.dataset.motivo=m.codigo||"";
+  // conta + cliente: para achar o OUTRO pedido do mesmo cliente na mesma
+  // conta e dar a ele o rastreio que sobrou (EDESIO, #165172 e #165173)
+  el.dataset.conta=x.conta; el.dataset.cliente=normCliente(x.nome);
 
   var cab='<div class="item-cab">'+
     '<span class="est '+(grave?"er":"at")+'"><span class="pt"></span>'+
@@ -1894,17 +1901,66 @@ function itemDaConferencia(x){
 
   // Os candidatos do empate, para dar para escolher.
   if((x.candidatos||[]).length){
+    var comCodigo=x.candidatos.filter(function(c){return (c.codigos||[]).length;});
     corpo+='<div class="cands">'+x.candidatos.map(function(c){
       return '<div class="cand"><span class="mono">'+esc((c.codigos||[]).join(" · "))+
         '</span><span class="ter">'+dinheiro(c.valor)+
-        (c.cep?' · CEP '+esc(c.cep):"")+'</span>'+
+        (c.cep?' · CEP '+esc(c.cep):"")+'</span><span class="cand-irmao ter"></span>'+
         '<button class="btn" data-usar-codigo="'+esc((c.codigos||[]).join(" "))+
         '">Usar este</button></div>';
-    }).join("")+'</div>';
+    }).join("")+
+    // Pedido com 2 produtos que viraram 2 compras na Shopee: os dois
+    // rastreios vão para o MESMO pedido da Shopify.
+    (comCodigo.length>1
+      ? '<div class="cand cand-todos"><span class="ter">Os '+comCodigo.length+' são deste pedido (produtos comprados separados)</span>'+
+        '<button class="btn" data-usar-todos="'+esc(comCodigo.map(function(c){return c.codigos.join(" ");}).join(" "))+
+        '">Usar os '+(comCodigo.length===2?"dois":comCodigo.length)+'</button></div>' : "")+
+    '</div>';
   }
 
   el.innerHTML=cab+corpo;
   return el;
+}
+function normCliente(n){
+  return String(n||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z]+/g," ").trim();
+}
+// O outro pedido do mesmo cliente, na mesma conta, com os mesmos candidatos.
+// Só quando são exatamente dois pedidos: escolher o rastreio de um decide o
+// do outro. Com três ou mais, cada um continua sendo escolha sua.
+function irmaoDe(it){
+  var outros=Array.prototype.filter.call(document.querySelectorAll("#cxPrecisa .item[data-rev]"),function(o){
+    return o!==it && o.dataset.conta===it.dataset.conta && o.dataset.cliente && o.dataset.cliente===it.dataset.cliente &&
+      o.querySelector("[data-usar-codigo]");
+  });
+  return outros.length===1?outros[0]:null;
+}
+function codigosDe(it){
+  return Array.prototype.map.call(it.querySelectorAll(".cand:not(.cand-todos) [data-usar-codigo]"),function(b){return b.dataset.usarCodigo;});
+}
+// O que sobra para o irmão se ESTE pedido ficar com `codigo`.
+function sobraParaIrmao(it,codigo){
+  var irmao=irmaoDe(it); if(!irmao) return null;
+  var meus=codigosDe(it), deles=codigosDe(irmao);
+  if(meus.length!==2||deles.length!==2) return null;
+  if(meus.slice().sort().join("|")!==deles.slice().sort().join("|")) return null;
+  var resto=meus.filter(function(c){return c!==codigo;});
+  return resto.length===1?{irmao:irmao, codigo:resto[0]}:null;
+}
+// Escreve no rótulo de cada "Usar este" o que acontece com o outro pedido.
+function marcarIrmaos(){
+  Array.prototype.forEach.call(document.querySelectorAll("#cxPrecisa .item[data-rev]"),function(it){
+    // Se existe o outro pedido do mesmo cliente com os mesmos rastreios, eles
+    // são de pedidos DIFERENTES: "Usar os dois" num pedido só seria errado.
+    var todos=it.querySelector(".cand-todos");
+    if(todos) todos.hidden=!!sobraParaIrmao(it,codigosDe(it)[0]);
+    Array.prototype.forEach.call(it.querySelectorAll(".cand:not(.cand-todos)"),function(cand){
+      var b=cand.querySelector("[data-usar-codigo]"), dica=cand.querySelector(".cand-irmao");
+      if(!b||!dica) return;
+      var s=sobraParaIrmao(it,b.dataset.usarCodigo);
+      dica.textContent=s?"o "+s.irmao.dataset.pedido+" fica com "+s.codigo:"";
+      b.textContent=s?"Usar este e o outro":"Usar este";
+    });
+  });
 }
 function caixinha(titulo, lado){
   if(!lado) return "";
@@ -2135,9 +2191,21 @@ $("cxPrecisa").addEventListener("click",function(e){
   if(usarConta) return resolver(it,"passou a usar a conta "+usarConta.dataset.usarConta,
     {decisao:"conta", conta:Number(usarConta.dataset.usarConta)});
 
+  var todos=e.target.closest("[data-usar-todos]");
+  if(todos) return resolver(it,"os dois rastreios no mesmo pedido: "+todos.dataset.usarTodos,
+    {decisao:"colar", texto:todos.dataset.usarTodos});
+
   var usarCod=e.target.closest("[data-usar-codigo]");
-  if(usarCod) return resolver(it,"escolhido o rastreio "+usarCod.dataset.usarCodigo,
-    {decisao:"colar", texto:usarCod.dataset.usarCodigo});
+  if(usarCod){
+    // O outro pedido do mesmo cliente fica com o rastreio que sobrou: um
+    // clique decide os dois, e o mesmo rastreio nunca vai para dois pedidos.
+    var sobra=sobraParaIrmao(it,usarCod.dataset.usarCodigo);
+    resolver(it,"escolhido o rastreio "+usarCod.dataset.usarCodigo,
+      {decisao:"colar", texto:usarCod.dataset.usarCodigo});
+    if(sobra) resolver(sobra.irmao,"ficou com o rastreio que sobrou: "+sobra.codigo,
+      {decisao:"colar", texto:sobra.codigo});
+    return;
+  }
 
   var b=e.target.closest(".btn[data-acao], .cand .btn, .esperando .btn");
   if(!b) return;
@@ -2984,6 +3052,7 @@ window.TELA = {
     Array.prototype.forEach.call(cx.querySelectorAll(".item[data-rev]"),
       function(i){ i.remove(); });
     itens.forEach(function(x){ cx.appendChild(itemDaConferencia(x)); });
+    marcarIrmaos();
     pintaRevisao();
   },
 
