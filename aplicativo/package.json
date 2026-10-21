@@ -13,9 +13,10 @@
     "ensaio": "electron ensaio.mjs",
     "ensaio:ajustes": "electron ensaio-ajustes.mjs",
     "ensaio:arranque": "electron ensaio-arranque.mjs",
-    "ensaios": "npm run ensaio:arranque && npm run ensaio && npm run ensaio:ajustes && npm run ensaio:chave && npm run ensaio:retry",
+    "ensaios": "npm run ensaio:arranque && npm run ensaio && npm run ensaio:ajustes && npm run ensaio:chave && npm run ensaio:retry && npm run ensaio:historico",
     "ensaio:chave": "electron ensaio-chave.mjs",
-    "ensaio:retry": "electron ensaio-retry.mjs"
+    "ensaio:retry": "electron ensaio-retry.mjs",
+    "ensaio:historico": "electron ensaio-historico.mjs"
   },
   "devDependencies": {
     "electron": "^34.0.0",

@@ -341,11 +341,16 @@ async function carregarEscrita(){
 
 /* ── A conferência ── */
 function conferencia(){
+  // Decidir pode ESCREVER na Shopify ("colei o rastreio"): o histórico
+  // recarrega depois, como na escrita em lote. Antes só recarregava ao
+  // reabrir o app.
   GANCHOS.decidir = async function(pedido, ordem){
-    return pedir("conferencia:decidir", {
+    var r = await pedir("conferencia:decidir", {
       pedido: pedido, decisao: ordem.decisao, texto: ordem.texto,
       conta: ordem.conta, motivo: ordem.motivo, ate: ordem.ate,
     });
+    recarregar();
+    return r;
   };
   GANCHOS.conferirColado = async function(pedido, texto){
     var r = await pedir("manual:conferir", { pedido: pedido, texto: texto });
@@ -354,7 +359,9 @@ function conferencia(){
              cep: r.alvo && r.alvo.cep, codigos: r.codigos, transportadora: r.transportadora };
   };
   GANCHOS.desfazer = async function(pedido){
-    return pedir("conferencia:desfazer", { pedido: pedido });
+    var r = await pedir("conferencia:desfazer", { pedido: pedido });
+    recarregar();
+    return r;
   };
 }
 
@@ -392,6 +399,12 @@ GANCHOS.proximaRodada = async function(){
   try { await pedir("planilha:esquecer", {}); } catch (e) {}
   recarregar();
 };
+// Ao abrir a aba Histórico, ela é lida de novo: o que foi escrito por
+// qualquer caminho aparece sem precisar fechar o app.
+document.querySelector('[data-tela="historico"]')?.addEventListener("click", function(){
+  pedir("historico:dias").then(TELA.historico).catch(function(){});
+});
+
 async function recarregar(){
   try { TELA.atrasados(await pedir("pendentes:atrasados")); } catch (e) {}
   try { TELA.historico(await pedir("historico:dias")); } catch (e) {}

@@ -2386,9 +2386,16 @@ var diaAberto=null, filtroSit="";
 function abrirDia(isoDia){
   diaAberto=DIAS.filter(function(d){return d.iso===isoDia;})[0]; if(!diaAberto) return;
   $("histLista").hidden=true; $("histDia").hidden=false;
+  pintaCabecalhoDia(); pintaPedidosDia(); window.scrollTo(0,0);
+}
+function pintaCabecalhoDia(){
   $("diaTit").textContent=diaAberto.br+(diaAberto.hoje?" · hoje":" · "+diaAberto.sem);
-  $("diaSub").textContent=diaAberto.contas+" contas visitadas em "+diaAberto.dur+", "+
-    diaAberto.semLogin+" já estavam conectadas.";
+  // Dia só com escritas (sem rodada de coleta) não tem contas nem duração:
+  // mostrava "null contas visitadas em null, null já estavam conectadas".
+  $("diaSub").textContent = diaAberto.contas==null
+    ? "Nenhuma rodada de coleta neste dia — só escritas na Shopify."
+    : diaAberto.contas+" contas visitadas em "+diaAberto.dur+
+      (diaAberto.semLogin!=null ? ", "+diaAberto.semLogin+" já estavam conectadas." : ".");
   $("diaResumo").innerHTML=[
     ["",diaAberto.total,"pedidos na planilha"],
     ["ok",diaAberto.escritos,"escritos na Shopify"],
@@ -2396,7 +2403,6 @@ function abrirDia(isoDia){
     ["",diaAberto.total-diaAberto.escritos-diaAberto.revisao,"ficaram sem rastreio"]
   ].map(function(m){ return '<div class="'+m[0]+'"><div class="v num">'+m[1]+
     '</div><div class="r">'+m[2]+'</div></div>'; }).join("");
-  pintaPedidosDia(); window.scrollTo(0,0);
 }
 function pintaPedidosDia(){
   var l=diaAberto.pedidos.filter(function(x){return !filtroSit||x.s===filtroSit;});
@@ -2767,7 +2773,16 @@ window.TELA = {
     pintaAtrasados(); pintaRevisao();
   },
 
-  historico: function(dias){ DIAS=dias||[]; pintaDias(); },
+  // O dia aberto também é refeito: antes só a lista mudava, e o dia que a
+  // pessoa estava olhando continuava com os dados de antes (o "só atualiza
+  // fechando o app" do Matheus).
+  historico: function(dias){
+    DIAS=dias||[]; pintaDias();
+    if(diaAberto && !$("histDia").hidden){
+      var novo=DIAS.filter(function(d){return d.iso===diaAberto.iso;})[0];
+      if(novo){ diaAberto=novo; pintaCabecalhoDia(); pintaPedidosDia(); }
+    }
+  },
 
   contas: function(r){
     // a ponte manda { contas, duplicadas }; um array solto é o formato antigo
