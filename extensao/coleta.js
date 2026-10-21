@@ -150,6 +150,9 @@
     const naoAutenticado =
       /\/buyer\/login/.test(location.pathname) || /\/verify\//.test(location.pathname) ||
       (nenhumaListaRespondeu && listas.some(semSessao));
+    // "Verificar Identidade" é do login.js (ele busca o link no e-mail).
+    // Mandar para o /buyer/login daqui recomeçava o login do zero.
+    if (/\/verify\/ivs/.test(location.pathname)) return;
     if (naoAutenticado) {
       const motivo = /\/verify\//.test(location.pathname)
         ? "a Shopee mostrou a página de verificação de tráfego (sessão caiu)"

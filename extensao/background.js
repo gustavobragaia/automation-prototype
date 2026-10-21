@@ -15,7 +15,7 @@ const COLETOR = "http://127.0.0.1:3000";
 // A aba que ganha a 1 ainda precisa ganhar a 2.
 let donoDoLogin = null;
 let travadoEm = 0;
-const TRAVA_VALE_MS = 45_000;   // dona que não concluiu em 45s perde a vez
+const TRAVA_VALE_MS = 120_000;  // dona que não concluiu em 2 min perde a vez (igual ao coletor)
 
 // A aba restaurada costuma chegar primeiro e pegar a trava; logo depois a
 // fila a fecha, e a trava ficava presa numa aba morta — nenhuma outra
@@ -80,7 +80,8 @@ chrome.runtime.onMessage.addListener((msg, remetente, responder) => {
 
   // Pedidos que esperam resposta (credencial, código de verificação).
   if (msg?.pedido) {
-    const url = new URL(`${COLETOR}/${msg.pedido === "otp" ? "otp" : "credencial"}`);
+    const rota = ["otp", "link", "caixa"].includes(msg.pedido) ? msg.pedido : "credencial";
+    const url = new URL(`${COLETOR}/${rota}`);
     url.searchParams.set("conta", self.COLETOR_CONTA ?? "");
     url.searchParams.set("token", self.COLETOR_TOKEN ?? "");
     if (msg.desde) url.searchParams.set("desde", msg.desde);

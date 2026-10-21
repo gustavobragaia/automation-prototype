@@ -189,7 +189,13 @@ tudo &= ok(p0.limite === comecou + T && !p0.desistir, "sem aviso: o prazo normal
 const p1 = prazoDaConta({ comecou, agora: comecou + 140_000, timeoutMs: T,
   marca: { tipo: "otp-preenchido", em: comecou + 140_000 } });
 tudo &= ok(p1.limite > comecou + T && !p1.desistir, "login em andamento: o prazo cresce a partir do último passo");
-for (const [tipo, frase] of [["precisa-humano", /pessoa/], ["login-falhou", /login automático falhou/],
+// precisa de uma pessoa: a janela fica aberta (10 min), não desiste na hora
+const pH = prazoDaConta({ comecou, agora: comecou + 5000, timeoutMs: T, marca: { tipo: "precisa-humano", em: comecou + 4000 } });
+tudo &= ok(!pH.desistir && pH.limite >= comecou + 4000 + 600_000,
+  "'precisa-humano': a janela fica aberta 10 min para a pessoa resolver (antes fechava em 2 s)");
+const pH2 = prazoDaConta({ comecou, agora: comecou + 4000 + 600_001, timeoutMs: T, marca: { tipo: "precisa-humano", em: comecou + 4000, motivo: "x" } });
+tudo &= ok(/ninguém resolveu/.test(pH2.desistir ?? ""), "depois dos 10 min sem ninguém, desiste dizendo por quê");
+for (const [tipo, frase] of [["login-falhou", /login automático falhou/],
                              ["coleta-falhou", /não leu nenhum pedido/], ["sessao-caida", /desligado/]]) {
   const p = prazoDaConta({ comecou, agora: comecou + 5000, timeoutMs: T, marca: { tipo, em: comecou + 4000, motivo: "x" } });
   tudo &= ok(frase.test(p.desistir ?? ""), `'${tipo}': desiste na hora, com o motivo`);

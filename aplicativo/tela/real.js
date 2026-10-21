@@ -428,6 +428,23 @@ function atualizacao(){
   };
 }
 
+/* ── Alertas: o sino no topo da barra lateral ── */
+async function alertas(){
+  TELA.alertas(await pedir("alertas:ler"));
+  GANCHOS.dispensarAlerta = function(id){
+    pedir("alertas:dispensar", id).then(TELA.alertas)
+      .catch(function(e){ TELA.avisar("Não consegui dispensar o alerta", e.message); });
+  };
+  window.esteira.aoEvento(function(e){
+    if (e.tipo === "alerta:resolvido") return TELA.alertaResolvido(e.id);
+    if (e.tipo !== "alerta:novo") return;
+    TELA.alertaNovo(e.alerta, e.novo);
+    // Erro novo merece aviso do sistema; "precisa de você" já tem o seu.
+    if (e.novo && e.alerta.nivel === "erro")
+      TELA.avisar(e.alerta.titulo, e.alerta.acao || e.alerta.texto || "");
+  });
+}
+
 /* ── Aviso pelo sistema operacional, não pelo navegador ── */
 function avisos(){
   var doNavegador = TELA.avisar;
@@ -445,7 +462,7 @@ function avisos(){
     ["AdsPower",adspower],["arquivos",arquivos],["planilha",planilha],["rodada",rodada],
     ["conferência",conferencia],["escrita",escrita],["avisos",avisos],["atualização",atualizacao],
     // carregam: vão à ponte e esperam
-    ["arranque",arranque],["ajustes",ajustes],["máquina",maquina],["Shopify",shopify]];
+    ["arranque",arranque],["ajustes",ajustes],["máquina",maquina],["Shopify",shopify],["alertas",alertas]];
   for (var i = 0; i < partes.length; i++) {
     try { await partes[i][1](); trocou.push(partes[i][0]); }
     catch (e) { falhou.push(partes[i][0] + ": " + e.message); }

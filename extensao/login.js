@@ -82,10 +82,25 @@
   const temVerificacaoDeImagem = () =>
     ["#NEW_CAPTCHA", "#captchaMask", "aside[aria-modal=true] canvas"].some((s) => document.querySelector(s));
 
+  // A vez de logar. Um login por vez na rodada inteira (vários logins
+  // juntos fizeram a Shopee pedir verificação por imagem). Quem perde a vez
+  // ESPERA e tenta de novo. Antes desistia para sempre: na rodada de 21/10
+  // na Chomps, com dezenas de sessões caídas, só uma conta entrava e as
+  // outras ficavam paradas na tela de login até a fila estourar o prazo.
+  // Cada pedido negado avisa o coletor, e é isso que mantém a fila esperando.
+  async function esperarVez() {
+    for (;;) {
+      const t = await pedir("travar-login");
+      if (t?.ok) return true;
+      if (!/\/buyer\/login/.test(location.pathname)) return false;   // saiu do login: nada a fazer
+      await new Promise((r) => setTimeout(r, 6000));
+    }
+  }
+
   async function entrar() {
+    await fecharModais();
     // Abas restauradas também caem aqui; só a primeira loga.
-    const trava = await pedir("travar-login");
-    if (!trava?.ok) return;
+    if (!(await esperarVez())) return;
 
     await fecharModais();
 
@@ -93,6 +108,9 @@
     if (!campoUsuario) return avisar("login-falhou", { motivo: "campo de usuário não apareceu" });
 
     const cred = await pedir("credencial");
+    // Segunda vez na mesma rodada: o login anterior não pegou. Tentar de
+    // novo é o que faz a Shopee pedir verificação por imagem.
+    if (cred?.repetida) return avisar("precisa-humano", { motivo: "a Shopee pediu login de novo depois que o robô já tinha entrado — entre à mão nesta janela" });
     if (!cred?.email) return avisar("login-falhou", { motivo: cred?.erro ?? "coletor não devolveu credencial" });
 
     const campoSenha = await esperar(SEL.senha);
@@ -124,6 +142,8 @@
     avisar("campo-conferido", { valor: campoUsuario.value, senhaOk: campoSenha.value === cred.senha });
 
     const inicio = Math.floor(Date.now() / 1000);
+    // O código de verificação vai para a mesma caixa: ativa antes do clique.
+    await pedir("caixa");
     await fecharModais();   // o modal pode reaparecer entre o preenchimento e o clique
 
     // Se outro elemento estiver por cima, o clique vai para ele e o login
@@ -147,6 +167,14 @@
       const erro = erroNaTela();
       if (erro) return avisar("login-falhou", { motivo: `a Shopee respondeu: ${erro}` });
 
+      // Sair do /buyer/login NÃO é ter entrado. A Shopee pode mandar para
+      // "Verificar Identidade" (/verify/ivs) ou outra verificação; tratar
+      // isso como login-ok fazia o robô voltar para Minhas Compras, cair no
+      // login de novo e entrar outra vez — 6 vezes em 30 s, até o captcha.
+      if (/\/verify\/ivs/.test(location.pathname)) return verificarIdentidade(inicio);
+      if (/\/verify\//.test(location.pathname))
+        return avisar("precisa-humano", { motivo: `a Shopee pediu uma verificação (${location.pathname})` });
+
       if (!/\/buyer\/login/.test(location.pathname)) {
         avisar("login-ok", { duracaoMs: Date.now() - t0 });
         // A Shopee devolve para onde a pessoa tentou ir, que pode ser
@@ -158,6 +186,7 @@
 
       const campoCodigo = document.querySelector(SEL.codigo);
       if (campoCodigo && !campoCodigo.value) {
+        await pedir("travar-login");   // renova a vez: o código pode levar 90s
         const r = await pedir("otp", { desde: inicio });
         if (!r?.codigo) return avisar("login-falhou", { motivo: r?.erro ?? "código não chegou no e-mail" });
         preencher(campoCodigo, r.codigo);
@@ -168,13 +197,67 @@
     avisar("login-falhou", { motivo: "sem desfecho em 60s" });
   }
 
+  // "Verificar Identidade" (/verify/ivs): a Shopee manda um link por e-mail.
+  // O robô pede o e-mail, busca o link na mesma caixa do código e abre aqui.
+  // Uma vez só; se não der, a janela fica aberta para uma pessoa.
+  const achaTexto = (re) => [...document.querySelectorAll("button, a, [role=button], div, span")]
+    .filter((el) => re.test((el.innerText || "").trim()))
+    .sort((a, b) => (a.innerText || "").length - (b.innerText || "").length)[0] ?? null;
+
+  async function verificarIdentidade(desde) {
+    let ja = false;
+    try { ja = sessionStorage.getItem("esteira-ivs") === "1"; } catch {}
+    if (ja) return avisar("precisa-humano", { motivo: "a Shopee pediu de novo para confirmar a identidade por e-mail — confirme nesta janela" });
+    try { sessionStorage.setItem("esteira-ivs", "1"); } catch {}
+
+    const botao = await esperar(() => achaTexto(/^verificar via link por e-?mail$/i), 15000);
+    if (!botao) return avisar("precisa-humano", { motivo: "a Shopee pediu para confirmar a identidade e o botão do e-mail não apareceu" });
+    await pedir("travar-login");   // renova a vez: o e-mail pode levar 2 min
+    // Ativa a caixa ANTES de a Shopee mandar: caixa não ativada perde o e-mail.
+    const caixa = await pedir("caixa");
+    if (caixa?.erro) return avisar("precisa-humano", { motivo: `a Shopee pediu para confirmar a identidade por e-mail, e a caixa de e-mail não respondeu: ${caixa.erro}` });
+    botao.click();
+    // O que a Shopee mostrou depois do clique ("enviamos um link para…",
+    // ou nada). Sem isto não dá para saber se o e-mail chegou a ser pedido.
+    await new Promise((r) => setTimeout(r, 4000));
+    avisar("verificacao-email-pedida", { motivo: (document.body?.innerText ?? "").replace(/\s+/g, " ").slice(0, 300) });
+
+    const r = await pedir("link", { desde });
+    if (!r?.link) return avisar("precisa-humano", { motivo: `a Shopee pediu para confirmar a identidade por e-mail, e ${r?.erro ?? "o link não chegou"}` });
+    avisar("verificacao-link-aberto");
+    try { sessionStorage.setItem("esteira-depois-do-link", "1"); } catch {}
+    location.href = r.link;
+  }
+
+  // Depois do link a Shopee pode parar numa página de "verificado". Volta
+  // para Minhas Compras, que é onde a coleta acontece.
+  try {
+    if (sessionStorage.getItem("esteira-depois-do-link") === "1" && !/\/verify\//.test(location.pathname)) {
+      sessionStorage.removeItem("esteira-depois-do-link");
+      avisar("login-ok", { via: "link do e-mail" });
+      if (!/\/user\/purchase/.test(location.pathname))
+        setTimeout(() => { location.href = "https://shopee.com.br/user/purchase?type=7"; }, 3000);
+    }
+  } catch {}
+
   // A Shopee troca /user/purchase por /buyer/login POR DENTRO da SPA, sem
   // recarregar. Content script casado só com a URL de login nunca era
   // injetado na aba que a fila abre — ela nasce em /user/purchase.
   // Por isso este script roda em qualquer página da Shopee e observa a URL.
   let jaTentou = false;
   function talvezEntrar() {
-    if (jaTentou || !/\/buyer\/login/.test(location.pathname)) return;
+    if (jaTentou) return;
+    // Caiu direto em "Verificar Identidade", sem passar pelo nosso login.
+    if (/\/verify\/ivs/.test(location.pathname)) {
+      jaTentou = true;
+      pedir("login-ligado").then((r) => {
+        if (r?.ok === false) return avisar("precisa-humano", { motivo: "a Shopee pediu para confirmar a identidade" });
+        pedir("travar-login").then(() => verificarIdentidade(Math.floor(Date.now() / 1000)))
+          .catch((e) => avisar("precisa-humano", { motivo: `erro no login.js: ${e?.message ?? e}` }));
+      });
+      return;
+    }
+    if (!/\/buyer\/login/.test(location.pathname)) return;
     jaTentou = true;
     pedir("login-ligado").then((r) => {
       if (r?.ok === false) return avisar("sessao-caida");

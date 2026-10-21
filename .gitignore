@@ -44,3 +44,4 @@ src/vendor/
 
 # o electron-updater montado (empacotar/montar-vendor.mjs)
 aplicativo/vendor/
+ao-vivo/

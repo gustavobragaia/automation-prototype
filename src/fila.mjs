@@ -24,7 +24,7 @@ const ESPERA_LOGIN_MS = Number(process.env.ESPERA_LOGIN_MS ?? 180_000);
 // Verificação da Shopee não é contornada por software: alguém resolve na
 // janela. Fechar o perfil na hora tirava da pessoa a chance de fazer isso —
 // e é exatamente o fluxo que o produto promete.
-const ESPERA_HUMANO_MS = Number(process.env.ESPERA_HUMANO_MS ?? 300_000);
+const ESPERA_HUMANO_MS = Number(process.env.ESPERA_HUMANO_MS ?? 600_000);
 
 // Perfis abertos por este processo. Um kill no meio da rodada não executa
 // o finally de processarConta, e o navegador fica órfão na máquina do
@@ -145,7 +145,15 @@ export function prazoDaConta({ comecou, agora, timeoutMs, marca }) {
   const base = { limite: comecou + timeoutMs, desistir: null };
   if (!marca || !(marca.em >= comecou)) return base;
   const motivo = marca.motivo ? ` — ${marca.motivo}` : "";
-  if (/^precisa-humano/.test(marca.tipo)) return { ...base, desistir: `a Shopee pediu uma pessoa${motivo}` };
+  // Precisa de uma pessoa: a janela FICA ABERTA para ela resolver, e a tela
+  // mostra "precisa de você". Antes a fila desistia na hora e fechava o
+  // navegador 2 s depois do aviso — ninguém conseguia agir. Se a pessoa
+  // resolve, a página volta a Minhas Compras e a coleta chega sozinha.
+  if (/^precisa-humano/.test(marca.tipo)) {
+    const limite = marca.em + ESPERA_HUMANO_MS;
+    if (agora >= limite) return { ...base, desistir: `a Shopee pediu uma pessoa e ninguém resolveu em ${Math.round(ESPERA_HUMANO_MS / 60000)} min${motivo}` };
+    return { limite: Math.max(base.limite, limite), desistir: null };
+  }
   if (/^login-falhou/.test(marca.tipo)) return { ...base, desistir: `o login automático falhou${motivo}` };
   if (/^coleta-falhou/.test(marca.tipo)) return { ...base, desistir: `a coleta não leu nenhum pedido${motivo}` };
   if (/^sessao-caida/.test(marca.tipo))

@@ -23,6 +23,8 @@ export const TIPOS = new Set([
   "conta:lendo",      // { conta }  — já dentro, lendo os pedidos
   "conta:feita",      // { conta, pedidos, segundos, precisouLogin }
   "conta:falhou",     // { conta, erro }
+  "alerta:novo",      // { alerta, novo } — src/alertas.mjs
+  "alerta:resolvido", // { id }
 ]);
 
 const ouvintes = new Set();

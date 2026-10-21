@@ -23,9 +23,15 @@ const BASE_EXT = emRecursos("extensao");
 const RAIZ_RODADA = emTrabalho("extensao-rodada");
 let tokenAtual = null;
 let dirRodada = null;
+// Contas que já receberam a senha nesta rodada. Uma tentativa de login por
+// conta por rodada: na Chomps, em 21/10, o robô entrou 6 vezes em 30 s na
+// mesma conta (a Shopee pedia "Verificar Identidade", ele achava que tinha
+// entrado e voltava) até a Shopee pedir verificação por imagem.
+const jaEntregue = new Set();
 
 export function novoToken() {
   tokenAtual = randomBytes(24).toString("hex");
+  jaEntregue.clear();
   // O ID de uma extensão descompactada vem do CAMINHO. Reusar a mesma pasta
   // fazia o Chrome reaproveitar o service worker em cache do perfil — com o
   // token da rodada anterior, e a credencial era recusada como inválida.
@@ -76,3 +82,26 @@ export function credencialDaConta(conta) {
   if (!senha) throw new Error("a senha das contas da Shopee não está preenchida — Ajustes → Contas da Shopee");
   return { email: emailDaConta(Number(conta)), senha };
 }
+
+/**
+ * A senha para o login.js, UMA vez por conta por rodada. A segunda vez
+ * quer dizer que o login anterior não pegou; insistir é o que faz a Shopee
+ * endurecer com a conta. Daí em diante é com uma pessoa.
+ */
+export function entregarCredencial(conta) {
+  const n = Number(conta);
+  if (jaEntregue.has(n)) {
+    const e = new Error("o robô já tentou entrar nesta conta nesta rodada e não ficou logado");
+    e.repetida = true;
+    throw e;
+  }
+  return credencialDaConta(n);
+}
+
+/**
+ * O login COMEÇOU nesta conta (o login.js preencheu e vai clicar). É isto que
+ * conta como "a tentativa da rodada", não a entrega da senha: o perfil
+ * restaura abas antigas, uma delas pedia a senha antes de a fila fechá-la, e
+ * a aba de verdade ficava sem (conta 122, 21/10).
+ */
+export function marcarTentativa(conta) { jaEntregue.add(Number(conta)); }

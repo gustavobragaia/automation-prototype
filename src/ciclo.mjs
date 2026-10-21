@@ -16,6 +16,7 @@ import { lerColetas } from "./conciliar.mjs";
 import { escreverRastreios } from "./escrita.mjs";
 import { alarmar, avaliarRodada } from "./alarme.mjs";
 import { emitir } from "./eventos.mjs";
+import { alertar, resolver } from "./alertas.mjs";
 import { escreverPlanilha } from "./planilha-saida.mjs";
 
 export { historico };
@@ -128,6 +129,30 @@ export function juntarPendentes(contasDaPlanilha, atrasados) {
  * @param opts.escrever   false = dry-run
  * @param opts.simular    injeta rastreio falso onde ainda não há (teste)
  */
+// "24 de 33 contas falharam (73%)" dizia o tamanho do problema e nada da
+// causa. O alerta agrupa as contas pelo motivo, com os números de cada uma.
+export function agruparFalhas(falhas) {
+  const grupos = new Map();
+  for (const f of falhas) {
+    const motivo = String(f.erro ?? "sem motivo").replace(/^conta \d+:\s*/, "")
+      .replace(/em \d+s$/, "a tempo").split(" — ")[0].trim();
+    if (!grupos.has(motivo)) grupos.set(motivo, []);
+    grupos.get(motivo).push(f.conta);
+  }
+  return [...grupos].sort((a, b) => b[1].length - a[1].length)
+    .map(([motivo, contas]) => ({ motivo, contas }));
+}
+
+function alertarFalhas(falhas, total) {
+  if (!falhas.length) return resolver("rodada-falhas");
+  const grupos = agruparFalhas(falhas);
+  alertar({ id: "rodada-falhas", nivel: "erro",
+    titulo: `${falhas.length} de ${total} contas não foram lidas nesta rodada`,
+    texto: grupos.map((g) => `${g.contas.length} × ${g.motivo} (${g.contas.length > 1 ? "contas" : "conta"} ${g.contas.join(", ")})`).join("\n"),
+    acao: "Os pedidos dessas contas estão na conferência como \"conta não foi lida\". Resolva o motivo e rode a coleta de novo — só as que faltam.",
+  });
+}
+
 export async function rodarCiclo({ contas, escrever = true, simular = false,
                                   planilhas: planilhasPedidas, aba: abaPedida,
                                   aoLog = () => {} } = {}) {
@@ -260,6 +285,7 @@ export async function rodarCiclo({ contas, escrever = true, simular = false,
     aoLog(`motivos não gravados: ${e.message}`);   // nunca derruba a rodada
   }
 
+  alertarFalhas(falhas, contas.length);
   const motivos = avaliarRodada({ contas: contas.length, coletadas, pedidosVistos: vistos, falhas });
   if (motivos.length) await alarmar("Rodada com problema", motivos.join("\n"));
 

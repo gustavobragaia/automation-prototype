@@ -25,6 +25,7 @@ import { resolverManual, prepararManual } from "../src/manual.mjs";
 import { lerAjustes, salvarAjustes, aplicarNoAmbiente, SEGREDOS,
          faltaConfigurar } from "../src/ajustes.mjs";
 import { aoEvento, emitir } from "../src/eventos.mjs";
+import { lerAlertas, dispensar } from "../src/alertas.mjs";
 import { pedirParada } from "../src/fila.mjs";
 import net from "node:net";
 import { diaLocal } from "../src/datas.mjs";
@@ -174,6 +175,10 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
     // ── ajustes que o cliente escolhe uma vez ─────────────────────────
     // A leitura geral leva só "guardada" no lugar de cada segredo; o valor,
     // para preencher o campo, vem por "ajustes:verSegredo".
+    // ── alertas: o sino no topo da barra lateral ───────────────────────
+    "alertas:ler": async () => lerAlertas(),
+    "alertas:dispensar": async (id) => { dispensar(String(id ?? "")); return lerAlertas(); },
+
     "ajustes:ler": async () => {
       const a = lerAjustes();
       return { ...semSegredos(a), falta: faltaConfigurar(a) };

@@ -706,6 +706,42 @@ details.cred{margin-top:16px;border-top:1px solid var(--linha);padding-top:12px}
 details.cred summary{cursor:pointer;font-size:12.5px;color:var(--tinta-2);font-weight:500}
 details.cred summary:hover{color:var(--tinta)}
 
+/* ── o sino de alertas, no topo da barra lateral ── */
+.sino{margin-left:auto;position:relative;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--tinta-2)}
+.sino:hover,.sino[aria-expanded="true"]{background:var(--sup-2);color:var(--tinta)}
+.sino svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sino.tem{color:var(--tinta)}
+.conta-sino{position:absolute;top:0;right:-2px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;
+  background:var(--erro);color:#fff;font:600 10.5px/17px var(--ui);text-align:center;box-shadow:0 0 0 2px var(--sup-1)}
+.conta-sino.at{background:var(--atencao)}
+.sino.toca svg{animation:sacode .7s ease}
+@keyframes sacode{20%{transform:rotate(14deg)}40%{transform:rotate(-12deg)}60%{transform:rotate(8deg)}80%{transform:rotate(-4deg)}}
+@media(prefers-reduced-motion:reduce){.sino.toca svg{animation:none}}
+.painel-alertas{position:fixed;left:256px;top:14px;z-index:30;width:min(440px,calc(100vw - 272px));
+  max-height:calc(100vh - 28px);overflow:auto;background:var(--canvas);border:1px solid var(--linha-forte);
+  border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 24px 60px -24px rgba(0,0,0,.4)}
+:root[data-janela="darwin"] .painel-alertas{top:40px}
+.pa-cab{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--linha);
+  position:sticky;top:0;background:var(--canvas);z-index:1}
+.pa-cab b{font-size:14px;font-weight:600}
+.pa-cab .ter{font-size:12px}
+.pa-fechar{margin-left:auto;width:28px;height:28px;border-radius:7px;display:grid;place-items:center;color:var(--tinta-3)}
+.pa-fechar:hover{background:var(--sup-2);color:var(--tinta)}
+.pa-fechar svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.alerta{display:grid;grid-template-columns:9px minmax(0,1fr);column-gap:12px;padding:15px 16px;border-bottom:1px solid var(--linha)}
+.alerta:last-child{border-bottom:none}
+.alerta .pt{width:9px;height:9px;border-radius:50%;margin-top:5px;background:var(--erro)}
+.alerta.atencao .pt{background:var(--atencao)}
+.alerta .t{font-weight:600;font-size:13px;line-height:1.4}
+.alerta .x{font-size:12.5px;color:var(--tinta-2);line-height:1.55;margin-top:4px;white-space:pre-line;overflow-wrap:anywhere}
+.alerta .a{font-size:12.5px;color:var(--tinta);line-height:1.55;margin-top:6px;padding:8px 10px;border-radius:8px;background:var(--sup-1)}
+.alerta .a b{font-weight:600}
+.alerta .meta{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;font-size:11.5px;color:var(--tinta-3)}
+.alerta .meta .btn{margin-left:0}
+.alerta .meta .esq{margin-right:auto}
+.pa-vazio{padding:30px 20px;text-align:center;font-size:12.5px;color:var(--tinta-2);line-height:1.55}
+.pa-vazio b{display:block;color:var(--tinta);font-size:13.5px;font-weight:500;margin-bottom:3px}
+
 /* aviso de versão nova, no pé da barra lateral */
 .lado-atualiza{margin-top:12px;padding:12px;border-radius:10px;display:grid;gap:6px;
   background:color-mix(in srgb,var(--marca) 12%,var(--canvas));border:1px solid color-mix(in srgb,var(--marca) 35%,var(--linha))}
@@ -731,6 +767,10 @@ details.cred summary:hover{color:var(--tinta)}
     </svg><b>Esteira</b>
   </span>
   <span class="selo-proto" title="Nenhum dado real de cliente nesta página">protótipo · dados de exemplo</span>
+  <button class="sino" id="bAlertas" aria-label="Alertas" aria-expanded="false" aria-controls="painelAlertas" title="Nenhum alerta">
+    <svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+    <span class="conta-sino" id="sinoN" hidden></span>
+  </button>
 </div>
 
 <div class="lado-rodada">
@@ -769,6 +809,13 @@ details.cred summary:hover{color:var(--tinta)}
 </div>
 <button class="lado-status" id="ladoStatus" data-tela="ajustes" hidden></button>
 </aside>
+
+<!-- Alertas: o que impede o robô de trabalhar, com o que fazer -->
+<div class="painel-alertas" id="painelAlertas" role="dialog" aria-label="Alertas" hidden>
+  <div class="pa-cab"><b>Alertas</b><span class="ter" id="paConta"></span>
+    <button class="pa-fechar" id="paFechar" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div id="listaAlertas"></div>
+</div>
 
 <main class="tela">
 
@@ -2605,7 +2652,58 @@ $("escopos").innerHTML=["read_orders","write_orders","read_fulfillments","write_
   "read_assigned_fulfil…","write_assigned_fulfil…","read_merchant_man…","write_merchant_man…"]
   .map(function(e){ return '<div class="escopo"><svg viewBox="0 0 24 24">'+ICO_OK+'</svg>'+e+'</div>'; }).join("");
 
+/* ── Alertas ──
+   O que impede o robô de trabalhar e só uma pessoa resolve, dito com todas
+   as letras: o que houve, por que importa e o que fazer. O sino mostra
+   quantos; vermelho se algum é erro, amarelo se só pedem atenção. Começa
+   vazio: sem ponte não há alerta de verdade, e alerta inventado ensina a
+   ignorar o sino. */
+var alertas=[];
+var ICO_SINO_OK='<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--ok)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px"><path d="M20 6L9 17l-5-5"/></svg>';
+function quandoAlerta(ms){
+  var s=Math.max(0,Math.round((Date.now()-ms)/1000));
+  if(s<60) return "agora"; var m=Math.round(s/60); if(m<60) return "há "+m+" min";
+  var h=Math.round(m/60); if(h<24) return "há "+h+" h"; return "há "+Math.round(h/24)+" dia(s)";
+}
+function pintaAlertas(){
+  var n=alertas.length, erro=alertas.some(function(a){return a.nivel==="erro";});
+  var c=$("sinoN"); c.hidden=!n; c.textContent=n>9?"9+":String(n); c.className="conta-sino"+(erro?"":" at");
+  var b=$("bAlertas"); b.classList.toggle("tem",n>0);
+  b.title=n?(n+(n>1?" alertas":" alerta")):"Nenhum alerta";
+  $("paConta").textContent=n?String(n):"";
+  $("listaAlertas").innerHTML=n?alertas.map(function(a){
+    return '<div class="alerta '+(a.nivel==="atencao"?"atencao":"erro")+'"><span class="pt"></span><div>'+
+      '<div class="t">'+esc(a.titulo)+'</div>'+
+      (a.texto?'<div class="x">'+esc(a.texto)+'</div>':"")+
+      (a.acao?'<div class="a"><b>O que fazer:</b> '+esc(a.acao)+'</div>':"")+
+      '<div class="meta"><span class="esq">'+quandoAlerta(a.em)+(a.vezes>1?" · "+a.vezes+" vezes":"")+'</span>'+
+      (a.ir?'<button class="btn peq" data-ir="'+esc(a.ir)+'">Abrir '+esc(a.ir==="ajustes"?"Ajustes":a.ir)+'</button>':"")+
+      '<button class="btn peq" data-dispensar="'+esc(a.id)+'">Dispensar</button></div></div></div>';
+  }).join(""):'<div class="pa-vazio">'+ICO_SINO_OK+'<b>Nenhum alerta</b>Quando algo impedir o robô de trabalhar, aparece aqui com o que fazer.</div>';
+}
+function abrirAlertas(abrir){
+  var p=$("painelAlertas"); p.hidden=!abrir; $("bAlertas").setAttribute("aria-expanded",String(abrir));
+}
+$("bAlertas").addEventListener("click",function(e){ e.stopPropagation(); abrirAlertas($("painelAlertas").hidden); });
+$("paFechar").addEventListener("click",function(){ abrirAlertas(false); });
+document.addEventListener("keydown",function(e){ if(e.key==="Escape") abrirAlertas(false); });
+document.addEventListener("click",function(e){
+  if(!$("painelAlertas").hidden && !e.target.closest("#painelAlertas,#bAlertas")) abrirAlertas(false);
+});
+$("listaAlertas").addEventListener("click",function(e){
+  var ir=e.target.closest("[data-ir]"), fora=e.target.closest("[data-dispensar]");
+  if(ir){ abrirAlertas(false); var t=document.querySelector('.apoio [data-tela="'+ir.dataset.ir+'"]'); if(t) t.click(); }
+  if(fora) GANCHOS.dispensarAlerta(fora.dataset.dispensar);
+});
+GANCHOS.dispensarAlerta=function(id){
+  alertas=alertas.filter(function(a){return a.id!==id;}); pintaAlertas();
+};
+function tocarSino(){
+  var b=$("bAlertas"); b.classList.remove("toca"); void b.offsetWidth; b.classList.add("toca");
+}
+
 /* ── Início ── */
+pintaAlertas();
 pintaAtrasados(); pintaArquivos(); pintaColeta(); pintaRevisao(); pintaEscrita();
 pintaDias(); pintaShopify();
 // A ponte só mexe na tela por estas portas — nada de alcançar variável interna.
@@ -2620,6 +2718,13 @@ window.TELA = {
   },
   planilha: somar,
   avisar: avisar,
+  alertas: function(lista){ alertas=lista||[]; pintaAlertas(); },
+  alertaNovo: function(a, novo){
+    alertas=[a].concat(alertas.filter(function(x){return x.id!==a.id;})); pintaAlertas();
+    if(novo) tocarSino();
+  },
+  alertaResolvido: function(id){ alertas=alertas.filter(function(x){return x.id!==id;}); pintaAlertas(); },
+  abrirAlertas: function(){ abrirAlertas(true); },
   erroNaRodada: erroNaRodada,
 
   // ── o arranque honesto ──

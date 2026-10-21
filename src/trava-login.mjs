@@ -12,7 +12,10 @@
 
 // Dona que não concluiu perde a vez: sem isso, um perfil que travou no meio
 // do login deixaria todos os outros esperando para sempre.
-const VALE_MS = Number(process.env.TRAVA_LOGIN_MS ?? 45_000);
+// 45s era menos que um login com código no e-mail (até 8s + 90s de espera):
+// a vez era tomada no meio, e duas contas logavam juntas. A dona renova a
+// vez antes de esperar o código.
+const VALE_MS = Number(process.env.TRAVA_LOGIN_MS ?? 120_000);
 
 let dono = null;      // número da conta que está logando
 let desde = 0;
