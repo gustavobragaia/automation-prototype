@@ -256,9 +256,14 @@
     avisar("verificacao-link-aberto");
     // Espera esta aba sair da verificação (a Shopee leva para onde a pessoa ia).
     const t1 = Date.now();
-    while (/\/verify\//.test(location.pathname) && Date.now() - t1 < 90_000)
+    // /authenticate/ivs é onde a Shopee GRAVA o login depois da aprovação:
+    // sair dele antes da hora (como era) levava a Minhas Compras ainda sem
+    // sessão, e a conta caía no login de novo (conta 121, 21/10). Espera a
+    // própria Shopee sair de lá.
+    const verificando = () => /\/(verify|authenticate)\//.test(location.pathname);
+    while (verificando() && Date.now() - t1 < 90_000)
       await new Promise((res) => setTimeout(res, 1500));
-    if (/\/verify\//.test(location.pathname))
+    if (verificando())
       return avisar("precisa-humano", { motivo: "o link do e-mail foi aberto, mas a Shopee não liberou esta janela — confira se aparece \"Tentativa de login aprovada\"" });
     avisar("login-ok", { via: "link do e-mail" });
     if (!/\/user\/purchase/.test(location.pathname)) location.href = "https://shopee.com.br/user/purchase?type=7";
@@ -267,7 +272,7 @@
   // Depois do link a Shopee pode parar numa página de "verificado". Volta
   // para Minhas Compras, que é onde a coleta acontece.
   try {
-    if (sessionStorage.getItem("esteira-depois-do-link") === "1" && !/\/verify\//.test(location.pathname)) {
+    if (sessionStorage.getItem("esteira-depois-do-link") === "1" && !/\/(verify|authenticate)\//.test(location.pathname)) {
       sessionStorage.removeItem("esteira-depois-do-link");
       avisar("login-ok", { via: "link do e-mail" });
       if (!/\/user\/purchase/.test(location.pathname))
