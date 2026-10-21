@@ -14,7 +14,20 @@ import { DIR_COLETAS, DIR_EVENTOS, DIR_LOGIN, coletaDaConta, loginDaConta } from
 
 // A foto da caixa de cada conta, tirada antes de a Shopee mandar o e-mail:
 // o que estiver na caixa depois e não estiver nela é o e-mail novo.
-const fotos = new Map();
+// Uma foto só por login: tirar de novo antes de "Verificar" gastava 2
+// consultas à toa — o e-mail de verificação sempre chega depois da 1ª.
+const fotos = new Map();          // conta → { foto: Set, em }
+const FOTO_VALE_MS = 10 * 60_000;
+
+// A marca de login da conta, que a fila lê para saber se espera ou desiste.
+// "precisa de você" recente não é sobrescrito por um aviso menor.
+function marcar(conta, tipo, motivo = null) {
+  let anterior = null;
+  try { anterior = JSON.parse(readFileSync(loginDaConta(conta), "utf8")); } catch {}
+  const segura = anterior?.tipo === "precisa-humano" && Date.now() - anterior.em < 10 * 60_000 &&
+    !/^(precisa-humano|login-ok)/.test(tipo);
+  if (!segura) writeFileSync(loginDaConta(conta), JSON.stringify({ tipo, motivo, em: Date.now() }, null, 2));
+}
 
 export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
   for (const d of [DIR_COLETAS, DIR_EVENTOS, DIR_LOGIN])
@@ -63,8 +76,10 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         // address, wait for messages"). Ativar depois de pedir o e-mail perdia a
         // mensagem — na conta 120, em 21/10, a caixa ficou vazia.
         if (u.pathname === "/caixa") {
+          const ja = fotos.get(String(conta));
+          if (ja && Date.now() - ja.em < FOTO_VALE_MS) return res.end(JSON.stringify({ ok: true, reaproveitada: true }));
           const foto = await fotoDaCaixa(credencialDaConta(conta).email);
-          fotos.set(String(conta), foto);
+          fotos.set(String(conta), { foto, em: Date.now() });
           aoLog(`conta ${conta}: caixa de e-mail ativada antes do envio (${foto.size} mensagem(ns) já lá)`);
           return res.end(JSON.stringify({ ok: true }));
         }
@@ -73,7 +88,9 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
           const desde = Number(u.searchParams.get("desde") || 0);
           aoLog(`conta ${conta}: buscando o link de verificação no e-mail`);
           try {
-            const r = await obterLink(credencialDaConta(conta).email, desde, { antes: fotos.get(String(conta)) ?? null });
+            const r = await obterLink(credencialDaConta(conta).email, desde, { antes: fotos.get(String(conta))?.foto ?? null,
+              // a espera pode passar de 3 min: cada consulta renova o prazo da fila
+              aCadaConsulta: (n) => marcar(conta, "verificacao-esperando-email", `consulta ${n} à caixa`) });
             aoLog(`conta ${conta}: link de verificação obtido ("${r.assunto}")`);
             return res.end(JSON.stringify({ link: r.link }));
           } catch (e) {
@@ -84,7 +101,8 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         // OTP: a chave da API de e-mail fica aqui, nunca no navegador.
         const desde = Number(u.searchParams.get("desde") || 0);
         aoLog(`conta ${conta}: buscando código de verificação no e-mail`);
-        const r = await obterCodigo(credencialDaConta(conta).email, desde, { antes: fotos.get(String(conta)) ?? null });
+        const r = await obterCodigo(credencialDaConta(conta).email, desde, { antes: fotos.get(String(conta))?.foto ?? null,
+          aCadaConsulta: (n) => marcar(conta, "otp-esperando-codigo", `consulta ${n} à caixa`) });
         aoLog(`conta ${conta}: código obtido em ${r.tentativas} tentativa(s)`);
         return res.end(JSON.stringify({ codigo: r.codigo }));
       } catch (e) {
@@ -154,34 +172,30 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         // "verificacao-*" também: a espera do e-mail pode passar de 3 min, e
         // cada passo dela renova o prazo da fila.
         if (/^(login-|otp-|verificacao-|precisa-humano|nao-autenticado|coleta-falhou|sessao-caida)/.test(m.tipo ?? "")) {
-          // "precisa de você" não é sobrescrito por um aviso menor da mesma
-          // conta: a fila lê a ÚLTIMA marca, e um "nao-autenticado" logo depois
-          // tirava os 10 min de espera — a janela fechava com a pessoa a caminho.
-          let anterior = null;
-          try { anterior = JSON.parse(readFileSync(loginDaConta(conta), "utf8")); } catch {}
-          const segura = anterior?.tipo === "precisa-humano" && Date.now() - anterior.em < 10 * 60_000 &&
-            !/^(precisa-humano|login-ok)/.test(m.tipo);
-          if (!segura) writeFileSync(loginDaConta(conta),
-            JSON.stringify({ tipo: m.tipo, motivo: m.motivo ?? null, em: Date.now() }, null, 2));
+          marcar(conta, m.tipo, m.motivo ?? null);
 
           // A tela precisa separar dois casos que no log parecem o mesmo:
           // o robô vai resolver sozinho, ou a rodada parou esperando uma
           // pessoa. O segundo é o único que merece som e notificação.
+          // Um caso só por aviso. Na 0.1.6 o alerta de senha entrou no meio
+          // deste if/else, e "precisa de você" passou a disparar TAMBÉM
+          // "conta:logando" logo depois — a tabela mostrava "logando".
           if (/^precisa-humano/.test(m.tipo)) {
             emitir("conta:humano", { conta, motivo: m.motivo ?? null });
             alertar({ id: `conta-humano-${conta}`, nivel: "atencao", conta,
               titulo: `A conta ${conta} está esperando você`,
               texto: m.motivo ? `A Shopee parou o robô: ${m.motivo}.` : "A Shopee pediu uma verificação que só uma pessoa resolve.",
-              acao: `A janela do AdsPower da conta ${conta} fica aberta por 10 minutos. Resolva lá; quando a página voltar para Minhas Compras, o robô lê sozinho.` });
-          }
-          if (/^login-falhou/.test(m.tipo) && /senha inv[aá]lida/.test(m.motivo ?? ""))
-            alertar({ id: "shopee-senha", nivel: "erro",
-              titulo: "A Shopee recusou a senha das contas",
-              texto: `Na conta ${conta}, a Shopee respondeu "senha inválida". O robô usa a mesma senha para todas; se ela mudou, nenhuma conta deslogada consegue entrar.`,
-              acao: "Confira a senha em Ajustes → Contas da Shopee → 2, e o padrão do e-mail (prefixo e domínio).", ir: "ajustes" });
-          // falhas: quem avisa a tela é a fila, ao desistir da conta
-          else if (!/^(coleta-falhou|login-falhou|sessao-caida)/.test(m.tipo))
+              acao: `Procure a janela "Conta ${conta}" (o robô a traz para a frente). Ela fica aberta por 10 minutos; resolva lá e, quando a página voltar para Minhas Compras, o robô lê sozinho.` });
+          } else if (/^(coleta-falhou|login-falhou|sessao-caida)/.test(m.tipo)) {
+            // falhas: quem avisa a tela é a fila, ao desistir da conta
+            if (/^login-falhou/.test(m.tipo) && /senha inv[aá]lida/.test(m.motivo ?? ""))
+              alertar({ id: "shopee-senha", nivel: "erro",
+                titulo: "A Shopee recusou a senha das contas",
+                texto: `Na conta ${conta}, a Shopee respondeu "senha inválida". O robô usa a mesma senha para todas; se ela mudou, nenhuma conta deslogada consegue entrar.`,
+                acao: "Confira a senha em Ajustes → Contas da Shopee → 2, e o padrão do e-mail (prefixo e domínio).", ir: "ajustes" });
+          } else {
             emitir("conta:logando", { conta });
+          }
         }
       } catch (e) {
         aoLog(`erro ao tratar payload: ${e.message}`);

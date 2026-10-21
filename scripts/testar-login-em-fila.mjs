@@ -93,6 +93,7 @@ const sessao = {};
 const avisosIvs = [];
 let senhasPedidas = 0, linkPedido = 0, caixaAntes = false;
 let cliqueRoboPega = true, pessoaClica = () => {};
+let linkFalhaPrimeiro = false, reenviou = 0;
 const abasAbertas = [];
 function abrirPagina(caminho) {
   const loc = { pathname: caminho, _href: "https://shopee.com.br" + caminho, navegou: null,
@@ -110,11 +111,13 @@ function abrirPagina(caminho) {
     if (cliqueRoboPega) { enviado = true; loc.pathname = "/verify/email-link"; }
   });
   pessoaClica = () => { enviado = true; loc.pathname = "/verify/email-link"; };
+  const reenviarEl = el("Reenviar", () => { reenviou++; });
   const doc = {
     body: { innerText: "" },
     querySelector: (q) => loc.pathname === "/buyer/login" ? (/loginKey/.test(q) ? usuario : /password/.test(q) ? senha : null)
       : (loc.pathname === "/verify/ivs" && /aria-label="Verificar via link/.test(q) && !enviado) ? viaEmail : null,
-    querySelectorAll: () => loc.pathname === "/verify/ivs" ? (enviado ? [] : [viaEmail]) : [entrar],
+    querySelectorAll: () => loc.pathname === "/verify/ivs" ? (enviado ? [] : [viaEmail])
+      : loc.pathname === "/verify/email-link" ? [reenviarEl] : [entrar],
     elementFromPoint: () => entrar,
   };
   const chrome = { runtime: { sendMessage: (msg, responder) => {
@@ -123,7 +126,9 @@ function abrirPagina(caminho) {
     if (msg.pedido === "credencial") { senhasPedidas++;
       try { return responder(entregarCredencial(160)); } catch (e) { return responder({ erro: e.message, repetida: e.repetida }); } }
     if (msg.pedido === "caixa") { caixaAntes = !avisosIvs.some((a) => a.tipo === "clicou-email"); return responder({ ok: true }); }
-    if (msg.pedido === "link") { linkPedido++; return responder({ link: "https://u1.ct.sendgrid.net/ls/click?upn=abc" }); }
+    if (msg.pedido === "link") { linkPedido++;
+      if (linkFalhaPrimeiro && linkPedido === 1) return responder({ erro: "o e-mail com o link de verificação não chegou em 180 s" });
+      return responder({ link: "https://u1.ct.sendgrid.net/ls/click?upn=abc" }); }
     if (msg.pedido === "abrir-aba") {
       abasAbertas.push(msg.url);
       // a Shopee aprova e a aba que esperava segue sozinha
@@ -177,6 +182,20 @@ pessoaClica();
 for (let i = 0; i < 600 && !p3.navegou; i++) await new Promise((r) => setTimeout(r, 10));
 tudo &= ok(linkPedido === 1 && abasAbertas.length === 2 && p3.navegou === "https://shopee.com.br/user/purchase?type=7",
   "a pessoa clica uma vez; o robô percebe, busca o link no e-mail e abre sozinho");
+
+// O e-mail não chegou: o robô pede "Reenviar" à Shopee, UMA vez, e espera
+// de novo — em vez de desistir na primeira espera.
+console.log("\n\x1b[1mO e-mail de verificação não chega na primeira vez\x1b[0m");
+novoToken(); limparTrava();
+for (const k of Object.keys(sessao)) delete sessao[k];
+avisosIvs.length = 0; linkPedido = 0; cliqueRoboPega = true; linkFalhaPrimeiro = true; abasAbertas.length = 0;
+const p4 = abrirPagina("/buyer/login");
+for (let i = 0; i < 1000 && !p4.navegou; i++) await new Promise((r) => setTimeout(r, 10));
+tudo &= ok(reenviou === 1 && avisosIvs.some((a) => a.tipo === "verificacao-reenviada"),
+  `clica em "Reenviar" uma vez (${reenviou}) e avisa que reenviou`);
+tudo &= ok(linkPedido === 2 && abasAbertas.length === 1 && p4.navegou === "https://shopee.com.br/user/purchase?type=7",
+  "espera de novo, acha o link e termina o login");
+linkFalhaPrimeiro = false;
 
 // Aba restaurada pelo perfil pega a senha e é fechada pela fila antes de
 // entrar (conta 122, 21/10). A aba de verdade ainda tem direito à tentativa.

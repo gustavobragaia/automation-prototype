@@ -117,40 +117,51 @@ export function extrairCodigo(texto) {
 export async function esperarMensagem(endereco, {
   antes = null, desdeEpoch = 0, extrair, oQue = "o que procuro", limite = 180_000,
   remetente = "shopee", esperaInicial = 10_000, ritmo = (ms) => (ms < 60_000 ? 10_000 : 20_000),
-  pausa = dormir,
+  pausa = dormir, aCadaConsulta = () => {}, relogio = () => Date.now(),
 } = {}) {
   await pausa(esperaInicial);
-  const t0 = Date.now();
+  const t0 = relogio();
   let tentativas = 0, vistas = [];
+  // Cada e-mail é aberto uma vez só: abrir custa uma consulta da cota.
+  const jaLidas = new Set();
+  const puladas = [];
   const nova = (m) => antes ? !antes.has(String(m.uid))
                             : Number(m.created_at_epoch) > desdeEpoch - 300;
   for (;;) {
     tentativas++;
+    aCadaConsulta(tentativas);   // a fila renova o prazo da conta a cada consulta
     const msgs = await listarMensagens(endereco);
     vistas = Array.isArray(msgs) ? msgs : [];
-    const candidata = vistas
+    // TODOS os novos da Shopee, do mais novo ao mais velho. A Shopee manda
+    // outros e-mails sem link no meio ("Alerta de Segurança: Novo login",
+    // "falha em tentativa de login" — conta 167, 21/10): esses são pulados e
+    // a espera continua. Antes, o primeiro sem link encerrava tudo.
+    const candidatas = vistas
       .filter((m) => String(m.from ?? "").toLowerCase().includes(remetente))
       .filter(nova)
-      .sort((a, b) => Number(b.created_at_epoch) - Number(a.created_at_epoch))[0];
-    if (candidata) {
-      const corpo = await lerMensagem(candidata.uid);
+      .filter((m) => !jaLidas.has(String(m.uid)))
+      .sort((a, b) => Number(b.created_at_epoch) - Number(a.created_at_epoch));
+    for (const m of candidatas) {
+      jaLidas.add(String(m.uid));
+      const corpo = await lerMensagem(m.uid);
       const texto = corpo?.html ?? corpo?.text ?? corpo?.body ?? JSON.stringify(corpo);
       const achado = extrair(texto);
-      if (achado) return { achado, tentativas, uid: candidata.uid, assunto: candidata.subject ?? "" };
-      throw Object.assign(new Error(`o e-mail "${candidata.subject ?? ""}" chegou mas não achei ${oQue}`),
-        { html: String(texto).slice(0, 20000) });
+      if (achado) return { achado, tentativas, uid: m.uid, assunto: m.subject ?? "", puladas };
+      puladas.push({ assunto: m.subject ?? "", html: String(texto).slice(0, 20000) });
     }
-    const passou = Date.now() - t0;
+    const passou = relogio() - t0;
     if (passou >= limite) break;
     await pausa(Math.min(ritmo(passou), Math.max(1000, limite - passou)));
   }
   // Não chegou: diz o que havia na caixa e se o relógio daqui está torto.
   const desvio = Math.round(desvioMs / 1000);
-  const relogio = Math.abs(desvio) >= 30
+  const avisoRelogio = Math.abs(desvio) >= 30
     ? ` O relógio deste computador está ${Math.abs(desvio)} s ${desvio > 0 ? "adiantado" : "atrasado"} — acerte a hora do Windows.` : "";
   const daShopee = vistas.filter((m) => String(m.from ?? "").toLowerCase().includes(remetente)).length;
+  const outros = puladas.length ? ` Chegaram ${puladas.length} outro(s) e-mail(s) da Shopee sem ${oQue} ("${puladas.map((x) => x.assunto).join('", "')}").` : "";
   throw Object.assign(new Error(`o e-mail com ${oQue} não chegou em ${Math.round(limite / 1000)} s ` +
-    `(a caixa tem ${vistas.length} mensagem(ns), ${daShopee} da Shopee, nenhuma nova).${relogio}`), { naoChegou: true });
+    `(a caixa tem ${vistas.length} mensagem(ns), ${daShopee} da Shopee).${outros}${avisoRelogio}`),
+    { naoChegou: true, html: puladas[0]?.html });
 }
 
 /** Os uid que já estão na caixa: a foto de antes de a Shopee mandar. */
