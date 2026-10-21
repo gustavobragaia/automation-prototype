@@ -2036,19 +2036,22 @@ function agora(){var d=new Date();
 // Toda decisão da conferência passa por aqui — e só sai da tela depois que
 // o robô confirmou que gravou. Sumir antes e falhar depois seria o pior dos
 // mundos: a pessoa acha que resolveu e o pedido volta amanhã.
+// Devolve uma promessa: true se a decisão foi gravada, false se não foi.
 function resolver(it,rotulo,ordem){
   var pedido=it.dataset.pedido||(it.querySelector(".item-cab .t")||{}).textContent||"—";
   travar(it,true);
-  Promise.resolve(GANCHOS.decidir(pedido,ordem||{decisao:"encerrar"}))
+  return Promise.resolve(GANCHOS.decidir(pedido,ordem||{decisao:"encerrar"}))
     .then(function(r){
       TRATADOS.unshift({titulo:pedido, decisao:rotulo, hora:agora(),
         html:it.outerHTML, reversivel:!r||r.reversivel!==false});
       it.classList.add("sumindo");
       setTimeout(function(){ it.remove(); pintaRevisao(); }, rapido?0:200);
+      return true;
     })
     .catch(function(e){
       travar(it,false);
       erroNoItem(it,e&&e.message?e.message:"não deu para gravar essa decisão");
+      return false;
     });
 }
 function travar(it,sim){
@@ -2200,10 +2203,18 @@ $("cxPrecisa").addEventListener("click",function(e){
     // O outro pedido do mesmo cliente fica com o rastreio que sobrou: um
     // clique decide os dois, e o mesmo rastreio nunca vai para dois pedidos.
     var sobra=sobraParaIrmao(it,usarCod.dataset.usarCodigo);
+    if(sobra) travar(sobra.irmao,true);
     resolver(it,"escolhido o rastreio "+usarCod.dataset.usarCodigo,
-      {decisao:"colar", texto:usarCod.dataset.usarCodigo});
-    if(sobra) resolver(sobra.irmao,"ficou com o rastreio que sobrou: "+sobra.codigo,
-      {decisao:"colar", texto:sobra.codigo});
+      {decisao:"colar", texto:usarCod.dataset.usarCodigo}).then(function(deu){
+      if(!sobra) return;
+      // O outro pedido só é escrito DEPOIS de o primeiro dar certo: se a
+      // Shopify recusou o primeiro, a escolha pode estar errada, e escrever
+      // o segundo mesmo assim espalharia o erro para outro pedido.
+      if(deu) return resolver(sobra.irmao,"ficou com o rastreio que sobrou: "+sobra.codigo,
+        {decisao:"colar", texto:sobra.codigo});
+      travar(sobra.irmao,false);
+      erroNoItem(sobra.irmao,"Não escrevi este porque o "+it.dataset.pedido+" deu erro. Escolha de novo.");
+    });
     return;
   }
 

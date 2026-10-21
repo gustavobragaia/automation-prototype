@@ -86,6 +86,18 @@ sec("5. Quando NÃO dá para ter certeza, nada é escrito sozinho");
     "pareamento com menos de R$ 0,50 de folga para o segundo melhor: não decide");
 }
 
+sec("7. Rastreio que já foi para um pedido não é oferecido para o outro");
+{
+  // #10 bate o valor exato; #11 não bate nada e o total não fecha
+  const l = rodar(1, [linha(10, "Ana Teste", 34.8), linha(11, "Ana Teste", 12.9)],
+    [compra("Ana Teste", 34.8, "BR_A"), compra("Ana Teste", 14.66, "BR_B")]);
+  const a = de(l, 10)[0], b = de(l, 11)[0];
+  tudo &= ok(a.estado === "ok-valor" && a.codigo === "BR_A", "#10 fica com BR_A pelo valor exato");
+  const oferecidos = (b.motivo?.candidatos ?? []).map((c) => c.codigos[0]);
+  tudo &= ok(b.estado === "ambiguo" && oferecidos.join() === "BR_B",
+    `#11 fica para você, mas só com BR_B — BR_A já é do #10 (oferecidos: ${oferecidos.join(", ")})`);
+}
+
 sec("6. A escrita manda cada pedido uma vez só, mesmo em 2 linhas");
 {
   let mutacoes = 0;

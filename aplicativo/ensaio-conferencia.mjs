@@ -53,6 +53,18 @@ app.whenReady().then(async () => {
   tudo &= ok(dec === JSON.stringify([["Pedido #164925", "colar", "BR262981565516C BR269462194730E"]]),
     `"Usar os dois" escreve os dois rastreios no mesmo pedido (${dec})`);
 
+  // a Shopify recusa o primeiro: o segundo NÃO pode ser escrito
+  await montar([amb("Pedido #165172", 162, "EDESIO LOPES DE CERQUEIRA", EDESIO), amb("Pedido #165173", 162, "EDESIO LOPES DE CERQUEIRA", EDESIO)]);
+  await espera(300);
+  await js(`window.GANCHOS.decidir = async (pedido, ordem) => { window.__decisoes.push([pedido, ordem.texto]);
+    if (pedido === "Pedido #165172") throw new Error("Shopify: pedido cancelado"); return { reversivel: false }; }; 1`);
+  await js(`[...document.querySelectorAll('#cxPrecisa .item[data-pedido="Pedido #165172"] [data-usar-codigo]')].find(b => b.dataset.usarCodigo === "BR2620456593785").click()`);
+  await espera(500);
+  dec = await js(`JSON.stringify(window.__decisoes)`);
+  const aviso = await js(`document.querySelector('#cxPrecisa .item[data-pedido="Pedido #165173"] .erro-item')?.innerText ?? ""`);
+  tudo &= ok(JSON.parse(dec).length === 1 && /deu erro/.test(aviso),
+    `a Shopify recusou o #165172: o #165173 NÃO é escrito, e diz por quê ("${aviso}")`);
+
   // três pedidos do mesmo cliente: nenhum vira automático
   await montar([amb("Pedido #1", 7, "ANA", EDESIO), amb("Pedido #2", 7, "ANA", EDESIO), amb("Pedido #3", 7, "ANA", EDESIO)]);
   await espera(400);

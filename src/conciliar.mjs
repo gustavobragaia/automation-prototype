@@ -161,7 +161,7 @@ function parearPorCliente(linhas, coletas) {
 
     const { conta, p } = doGrupo[0];
     const compras = (coletas.get(conta) ?? []).filter((c) => normNome(c.nome) === normNome(p.nome));
-    if (!compras.length || !compras.every((c) => c.codigos?.length)) { if (conflito) emDuvida(doGrupo, compras); continue; }
+    if (!compras.length || !compras.every((c) => c.codigos?.length)) { if (conflito) emDuvida(doGrupo, compras); else tirarUsados(doGrupo); continue; }
     // pedido em várias linhas (2 produtos) é um pedido só
     const porNumero = new Map();
     for (const l of doGrupo) {
@@ -172,10 +172,10 @@ function parearPorCliente(linhas, coletas) {
     const pedidos = [...porNumero.values()];
     if (compras.length > pedidos.length) {
       const ceps = new Set(compras.map((c) => String(c.cep ?? "").replace(/\D/g, "")));
-      if (ceps.size !== 1 || [...ceps][0] === "") { if (conflito) emDuvida(doGrupo, compras); continue; }
+      if (ceps.size !== 1 || [...ceps][0] === "") { if (conflito) emDuvida(doGrupo, compras); else tirarUsados(doGrupo); continue; }
     }
     const par = pareamentoClaro(pedidos, compras);
-    if (!par) { if (conflito) emDuvida(doGrupo, compras); continue; }
+    if (!par) { if (conflito) emDuvida(doGrupo, compras); else tirarUsados(doGrupo); continue; }
     pedidos.forEach((ped, i) => {
       const minhas = compras.filter((_, k) => par[k] === i);
       for (const l of ped.linhas) {
@@ -187,6 +187,18 @@ function parearPorCliente(linhas, coletas) {
         delete l.motivo;
       }
     });
+  }
+}
+
+// Rastreio que já foi para outro pedido do mesmo cliente não pode ser
+// oferecido de novo na conferência: um clique o escreveria em dois pedidos.
+function tirarUsados(doGrupo) {
+  const usados = new Set(doGrupo.filter((l) => RESOLVIDO.has(l.estado))
+    .flatMap((l) => String(l.codigo || "").split(" · ").filter(Boolean)));
+  if (!usados.size) return;
+  for (const l of doGrupo) {
+    if (l.estado !== "ambiguo" || !l.motivo?.candidatos) continue;
+    l.motivo = { ...l.motivo, candidatos: l.motivo.candidatos.filter((c) => !(c.codigos ?? []).some((x) => usados.has(x))) };
   }
 }
 
