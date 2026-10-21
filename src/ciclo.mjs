@@ -143,13 +143,18 @@ export function agruparFalhas(falhas) {
     .map(([motivo, contas]) => ({ motivo, contas }));
 }
 
-function alertarFalhas(falhas, total) {
+export function alertarFalhas(falhas, total) {
   if (!falhas.length) return resolver("rodada-falhas");
   const grupos = agruparFalhas(falhas);
+  const precisam = falhas.filter((f) => f.natureza === "pessoa").length;
   alertar({ id: "rodada-falhas", nivel: "erro",
     titulo: `${falhas.length} de ${total} contas não foram lidas nesta rodada`,
     texto: grupos.map((g) => `${g.contas.length} × ${g.motivo} (${g.contas.length > 1 ? "contas" : "conta"} ${g.contas.join(", ")})`).join("\n"),
-    acao: "Os pedidos dessas contas estão na conferência como \"conta não foi lida\". Resolva o motivo e rode a coleta de novo — só as que faltam.",
+    acao: (precisam
+      ? "Nas que precisam de você, resolva na janela do AdsPower (ou entre à mão na conta). "
+      : "O robô já tentou cada uma até 3 vezes. ") +
+      "Os pedidos delas estão na conferência como \"conta não foi lida\". Depois, rode de novo só essas.",
+    rerodar: falhas.map((f) => f.conta),
   });
 }
 

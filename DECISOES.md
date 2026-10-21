@@ -695,3 +695,27 @@ grudado na planilha ("EduardoMafraCavalcanti") passa a casar.
 daquela rodada (`scripts/fixtures/coleta-sessao-caida-*.json`) e roda o
 `extensao/coleta.js` de verdade. Contra o código antigo, falha exatamente nos
 pontos do incidente; contra o novo, 34/34.
+
+## 21/10/2026 — Rodada da Chomps com 24 de 33 contas sem leitura (v0.1.6)
+
+Testado ao vivo, conta a conta, nas 33 contas da planilha do cliente
+(`scripts/ao-vivo.mjs`, a partir do Mac do Gustavo, perfis do AdsPower
+sincronizados). A leitura de pedidos estava certa: toda conta em que o robô
+entrou bateu os rastreios. O que derrubava a rodada era o LOGIN, quando as
+sessões caíam em massa:
+
+- **Login em fila**: quem perdia a vez de logar desistia para sempre. Agora
+  espera; a vez vale 2 min e é renovada antes de esperar o e-mail.
+- **"Verificar Identidade"** (/verify/ivs) era tratado como "entrei" → loop de
+  6 logins em 30 s → captcha. Agora o robô passa por ela sozinho (ver a
+  memória do projeto e `extensao/login.js`): clica no `<button>` de verdade,
+  ativa a caixa do inboxes antes, pega o link "aqui" do SendGrid e abre em
+  OUTRA aba; espera a Shopee sair de /authenticate/ivs.
+- **"Precisa de você"** fechava a janela em 2 s; agora fica aberta 10 min.
+- **Cota da RapidAPI** (100/mês no grátis) acabou no meio: alerta no app.
+- **Tentar de novo**: falha passageira volta ao fim da fila (até 3
+  tentativas, pausa de 30 s, no máx. 2 logins por conta); falha que precisa de
+  pessoa não repete. Alerta final com "Tentar de novo só essas".
+
+Resultado: 14 contas lidas, 93 de 94 pedidos com rastreio (o 94º não está
+na conta indicada pela planilha). As outras ficaram para a chave paga.

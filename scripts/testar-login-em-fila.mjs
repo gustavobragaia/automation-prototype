@@ -154,10 +154,11 @@ tudo &= ok(abasAbertas[0] === "https://u1.ct.sendgrid.net/ls/click?upn=abc" && p
   "abre o link do e-mail em OUTRA aba; a aba que esperava termina o login e vai para Minhas Compras");
 // a Shopee devolve para o login mesmo assim: a senha NÃO sai de novo
 const p2 = abrirPagina("/buyer/login");
-for (let i = 0; i < 300 && !avisosIvs.some((a) => a.tipo === "precisa-humano"); i++) await new Promise((r) => setTimeout(r, 10));
+for (let i = 0; i < 300 && !avisosIvs.some((a) => a.tipo === "login-falhou"); i++) await new Promise((r) => setTimeout(r, 10));
 tudo &= ok(senhasPedidas === 2 && avisosIvs.filter((a) => a.tipo === "login-iniciado").length === 1,
   "segunda ida ao login: a senha é negada, o robô não entra de novo (antes: 6 logins em 30 s)");
-tudo &= ok(avisosIvs.some((a) => a.tipo === "precisa-humano"), "e vira \"precisa de você\", com a janela aberta");
+tudo &= ok(avisosIvs.some((a) => a.tipo === "login-falhou" && /pediu login de novo/.test(a.motivo ?? "")),
+  "e falha na hora com o motivo — a fila põe a conta no fim e tenta de novo (antes: 10 min parada)");
 void p2;
 
 // A Shopee ignora o clique do script (o que acontece de verdade): o robô

@@ -63,7 +63,7 @@ log("──── resultado por conta");
 for (const c of alvos) {
   const r = res.find((x) => x.conta === c.conta);
   const col = coletas.get(c.conta);
-  log(`conta ${c.conta}: ${r?.ok ? "coletada" : "FALHOU " + (r?.erro ?? "sem perfil")} · ` +
+  log(`conta ${c.conta}: ${r?.ok ? "coletada" : "FALHOU " + (r?.erro ?? "sem perfil")}${r?.tentativas > 1 ? ` (${r.tentativas} tentativas)` : ""} · ` +
       `${col?.length ?? 0} pedido(s) lidos · planilha ${c.pedidos.length} · ${JSON.stringify(porConta.get(c.conta) ?? {})}`);
 }
 log(`eventos: ${readdirSync(DIR_EVENTOS).length} arquivo(s) em ${DIR_EVENTOS}`);

@@ -110,7 +110,9 @@
     const cred = await pedir("credencial");
     // Segunda vez na mesma rodada: o login anterior não pegou. Tentar de
     // novo é o que faz a Shopee pedir verificação por imagem.
-    if (cred?.repetida) return avisar("precisa-humano", { motivo: "a Shopee pediu login de novo depois que o robô já tinha entrado — entre à mão nesta janela" });
+    // Falha na hora (e não "precisa de você", que esperava 10 min): a fila põe
+    // a conta no fim e tenta de novo, com direito a mais um login.
+    if (cred?.repetida) return avisar("login-falhou", { motivo: "a Shopee pediu login de novo depois que o robô já tinha entrado" });
     if (!cred?.email) return avisar("login-falhou", { motivo: cred?.erro ?? "coletor não devolveu credencial" });
 
     const campoSenha = await esperar(SEL.senha);

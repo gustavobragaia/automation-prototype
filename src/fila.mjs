@@ -11,7 +11,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 // custaram caro neste projeto.
 import { abrirPerfil, fecharPerfil, statusPerfil, BASE, KEY } from "./adspower.mjs";
 import { soltarTrava } from "./trava-login.mjs";
-import { novoToken, limparToken, extensaoDaConta } from "./credenciais.mjs";
+import { novoToken, limparToken, extensaoDaConta, liberarLogin } from "./credenciais.mjs";
 import { emitir } from "./eventos.mjs";
 import { coletaDaConta, loginDaConta } from "./caminhos.mjs";
 
@@ -69,7 +69,12 @@ async function api(caminho, params = {}) {
 export async function processarConta({ serial, userId, conta }, {
   aoLog = () => {},
   timeoutMs = Number(process.env.TIMEOUT_CONTA_MS ?? 150_000),
+  tentativa = 1,
 } = {}) {
+  // Só para teste ao vivo do retry: ESTEIRA_TESTE_FALHAR=124 faz a 1ª tentativa
+  // da conta 124 estourar o prazo em 3 s, numa conta e num perfil de verdade.
+  if (tentativa === 1 && String(process.env.ESTEIRA_TESTE_FALHAR ?? "").split(",").includes(String(conta)))
+    timeoutMs = 3000;
   const ref = serial != null ? { serial } : { userId };
   emitir("conta:abrindo", { conta });
   const arq = coletaDaConta(conta);
@@ -189,40 +194,97 @@ let pararPedido = false;
 export function pedirParada() { pararPedido = true; }
 export function paradaPedida() { return pararPedido; }
 
-/** Roda a fila com concorrência limitada e pausa aleatória entre contas. */
-export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pausaMax = 12_000, aoLog = () => {} } = {}) {
-  const pendentes = [...contas];
+// ── Tentar de novo ──────────────────────────────────────────────────────
+//
+// Conta que falha por algo PASSAGEIRO (a página demorou, nenhuma lista
+// respondeu, o perfil não abriu, o login travou no meio) volta para o FIM da
+// fila e é tentada de novo depois das outras — até TENTATIVAS vezes no total.
+// Nunca em sequência: logar de novo na hora é o que fez a Shopee pedir
+// captcha nas contas 142, 149 e 153 (21/10).
+//
+// Conta que falha porque precisa de uma PESSOA (captcha, senha recusada,
+// cota da caixa de e-mail acabou, login automático desligado) não repete:
+// repetir não resolve e só piora a conta. Vai direto para o alerta.
+export const TENTATIVAS = () => Math.max(1, Number(process.env.TENTATIVAS_CONTA ?? 3));
+const PAUSA_REPETIR_MS = () => Number(process.env.PAUSA_REPETIR_MS ?? 30_000);
+
+const PRECISA_DE_PESSOA = new RegExp([
+  "pediu uma pessoa", "captcha", "verificação de imagem", "senha inv[aá]lida", "conta bloquead",
+  "conta não existe", "excesso de tentativas", "cota da RapidAPI", "RapidAPI recusou",
+  "login automático está desligado", "não está preenchid", "não está configurad",
+].join("|"), "i");
+
+/** "pessoa": só uma pessoa resolve, não repete. "passageira": vale tentar de novo. */
+export function tipoDaFalha(mensagem) {
+  return PRECISA_DE_PESSOA.test(String(mensagem ?? "")) ? "pessoa" : "passageira";
+}
+
+/**
+ * Roda a fila com concorrência limitada e pausa aleatória entre contas.
+ * `processar` existe para os testes; a rodada de verdade usa processarConta.
+ */
+export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pausaMax = 12_000, aoLog = () => {},
+                                          processar = processarConta } = {}) {
+  const pendentes = contas.map((c) => ({ c, tentativa: 1, naoAntesDe: 0 }));
   const resultados = [];
+  let emAndamento = 0;
 
   pararPedido = false;   // uma parada de ontem não cancela a rodada de hoje
 
   // Token novo a cada rodada: se vazar, vale só por esta execução.
   novoToken();
 
-  const trabalhador = async (n) => {
-    while (pendentes.length) {
+  // A próxima que já pode ir. Uma conta que voltou para a fila espera a sua
+  // pausa; enquanto isso, as outras andam.
+  const proxima = () => {
+    const agora = Date.now();
+    const i = pendentes.findIndex((p) => p.naoAntesDe <= agora);
+    return i < 0 ? null : pendentes.splice(i, 1)[0];
+  };
+
+  const trabalhador = async () => {
+    // Fica vivo enquanto houver conta pendente OU em andamento: uma conta em
+    // andamento pode voltar para a fila, e alguém precisa pegá-la.
+    while (pendentes.length || emAndamento) {
       if (pararPedido) {
         // As que sobraram não viram falha: ninguém tentou abrir.
         for (const resto of pendentes.splice(0))
-          aoLog(`conta ${resto.conta}: fora da rodada — parada pedida`);
+          aoLog(`conta ${resto.c.conta}: fora da rodada — parada pedida`);
         return;
       }
-      const c = pendentes.shift();
+      const item = proxima();
+      if (!item) { await dormir(500); continue; }
+      const { c, tentativa } = item;
+      emAndamento++;
       const comecou = Date.now();
+      let repetir = false;
       try {
-        const arq = await processarConta(c, { aoLog });
-        resultados.push({ ...c, ok: true, arq });
-        aoLog(`conta ${c.conta}: coletada`);
+        const arq = await processar(c, { aoLog, tentativa });
+        resultados.push({ ...c, ok: true, arq, tentativas: tentativa });
+        aoLog(`conta ${c.conta}: coletada${tentativa > 1 ? ` na ${tentativa}ª tentativa` : ""}`);
         emitir("conta:feita", {
-          conta: c.conta,
+          conta: c.conta, tentativas: tentativa,
           segundos: Math.round((Date.now() - comecou) / 1000),
           ...resumoDaColeta(c.conta, arq, comecou),
         });
       } catch (e) {
-        resultados.push({ ...c, ok: false, erro: e.message });
-        aoLog(`conta ${c.conta}: FALHOU — ${e.message}`);
-        emitir("conta:falhou", { conta: c.conta, erro: e.message });
+        // "natureza", e não "tipo": emitir() junta os dados ao evento, e um
+        // campo "tipo" apagava o "conta:falhou" — a tela não via a falha.
+        const natureza = tipoDaFalha(e.message);
+        repetir = natureza === "passageira" && tentativa < TENTATIVAS() && !pararPedido;
+        if (repetir) {
+          const pausa = PAUSA_REPETIR_MS();
+          pendentes.push({ c, tentativa: tentativa + 1, naoAntesDe: Date.now() + pausa });
+          liberarLogin(c.conta);   // a próxima tentativa pode entrar de novo (no máx. 2 logins por rodada)
+          aoLog(`conta ${c.conta}: falhou (${e.message}) — vai tentar de novo no fim da fila (${tentativa + 1}ª de ${TENTATIVAS()})`);
+          emitir("conta:repetindo", { conta: c.conta, tentativa: tentativa + 1, de: TENTATIVAS(), motivo: e.message });
+        } else {
+          resultados.push({ ...c, ok: false, erro: e.message, tentativas: tentativa, natureza });
+          aoLog(`conta ${c.conta}: FALHOU — ${e.message}${tentativa > 1 ? ` (depois de ${tentativa} tentativas)` : ""}`);
+          emitir("conta:falhou", { conta: c.conta, erro: e.message, tentativas: tentativa, natureza });
+        }
       } finally {
+        emAndamento--;
         // Rede de segurança: se o perfil morreu antes de soltar a vez, a
         // fila inteira ficaria esperando a trava expirar.
         soltarTrava(c.conta);
@@ -232,7 +294,7 @@ export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pau
   };
 
   try {
-    await Promise.all(Array.from({ length: Math.min(concorrencia, contas.length) }, (_, i) => trabalhador(i)));
+    await Promise.all(Array.from({ length: Math.min(concorrencia, contas.length) }, () => trabalhador()));
   } finally {
     limparToken();   // fora da rodada, o coletor não entrega credencial nenhuma
   }

@@ -1705,7 +1705,8 @@ function linhaConta(c){
   else if(e==="abrindo") situacao=est("andando","abrindo perfil");
   else if(e==="logando"){ situacao=est("andando","o robô está logando"); }
   else if(e==="humano") situacao=est("at","precisa de você");
-  else if(e==="falhou") situacao=est("er", c.erro ? "falhou: "+c.erro : "falhou");
+  else if(e==="repetindo") situacao='<span title="'+esc(c.motivo||"")+'">'+est("at","vai tentar de novo · "+c.tentativa+"ª de "+c.de)+'</span>';
+  else if(e==="falhou") situacao=est("er", (c.erro ? "falhou: "+c.erro : "falhou")+(c.tentativas>1?" ("+c.tentativas+" tentativas)":""));
   else if(e==="lendo"){ situacao=est("andando","lendo pedidos"); entrada=feita; }
   else { situacao=est("ok","coletada"); entrada=feita;
          pedidos='<span class="num">'+(c.pedidos==null?"—":c.pedidos)+'</span>';
@@ -2678,6 +2679,7 @@ function pintaAlertas(){
       (a.acao?'<div class="a"><b>O que fazer:</b> '+esc(a.acao)+'</div>':"")+
       '<div class="meta"><span class="esq">'+quandoAlerta(a.em)+(a.vezes>1?" · "+a.vezes+" vezes":"")+'</span>'+
       (a.ir?'<button class="btn peq" data-ir="'+esc(a.ir)+'">Abrir '+esc(a.ir==="ajustes"?"Ajustes":a.ir)+'</button>':"")+
+      (a.rerodar&&a.rerodar.length?'<button class="btn peq pri" data-rerodar="'+esc(a.rerodar.join(","))+'">Tentar de novo só essas ('+a.rerodar.length+')</button>':"")+
       '<button class="btn peq" data-dispensar="'+esc(a.id)+'">Dispensar</button></div></div></div>';
   }).join(""):'<div class="pa-vazio">'+ICO_SINO_OK+'<b>Nenhum alerta</b>Quando algo impedir o robô de trabalhar, aparece aqui com o que fazer.</div>';
 }
@@ -2694,7 +2696,11 @@ $("listaAlertas").addEventListener("click",function(e){
   var ir=e.target.closest("[data-ir]"), fora=e.target.closest("[data-dispensar]");
   if(ir){ abrirAlertas(false); var t=document.querySelector('.apoio [data-tela="'+ir.dataset.ir+'"]'); if(t) t.click(); }
   if(fora) GANCHOS.dispensarAlerta(fora.dataset.dispensar);
+  var de_novo=e.target.closest("[data-rerodar]");
+  if(de_novo){ abrirAlertas(false);
+    GANCHOS.rerodar(de_novo.dataset.rerodar.split(",").map(Number).filter(function(n){return n>0;})); }
 });
+GANCHOS.rerodar=function(contas){ avisar("Tentar de novo", "Contas "+contas.join(", ")+" (protótipo: nada roda aqui)"); };
 GANCHOS.dispensarAlerta=function(id){
   alertas=alertas.filter(function(a){return a.id!==id;}); pintaAlertas();
 };
@@ -2874,6 +2880,8 @@ window.TELA = {
         if(dados.segundos!=null) c.seg=dados.segundos;
         if(dados.precisouLogin!=null) c.viva=!dados.precisouLogin;
         if(dados.erro!=null) c.erro=dados.erro;
+        if(dados.tentativa!=null){ c.tentativa=dados.tentativa; c.de=dados.de; c.motivo=dados.motivo; }
+        if(dados.tentativas!=null) c.tentativas=dados.tentativas;
       }
       // "o robô está logando" já prova que a sessão tinha morrido, antes
       // mesmo de a conta terminar — senão a coluna fica mentindo no meio.

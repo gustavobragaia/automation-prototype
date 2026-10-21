@@ -27,11 +27,14 @@ let dirRodada = null;
 // conta por rodada: na Chomps, em 21/10, o robô entrou 6 vezes em 30 s na
 // mesma conta (a Shopee pedia "Verificar Identidade", ele achava que tinha
 // entrado e voltava) até a Shopee pedir verificação por imagem.
-const jaEntregue = new Set();
+const jaEntregue = new Map();     // conta → logins começados nesta rodada
+const permitidos = new Map();     // conta → logins permitidos (1; 2 depois de um retry)
+const MAX_LOGINS = 2;
 
 export function novoToken() {
   tokenAtual = randomBytes(24).toString("hex");
   jaEntregue.clear();
+  permitidos.clear();
   // O ID de uma extensão descompactada vem do CAMINHO. Reusar a mesma pasta
   // fazia o Chrome reaproveitar o service worker em cache do perfil — com o
   // token da rodada anterior, e a credencial era recusada como inválida.
@@ -90,7 +93,7 @@ export function credencialDaConta(conta) {
  */
 export function entregarCredencial(conta) {
   const n = Number(conta);
-  if (jaEntregue.has(n)) {
+  if ((jaEntregue.get(n) ?? 0) >= (permitidos.get(n) ?? 1)) {
     const e = new Error("o robô já tentou entrar nesta conta nesta rodada e não ficou logado");
     e.repetida = true;
     throw e;
@@ -104,4 +107,17 @@ export function entregarCredencial(conta) {
  * restaura abas antigas, uma delas pedia a senha antes de a fila fechá-la, e
  * a aba de verdade ficava sem (conta 122, 21/10).
  */
-export function marcarTentativa(conta) { jaEntregue.add(Number(conta)); }
+export function marcarTentativa(conta) {
+  const n = Number(conta);
+  jaEntregue.set(n, (jaEntregue.get(n) ?? 0) + 1);
+}
+
+/**
+ * A fila vai tentar a conta de novo, no fim da fila: ela ganha direito a
+ * mais um login — nunca mais de dois na rodada. O primeiro login que não
+ * pegou numa tentativa não condena a conta inteira; dois seguidos, sim.
+ */
+export function liberarLogin(conta) {
+  const n = Number(conta);
+  permitidos.set(n, Math.min(MAX_LOGINS, (permitidos.get(n) ?? 1) + 1));
+}

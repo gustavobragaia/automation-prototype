@@ -238,7 +238,7 @@ async function ler(caminho){
 var ESTADO_DO_EVENTO = {
   "conta:abrindo": "abrindo", "conta:aberta": "abrindo", "conta:logando": "logando",
   "conta:humano": "humano", "conta:lendo": "lendo", "conta:feita": "feita",
-  "conta:falhou": "falhou",
+  "conta:falhou": "falhou", "conta:repetindo": "repetindo",
 };
 function rodada(){
   // A escuta começa antes de qualquer rodada: o coletor sobe junto com o app
@@ -284,6 +284,27 @@ function rodada(){
       TELA.avisar("A rodada não terminou", e.message);
       console.error("[esteira] rodada:", e.message);
     } finally { botao.disabled = false; }
+  };
+
+  // "Tentar de novo só essas", no alerta do fim da rodada: as mesmas
+  // planilhas, só as contas que não foram lidas. As outras não são abertas de
+  // novo, e o que já foi lido delas continua valendo na conferência.
+  GANCHOS.rerodar = async function(numeros){
+    if (await pedir("rodada:emCurso")) return TELA.avisar("Já tem uma rodada em andamento", "Espere ela terminar.");
+    try {
+      var todas = await pedir("rodada:contas", []);
+      var contas = todas.filter(function(c){ return numeros.indexOf(Number(c.conta)) >= 0; });
+      if (!contas.length) throw new Error("essas contas não estão nas planilhas escolhidas");
+      document.querySelector('[data-etapa="2"]')?.click();
+      await pedir("rodada:iniciar", {
+        contas: contas,
+        escrever: document.getElementById("chDireto").getAttribute("aria-pressed") === "true",
+        concorrencia: paraleloEscolhido(),
+      });
+    } catch (e) {
+      TELA.rodada.terminar({ erro: e.message });
+      TELA.avisar("Não consegui tentar de novo", e.message);
+    }
   };
 
   GANCHOS.pararRodada = async function(){

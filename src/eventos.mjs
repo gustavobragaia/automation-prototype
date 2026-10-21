@@ -22,7 +22,8 @@ export const TIPOS = new Set([
   "conta:humano",     // { conta, motivo } — parou, precisa de uma pessoa
   "conta:lendo",      // { conta }  — já dentro, lendo os pedidos
   "conta:feita",      // { conta, pedidos, segundos, precisouLogin }
-  "conta:falhou",     // { conta, erro }
+  "conta:falhou",     // { conta, erro, tentativas, natureza }
+  "conta:repetindo",  // { conta, tentativa, de, motivo } — voltou para o fim da fila
   "alerta:novo",      // { alerta, novo } — src/alertas.mjs
   "alerta:resolvido", // { id }
 ]);
