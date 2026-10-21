@@ -51,6 +51,11 @@ chrome.runtime.onMessage.addListener((msg, remetente, responder) => {
     return true;
   }
 
+  if (msg?.pedido === "qual-conta") {
+    responder({ conta: self.COLETOR_CONTA ?? null });
+    return true;
+  }
+
   if (msg?.pedido === "travar-login") {
     const aba = remetente.tab?.id ?? 0;
     const expirou = donoDoLogin !== null && Date.now() - travadoEm > TRAVA_VALE_MS;

@@ -247,7 +247,23 @@
     }
     avisar("verificacao-email-pedida", { motivo: (document.body?.innerText ?? "").replace(/\s+/g, " ").slice(0, 300) });
 
-    const r = await pedir("link", { desde });
+    let r = await pedir("link", { desde });
+    // Não chegou: pede à Shopee para mandar de novo, UMA vez. A página
+    // /verify/email-link oferece "Reenviar" depois de 60 s.
+    if (!r?.link && /não chegou/.test(r?.erro ?? "")) {
+      const reenviar = await esperar(() => {
+        const el = [...document.querySelectorAll("button, a, [role=button], span, div")]
+          .filter((e) => /^reenviar/i.test((e.innerText || "").trim()))
+          .sort((a, b) => (a.innerText || "").length - (b.innerText || "").length)[0];
+        return el ? (el.closest("button, a, [role=button]") ?? el) : null;
+      }, 60_000);
+      if (reenviar) {
+        await pedir("travar-login");
+        reenviar.click();
+        avisar("verificacao-reenviada", { motivo: "o e-mail não chegou; pedi à Shopee para mandar de novo" });
+        r = await pedir("link", { desde });
+      }
+    }
     if (!r?.link) return avisar("precisa-humano", { motivo: `a Shopee pediu para confirmar a identidade por e-mail, e ${r?.erro ?? "o link não chegou"}` });
     // O link abre em OUTRA aba. Esta aqui é a que termina o login quando o
     // e-mail é confirmado — abrir o link nela (como era) aprovava o login na
@@ -281,6 +297,18 @@
         setTimeout(() => { location.href = "https://shopee.com.br/user/purchase?type=7"; }, 3000);
     }
   } catch {}
+
+  // O número da conta no título da aba: o título da aba ativa vira o nome da
+  // janela, e é por ele que a pessoa acha, na barra de tarefas, a conta que
+  // está pedindo "precisa de você". A Shopee troca o título ao navegar, então
+  // ele é reposto sempre que some.
+  pedir("qual-conta").then((r) => {
+    if (r?.conta == null) return;
+    const prefixo = `Conta ${r.conta} · `;
+    const marcar = () => { if (!document.title.startsWith(prefixo)) document.title = prefixo + document.title.replace(/^Conta \d+ · /, ""); };
+    marcar();
+    setInterval(marcar, 1500);
+  }).catch(() => {});
 
   // A Shopee troca /user/purchase por /buyer/login POR DENTRO da SPA, sem
   // recarregar. Content script casado só com a URL de login nunca era

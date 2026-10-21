@@ -63,7 +63,9 @@ export async function abrirPerfil(ref, {
     try {
       // cdp_mask=1 mascara a detecção de automação. Explícito de propósito.
       const d = await chamar("/api/v1/browser/start", {
-        ...idParams(ref), open_tabs: 0, ip_tab: 0, headless, cdp_mask: 1,
+        // ip_tab: 1 = a aba do próprio AdsPower ("Shopee 139"), que diz qual
+        // conta é esta janela. Com 0, ninguém achava a conta que pedia ajuda.
+        ...idParams(ref), open_tabs: 0, ip_tab: 1, headless, cdp_mask: 1,
         ...(launchArgs ? { launch_args: JSON.stringify(launchArgs) } : {}),
       });
       return { ws: d.ws.puppeteer, debugPort: d.debug_port };

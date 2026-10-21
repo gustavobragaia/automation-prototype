@@ -4,13 +4,17 @@
 import { createServer } from "node:http";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tokenValido, credencialDaConta, entregarCredencial, marcarTentativa } from "./credenciais.mjs";
-import { obterCodigo, obterLink, ativarCaixa } from "./otp.mjs";
+import { obterCodigo, obterLink, fotoDaCaixa } from "./otp.mjs";
 import { pedirTrava, soltarTrava, donoAtual } from "./trava-login.mjs";
 import { receberToken } from "./shopify-oauth.mjs";
 import { emitir } from "./eventos.mjs";
 import { alertar, resolver } from "./alertas.mjs";
 import { join } from "node:path";
 import { DIR_COLETAS, DIR_EVENTOS, DIR_LOGIN, coletaDaConta, loginDaConta } from "./caminhos.mjs";
+
+// A foto da caixa de cada conta, tirada antes de a Shopee mandar o e-mail:
+// o que estiver na caixa depois e não estiver nela é o e-mail novo.
+const fotos = new Map();
 
 export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
   for (const d of [DIR_COLETAS, DIR_EVENTOS, DIR_LOGIN])
@@ -59,8 +63,9 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         // address, wait for messages"). Ativar depois de pedir o e-mail perdia a
         // mensagem — na conta 120, em 21/10, a caixa ficou vazia.
         if (u.pathname === "/caixa") {
-          await ativarCaixa(credencialDaConta(conta).email);
-          aoLog(`conta ${conta}: caixa de e-mail ativada antes do envio`);
+          const foto = await fotoDaCaixa(credencialDaConta(conta).email);
+          fotos.set(String(conta), foto);
+          aoLog(`conta ${conta}: caixa de e-mail ativada antes do envio (${foto.size} mensagem(ns) já lá)`);
           return res.end(JSON.stringify({ ok: true }));
         }
         // "Verificar Identidade": o link que a Shopee manda por e-mail.
@@ -68,7 +73,7 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
           const desde = Number(u.searchParams.get("desde") || 0);
           aoLog(`conta ${conta}: buscando o link de verificação no e-mail`);
           try {
-            const r = await obterLink(credencialDaConta(conta).email, desde);
+            const r = await obterLink(credencialDaConta(conta).email, desde, { antes: fotos.get(String(conta)) ?? null });
             aoLog(`conta ${conta}: link de verificação obtido ("${r.assunto}")`);
             return res.end(JSON.stringify({ link: r.link }));
           } catch (e) {
@@ -79,7 +84,7 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         // OTP: a chave da API de e-mail fica aqui, nunca no navegador.
         const desde = Number(u.searchParams.get("desde") || 0);
         aoLog(`conta ${conta}: buscando código de verificação no e-mail`);
-        const r = await obterCodigo(credencialDaConta(conta).email, desde);
+        const r = await obterCodigo(credencialDaConta(conta).email, desde, { antes: fotos.get(String(conta)) ?? null });
         aoLog(`conta ${conta}: código obtido em ${r.tentativas} tentativa(s)`);
         return res.end(JSON.stringify({ codigo: r.codigo }));
       } catch (e) {
@@ -146,7 +151,9 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         // A fila lê este arquivo para saber se vale esperar mais: login em
         // andamento merece prazo; login falhado merece desistir na hora.
         if (m.tipo === "login-iniciado") marcarTentativa(conta);
-        if (/^(login-|otp-|precisa-humano|nao-autenticado|coleta-falhou|sessao-caida)/.test(m.tipo ?? "")) {
+        // "verificacao-*" também: a espera do e-mail pode passar de 3 min, e
+        // cada passo dela renova o prazo da fila.
+        if (/^(login-|otp-|verificacao-|precisa-humano|nao-autenticado|coleta-falhou|sessao-caida)/.test(m.tipo ?? "")) {
           // "precisa de você" não é sobrescrito por um aviso menor da mesma
           // conta: a fila lê a ÚLTIMA marca, e um "nao-autenticado" logo depois
           // tirava os 10 min de espera — a janela fechava com a pessoa a caminho.
