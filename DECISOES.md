@@ -747,3 +747,11 @@ claramente melhor (R$ 0,50 de folga); valores iguais ficam para a pessoa. Na
 conferência: "Usar este e o outro" e "Usar os dois". Corrigido também o
 envio duplicado de pedido em 2 linhas (2 produtos) e, na auditoria, o
 segundo pedido escrito mesmo com o primeiro recusado.
+
+## 21/10/2026 — v0.1.9: a conferência não mostra o que já foi resolvido
+
+A conferência mostra a carteira (o que ficou da rodada anterior). Depois da
+0.1.8 o EDESIO já era pareado pelo total, mas seguia em "dois candidatos".
+Agora o que a conciliação de agora resolve sai da lista com um aviso e vai
+para a etapa 4. O que a Shopify barrou continua. As etapas 3 e 4 são
+refeitas ao serem abertas (antes, só no fim da rodada).
