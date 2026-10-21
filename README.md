@@ -153,6 +153,39 @@ fixture.
 - [`FASES.md`](FASES.md): o roteiro, da operação real até "sem planilha".
 - [`INSTALACAO.md`](INSTALACAO.md): instalação e operação na máquina do cliente.
 
+## Resultados da prova de conceito (base real, 19.975 pedidos)
+
+Medido antes do aplicativo existir, contra a planilha de controle do cliente
+(março a setembro de 2026), com `npm run proof`. A conciliação de hoje usa
+mais sinais que isso (CEP, pedido em várias compras, pareamento pelo total).
+
+**Parser de rastreio**
+
+| | |
+|---|---|
+| Extraído sem ressalva | 92,75% |
+| Vários códigos na mesma célula, separados corretamente | 2,00% (399) |
+| Vazio na origem | 5,02% |
+| Não reconhecido → revisão | 0,07% (13) |
+
+107 células tinham o código dos Correios colado no da Shopee Xpress sem
+separador (`BR290000000007JSPXLM10000001`) — todas separadas corretamente.
+
+**Casamento Shopee → Shopify**, simulando dia a dia com janela de 21 dias:
+
+| Critério | Automático | Revisão | Casado errado |
+|---|---|---|---|
+| Só pelo nome | 89,11% | 10,89% | 0 |
+| Nome + valor + produto | **97,57%** | 2,43% | **0** |
+
+Em 10,89% dos pedidos o nome sozinho não identifica o pedido: existe outro
+pedido aberto do mesmo nome na janela. Na operação real entra também o
+endereço de entrega, que desempata boa parte do resto.
+
+> Os números do fixture sintético **não** reproduzem os acima — ele existe para
+> o código rodar em qualquer máquina, não para medir. Só cite números obtidos
+> com a planilha real.
+
 ## Princípios
 
 - **Nunca escrever sob dúvida.** Empate, total que não bate ou compra sem
