@@ -737,3 +737,13 @@ Plano e revisão em `PLANO-0.1.7.md`. O que mudou:
 - **Progresso** na coleta (etapa 2) e na escrita (etapa 4), "Ver todos".
 - **Avisos não somem** (7 dias), log em arquivo (14 dias), "Exportar
   diagnóstico" sem senha, chaves ou dados de cliente.
+
+## 21/10/2026 — v0.1.8: cliente com vários pedidos na mesma conta
+
+EDESIO (conta 162): #165172 R$ 36,56 e #165173 R$ 12,90 na planilha; compras
+de R$ 34,80 e R$ 14,66 na Shopee. Nenhum valor bate sozinho, a soma bate. O
+robô agora pareia pelo total do cliente quando o melhor pareamento é
+claramente melhor (R$ 0,50 de folga); valores iguais ficam para a pessoa. Na
+conferência: "Usar este e o outro" e "Usar os dois". Corrigido também o
+envio duplicado de pedido em 2 linhas (2 produtos) e, na auditoria, o
+segundo pedido escrito mesmo com o primeiro recusado.
