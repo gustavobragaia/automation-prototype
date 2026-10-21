@@ -10,6 +10,7 @@
 // Roda a fila de verdade (src/fila.mjs) com um "processar" de mentira que
 // falha do jeito que cada cenário pede, usando as mensagens REAIS de erro
 // que saíram nas rodadas de 21/10.
+import { fileURLToPath } from "node:url";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,7 +18,7 @@ import { join } from "node:path";
 const dir = mkdtempSync(join(tmpdir(), "esteira-retry-"));
 process.env.TRABALHO_DIR = dir;
 process.env.ESTADO_DIR = join(dir, "estado");
-process.env.RECURSOS_DIR = new URL("..", import.meta.url).pathname;
+process.env.RECURSOS_DIR = fileURLToPath(new URL("..", import.meta.url));
 process.env.PAUSA_REPETIR_MS = "60";
 process.env.SHOPEE_SENHA = "s"; process.env.SHOPEE_PREFIXO = "c"; process.env.SHOPEE_EMAIL_DOMINIO = "x.com";
 

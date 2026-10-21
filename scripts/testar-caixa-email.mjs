@@ -8,13 +8,14 @@
 // Aqui a RapidAPI é de mentira (com o cabeçalho Date do servidor, como a de
 // verdade), o relógio é de mentira (para esperar 3 min em milissegundos), e
 // o e-mail é o REAL da Shopee, limpo (scripts/fixtures/email-shopee-verificacao.html).
+import { fileURLToPath } from "node:url";
 import { readFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const dir = mkdtempSync(join(tmpdir(), "esteira-caixa-"));
 process.env.TRABALHO_DIR = dir; process.env.ESTADO_DIR = join(dir, "estado");
-process.env.RECURSOS_DIR = new URL("..", import.meta.url).pathname;
+process.env.RECURSOS_DIR = fileURLToPath(new URL("..", import.meta.url));
 process.env.RAPIDAPI_KEY = "chave-de-teste";
 process.env.SHOPEE_SENHA = "s"; process.env.SHOPEE_PREFIXO = "c"; process.env.SHOPEE_EMAIL_DOMINIO = "givmail.com";
 
