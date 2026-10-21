@@ -105,11 +105,7 @@ export async function processarConta({ serial, userId, conta }, {
     // coletas duplicadas. Fechar é pelo endpoint HTTP, sem sessão CDP.
     try {
       const abas = await (await fetch(`http://127.0.0.1:${porta}/json/list`)).json();
-      // A aba do próprio AdsPower ("Shopee 139", start.adspower.net) fica: é
-      // ela que diz qual conta é aquela janela — o Matheus precisava achar a
-      // conta que pedia "precisa de você" e não tinha como.
-      const antigas = abas.filter((t) => t.type === "page" &&
-        !/^(about:blank|chrome:)/.test(t.url ?? "") && !/^https?:\/\/start\.adspower\.(net|com)\//.test(t.url ?? ""));
+      const antigas = abasParaFechar(abas);
       for (const t of antigas)
         await fetch(`http://127.0.0.1:${porta}/json/close/${t.id}`).catch(() => {});
       if (antigas.length) aoLog(`conta ${conta}: ${antigas.length} aba(s) restaurada(s) fechada(s)`);
@@ -133,6 +129,18 @@ export async function processarConta({ serial, userId, conta }, {
     await fecharPerfil(ref).catch(() => {}); // nunca desloga
     abertosAgora.delete(ref);
   }
+}
+
+/**
+ * As abas restauradas que a fila fecha ao abrir o perfil. A aba do próprio
+ * AdsPower ("Shopee 139", start.adspower.net) FICA: é ela que diz qual conta é
+ * aquela janela — o Matheus precisava achar a conta que pedia "precisa de
+ * você" e não tinha como.
+ */
+export function abasParaFechar(abas) {
+  return abas.filter((t) => t.type === "page" &&
+    !/^(about:blank|chrome:)/.test(t.url ?? "") &&
+    !/^https?:\/\/start\.adspower\.(net|com)\//.test(t.url ?? ""));
 }
 
 /** O que a conta avisou sobre login nesta rodada (o arquivo do coletor). */

@@ -108,6 +108,14 @@ chrome.runtime.onMessage.addListener((msg, remetente, responder) => {
     return true;   // mantém o canal aberto para a resposta assíncrona
   }
 
+  // "Precisa de você": a janela desta conta vem para a frente e pisca na
+  // barra de tarefas. Com várias janelas abertas, ninguém achava qual era a
+  // conta que pedia ajuda (Matheus, 21/10).
+  if (msg?.tipo === "precisa-humano" && remetente.tab) {
+    chrome.tabs.update(remetente.tab.id, { active: true }).catch?.(() => {});
+    chrome.windows.update(remetente.tab.windowId, { focused: true, drawAttention: true }).catch?.(() => {});
+  }
+
   if (msg?.tipo && FIM_DO_LOGIN.has(msg.tipo)) {
     donoDoLogin = null; travadoEm = 0;
     travaGlobal("soltar").catch(() => {});
