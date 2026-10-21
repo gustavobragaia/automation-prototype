@@ -742,6 +742,22 @@ details.cred summary:hover{color:var(--tinta)}
 .pa-vazio{padding:30px 20px;text-align:center;font-size:12.5px;color:var(--tinta-2);line-height:1.55}
 .pa-vazio b{display:block;color:var(--tinta);font-size:13.5px;font-weight:500;margin-bottom:3px}
 
+/* progresso da coleta (etapa 2) */
+.prog-coleta{margin-top:16px;display:grid;gap:10px}
+.pc-barra{display:flex;height:8px;border-radius:6px;overflow:hidden;background:var(--sup-3)}
+.pc-barra i{display:block;height:100%;transition:width .3s ease}
+.pc-barra .lidas{background:var(--ok)} .pc-barra .falharam{background:var(--erro)}
+.pc-barra .esperando{background:var(--atencao)} .pc-barra .repetindo{background:color-mix(in srgb,var(--atencao) 55%,var(--sup-3))}
+.pc-barra .andando{background:var(--marca)}
+.pc-txt{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.pc-txt .total{font-weight:600;margin-right:6px}
+.pc-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;border:1px solid var(--linha);
+  background:var(--canvas);font-size:12.5px;color:var(--tinta-2)}
+.pc-chip .pt{width:7px;height:7px;border-radius:50%;flex:none}
+.pc-chip[aria-pressed="true"]{border-color:var(--tinta-2);background:var(--sup-2);color:var(--tinta)}
+.pc-chip:hover{background:var(--sup-2)}
+@media(prefers-reduced-motion:reduce){.pc-barra i{transition:none}}
+
 /* aviso de versão nova, no pé da barra lateral */
 .lado-atualiza{margin-top:12px;padding:12px;border-radius:10px;display:grid;gap:6px;
   background:color-mix(in srgb,var(--marca) 12%,var(--canvas));border:1px solid color-mix(in srgb,var(--marca) 35%,var(--linha))}
@@ -915,6 +931,12 @@ details.cred summary:hover{color:var(--tinta)}
       <div><div class="v num" id="vContas">0/5</div><div class="r">contas visitadas</div></div>
       <div class="ok"><div class="v num" id="vSemLogin">—</div><div class="r">já estavam conectadas<br><span class="ter">não precisaram de senha</span></div></div>
       <div><div class="v num" id="vTempo">—</div><div class="r">previsão</div></div>
+    </div>
+    <!-- Progresso da rodada: quantas foram, quantas não foram, e quantas
+         esperam alguém. Clicar num número filtra a tabela das contas. -->
+    <div class="prog-coleta" id="progColeta" hidden>
+      <div class="pc-barra" id="pcBarra" role="img" aria-label="Progresso da coleta"></div>
+      <div class="pc-txt" id="pcTxt"></div>
     </div>
   </div>
 
@@ -1717,8 +1739,39 @@ function linhaConta(c){
     '<td class="mono ter">'+(c.perfil||"—")+'</td><td>'+entrada+'</td><td>'+situacao+'</td>'+
     '<td class="dir">'+pedidos+'</td><td class="dir">'+tempo+'</td></tr>';
 }
+// Em que grupo cada conta está agora. Conta pelo estado ATUAL: uma conta
+// que esperou alguém e depois foi lida conta como lida, não nos dois.
+var GRUPO_DO_ESTADO={feita:"lidas",falhou:"falharam",humano:"esperando",repetindo:"repetindo",
+  abrindo:"andando",logando:"andando",lendo:"andando",fila:"fila"};
+// [grupo, singular, plural, cor]
+var GRUPOS_COLETA=[["lidas","lida","lidas","var(--ok)"],["andando","em andamento","em andamento","var(--marca)"],
+  ["esperando","esperando você","esperando você","var(--atencao)"],["repetindo","tentando de novo","tentando de novo","var(--atencao)"],
+  ["falharam","falhou","falharam","var(--erro)"],["fila","na fila","na fila","var(--tinta-3)"]];
+var filtroColeta="";
+function grupoDa(c){ return GRUPO_DO_ESTADO[estadoConta[c.n]]||"fila"; }
+function pintaProgresso(){
+  var total=CONTAS_RODADA.length, cx=$("progColeta");
+  cx.hidden=!total||(!rodando&&!coletou);
+  if(cx.hidden) return;
+  var n={}; CONTAS_RODADA.forEach(function(c){ var g=grupoDa(c); n[g]=(n[g]||0)+1; });
+  $("pcBarra").innerHTML=["lidas","falharam","esperando","repetindo","andando"].map(function(g){
+    return n[g]?'<i class="'+g+'" style="width:'+(n[g]/total*100)+'%"></i>':""; }).join("");
+  $("pcBarra").setAttribute("aria-label",(n.lidas||0)+" de "+total+" contas lidas");
+  $("pcTxt").innerHTML='<span class="total">'+(n.lidas||0)+" de "+total+' contas lidas</span>'+
+    GRUPOS_COLETA.filter(function(g){return n[g[0]];}).map(function(g){
+      return '<button class="pc-chip" data-grupo="'+g[0]+'" aria-pressed="'+(filtroColeta===g[0])+'">'+
+        '<span class="pt" style="background:'+g[3]+'"></span>'+n[g[0]]+" "+(n[g[0]]===1?g[1]:g[2])+'</button>'; }).join("")+
+    (filtroColeta?'<button class="pc-chip" data-grupo="">mostrar todas</button>':"");
+}
+$("pcTxt").addEventListener("click",function(e){
+  var b=e.target.closest("[data-grupo]"); if(!b) return;
+  filtroColeta = filtroColeta===b.dataset.grupo ? "" : b.dataset.grupo;
+  pintaColeta();
+});
 function pintaColeta(){
-  $("corpo").innerHTML=CONTAS_RODADA.map(linhaConta).join("");
+  var visiveis=filtroColeta?CONTAS_RODADA.filter(function(c){return grupoDa(c)===filtroColeta;}):CONTAS_RODADA;
+  $("corpo").innerHTML=visiveis.map(linhaConta).join("");
+  pintaProgresso();
   var f=CONTAS_RODADA.filter(function(c){return estadoConta[c.n]==="feita";});
   var sem=f.filter(function(c){return c.viva;}).length;
   prontos=f.reduce(function(s,c){return s+c.pedidos;},0);
@@ -2879,6 +2932,7 @@ window.TELA = {
       });
       estadoConta = {};
       CONTAS_RODADA.forEach(function(c){ estadoConta[c.n]="fila"; });
+      filtroColeta="";
       rodando=true; coletou=false; escrito=false; escritos=0;
       erroNaRodada("");            // o erro da tentativa anterior sai de cena
       document.body.classList.add("rodando");
