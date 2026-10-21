@@ -335,10 +335,18 @@ function escrita(){
     return r;
   };
 }
-async function carregarEscrita(){
+// `quieto`: ao só abrir a etapa, sem planilha escolhida ainda não é erro.
+async function carregarEscrita(quieto){
   try { TELA.escrita(await pedir("escrita:listar")); }
-  catch (e) { TELA.avisar("Não consegui montar a etapa 4", e.message); }
+  catch (e) {
+    if (quieto && /nenhuma planilha/.test(e.message)) return;
+    TELA.avisar("Não consegui montar a etapa 4", e.message);
+  }
 }
+GANCHOS.aoAbrirEtapa = function(t){
+  if (t === "3") carregarConferencia(true);
+  if (t === "4") carregarEscrita(true);
+};
 
 /* ── A conferência ── */
 function conferencia(){
@@ -367,10 +375,11 @@ function conferencia(){
 }
 
 // Depois de uma rodada, a lista de quem precisa de você sai do robô.
-async function carregarConferencia(){
+async function carregarConferencia(quieto){
   try {
     TELA.conferencia(await pedir("conferencia:listar"));
   } catch (e) {
+    if (quieto && /nenhuma planilha/.test(e.message)) return;
     console.error("[esteira] conferência:", e.message);
     TELA.avisar("Não consegui montar a conferência", e.message);
   }

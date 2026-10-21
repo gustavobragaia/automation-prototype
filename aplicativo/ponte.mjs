@@ -17,7 +17,7 @@ import { transportadoraDe } from "../src/shopify.mjs";
 import { guardarPendentes, baixarPendentes } from "../src/estado.mjs";
 import { pendentesAbertos, historico, adiarPendente, encerrarPendente, motivosDaRodada,
          reabrirPendente } from "../src/estado.mjs";
-import { lerColetas, conciliar, MOTIVOS } from "../src/conciliar.mjs";
+import { lerColetas, conciliar, MOTIVOS, separarJaResolvidos } from "../src/conciliar.mjs";
 import { lerDetalhe } from "../src/armazenamento/detalhe.mjs";
 import { rodarCiclo, descobrirContas } from "../src/ciclo.mjs";
 import { iniciarConexao, conexaoEmAndamento, cancelarConexao } from "../src/shopify-oauth.mjs";
@@ -281,7 +281,8 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
       const deHoje = new Map();
       for (const l of linhas) deHoje.set(l.p.pedido, l);
 
-      const itens = pendentesAbertos().filter((p) => {
+      const { ficam, resolvidos: resolvidosAgora } = separarJaResolvidos(pendentesAbertos(), linhas);
+      const itens = ficam.filter((p) => {
         const l = deHoje.get(p.pedido);
         // A conta da carteira diferente da conciliação de hoje quer dizer
         // que a pessoa acabou de corrigi-la. Ela já decidiu: o pedido volta
@@ -296,6 +297,7 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
 
       return {
         resumo,
+        resolvidosAgora,
         pendencias: itens.filter((i) => i.motivo.grupo === "precisa"),
         sozinhos: itens.filter((i) => i.motivo.grupo !== "precisa"),
       };

@@ -211,6 +211,34 @@ function emDuvida(doGrupo, compras) {
   }
 }
 
+// ── O que a conferência ainda precisa mostrar ────────────────────────────
+//
+// A conferência mostra a CARTEIRA: o que ficou pendente na rodada anterior.
+// Se a conciliação de agora já resolve um desses pedidos (versão nova que
+// pareia pelo total, coleta nova), ele não é mais dúvida — vai ser escrito
+// na etapa 4. Mostrar mesmo assim fazia o Matheus decidir à mão o que o robô
+// já sabia (EDESIO, 0.1.8, 21/10).
+//
+// Só saem os motivos que a PRÓPRIA conciliação cria. O que a Shopify barrou
+// (nome que não confere, pedido que não existe na loja, recusa ao escrever)
+// continua: a conciliação não enxerga a Shopify e não pode dar isso por
+// resolvido.
+const MOTIVOS_DA_CONCILIACAO = new Set(["ambiguo", "nao-achado-na-conta", "sem-rastreio-ainda", "conta-nao-lida"]);
+
+export function separarJaResolvidos(pendentes, linhas) {
+  const agora = new Map();
+  for (const l of linhas) if (resolvido(l.estado) && l.codigo) agora.set(l.p.pedido, l);
+  const ficam = [], resolvidos = [];
+  for (const p of pendentes) {
+    const l = agora.get(p.pedido);
+    const motivo = typeof p.motivo === "string" ? p.motivo : p.motivo?.codigo;
+    if (l && MOTIVOS_DA_CONCILIACAO.has(motivo) && Number(p.conta) === Number(l.conta))
+      resolvidos.push({ pedido: p.pedido, conta: l.conta, codigo: l.codigo });
+    else ficam.push(p);
+  }
+  return { ficam, resolvidos };
+}
+
 /**
  * Os candidatos são partes de um pedido só?
  * Exige os três ao mesmo tempo, porque qualquer um sozinho erra:

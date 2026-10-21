@@ -73,6 +73,20 @@ app.whenReady().then(async () => {
   dec = await js(`JSON.stringify(window.__decisoes)`);
   tudo &= ok(JSON.parse(dec).length === 1, "com três pedidos do mesmo cliente, só o escolhido é escrito (sem adivinhar os outros)");
 
+  // o que estava na carteira e já foi resolvido: sai da lista e é dito
+  await js(`window.TELA.conferencia({ pendencias: [], sozinhos: [], resolvidosAgora: [
+    { pedido: "Pedido #165172", conta: 162, codigo: "BR2620456593785" }, { pedido: "Pedido #165173", conta: 162, codigo: "BR265742968962P" }] }); 1`);
+  await espera(200);
+  const nota = await js(`document.getElementById("confResolvidos").hidden ? "" : document.getElementById("confResolvidosTxt").innerText`);
+  tudo &= ok(/2 pedidos que estavam aqui já foram resolvidos/.test(nota) && /#165172, #165173/.test(nota) && /etapa 4/.test(nota),
+    `avisa o que saiu e para onde foi: "${nota}"`);
+
+  // abrir a etapa 3 ou 4 refaz a lista (antes só no fim de uma rodada)
+  const abriu = await js(`(async () => { const vistos = []; window.GANCHOS.aoAbrirEtapa = (t) => vistos.push(t);
+    document.querySelector('[data-etapa="4"]').click(); document.querySelector('[data-etapa="3"]').click();
+    document.querySelector('[data-etapa="2"]').click(); return vistos.join(","); })()`);
+  tudo &= ok(abriu === "4,3", `abrir a etapa 4 e a 3 refaz cada uma; a 2 não (${abriu})`);
+
   console.log(tudo ? "\n\x1b[32m\x1b[1m  conferência: ok\x1b[0m\n" : "\n\x1b[31m\x1b[1m  conferência: FALHOU\x1b[0m\n");
   app.exit(tudo ? 0 : 1);
 });

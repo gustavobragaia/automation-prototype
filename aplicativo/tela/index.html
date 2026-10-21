@@ -994,6 +994,9 @@ details.cred summary:hover{color:var(--tinta)}
 
   <div class="bloco">
     <div class="rotulo"><h2>Precisa de você</h2><span class="dir" id="ctPrecisa"></span></div>
+    <div class="aviso" id="confResolvidos" hidden style="margin-bottom:12px">
+      <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+      <span id="confResolvidosTxt"></span></div>
     <div id="cxPrecisa">
       <div class="vazio" id="vzPrecisa" hidden>
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1515,6 +1518,10 @@ function ir(t){
     else b.removeAttribute("aria-current"); });
   if(/^[1-4]$/.test(t)) atual=Number(t);
   pintaTrilha(); window.scrollTo(0,0);
+  // A conferência e a escrita são refeitas ao abrir: antes só no fim de uma
+  // rodada, e depois de atualizar o app elas mostravam o de antes. Durante a
+  // rodada ou a escrita, não — refazer no meio atropelaria a tela.
+  if((t==="3"||t==="4") && !rodando && !escrevendo) GANCHOS.aoAbrirEtapa(t);
   try{ history.replaceState(null,"","#"+t); }catch(e){}
 }
 document.addEventListener("click",function(e){
@@ -2900,6 +2907,7 @@ $("listaAlertas").addEventListener("click",function(e){
   if(de_novo){ abrirAlertas(false);
     GANCHOS.rerodar(de_novo.dataset.rerodar.split(",").map(Number).filter(function(n){return n>0;})); }
 });
+GANCHOS.aoAbrirEtapa=function(){};
 GANCHOS.rerodar=function(contas){ avisar("Tentar de novo", "Contas "+contas.join(", ")+" (protótipo: nada roda aqui)"); };
 $("bDiagnostico").addEventListener("click",function(){ GANCHOS.exportarDiagnostico(); });
 GANCHOS.exportarDiagnostico=function(){ avisar("Exportar diagnóstico","Protótipo: nada a exportar aqui."); };
@@ -3059,6 +3067,15 @@ window.TELA = {
                s:(x.motivo&&x.motivo.codigo==="sem-rastreio-ainda")
                  ?"a Shopee ainda não despachou":"aguardando", d:x.dias||1 };
     });
+    // O que estava aqui da rodada anterior e o robô agora já resolve: sai da
+    // lista e é dito, para ninguém achar que sumiu.
+    var res=(dados&&dados.resolvidosAgora)||[];
+    $("confResolvidos").hidden=!res.length;
+    if(res.length){
+      var nums=[]; res.forEach(function(x){ if(nums.indexOf(x.pedido)<0) nums.push(x.pedido); });
+      $("confResolvidosTxt").innerHTML='<b>'+nums.length+(nums.length>1?" pedidos que estavam aqui já foram resolvidos":" pedido que estava aqui já foi resolvido")+
+        '</b> pelo robô e '+(nums.length>1?"vão":"vai")+' ser escrito'+(nums.length>1?"s":"")+' na etapa 4: '+esc(nums.map(function(p){return p.replace(/^Pedido /,"");}).join(", "))+'.';
+    }
     var cx=$("cxPrecisa");
     Array.prototype.forEach.call(cx.querySelectorAll(".item[data-rev]"),
       function(i){ i.remove(); });
