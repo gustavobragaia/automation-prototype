@@ -210,23 +210,58 @@
     if (ja) return avisar("precisa-humano", { motivo: "a Shopee pediu de novo para confirmar a identidade por e-mail — confirme nesta janela" });
     try { sessionStorage.setItem("esteira-ivs", "1"); } catch {}
 
-    const botao = await esperar(() => achaTexto(/^verificar via link por e-?mail$/i), 15000);
+    // O botão de verdade é <button aria-label="Verificar via link por E-mail">;
+    // o texto mora numa div dentro dele, e a div de FORA (wNdgaJ) tem o mesmo
+    // texto. Clicar nela não chega ao botão (21/10: a página não mudava).
+    const acharBotao = () => document.querySelector('button[aria-label="Verificar via link por E-mail" i]') ??
+      achaTexto(/^verificar via link por e-?mail$/i)?.querySelector?.("button") ??
+      achaTexto(/^verificar via link por e-?mail$/i)?.closest?.("button") ?? null;
+    const botao = await esperar(acharBotao, 15000);
     if (!botao) return avisar("precisa-humano", { motivo: "a Shopee pediu para confirmar a identidade e o botão do e-mail não apareceu" });
     await pedir("travar-login");   // renova a vez: o e-mail pode levar 2 min
     // Ativa a caixa ANTES de a Shopee mandar: caixa não ativada perde o e-mail.
     const caixa = await pedir("caixa");
     if (caixa?.erro) return avisar("precisa-humano", { motivo: `a Shopee pediu para confirmar a identidade por e-mail, e a caixa de e-mail não respondeu: ${caixa.erro}` });
+    // A Shopee ignora clique gerado por script neste botão (testado em
+    // 21/10: clique simples e sequência completa de mouse, a página não muda
+    // e nenhum e-mail sai). É proteção contra robô — não se contorna. Então
+    // o robô tenta uma vez; se a página não mudar, pede o clique a uma
+    // pessoa e fica olhando a página. Quando ela clicar, o resto (achar o
+    // link no e-mail e abrir) continua sozinho.
+    // Pedido aceito: a Shopee vai para /verify/email-link — "Por favor,
+    // responda à notificação enviada por E-mail para c***0@givmail.com".
+    const pediuEmail = () => /\/verify\/email-link/.test(location.pathname) || !acharBotao() ||
+      /responda à notificação|enviamos|reenviar/i.test(document.body?.innerText ?? "");
     botao.click();
-    // O que a Shopee mostrou depois do clique ("enviamos um link para…",
-    // ou nada). Sem isto não dá para saber se o e-mail chegou a ser pedido.
-    await new Promise((r) => setTimeout(r, 4000));
+    await esperar(() => pediuEmail() || null, 6000);
+    if (!pediuEmail()) {
+      avisar("precisa-humano", { motivo: "a Shopee pediu para confirmar a identidade — clique em \"Verificar via link por E-mail\" nesta janela; o robô abre o link do e-mail sozinho" });
+      const t0 = Date.now();
+      while (!pediuEmail()) {
+        if (Date.now() - t0 > 10 * 60_000) return;            // a fila já desistiu
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      await pedir("travar-login");
+    }
     avisar("verificacao-email-pedida", { motivo: (document.body?.innerText ?? "").replace(/\s+/g, " ").slice(0, 300) });
 
     const r = await pedir("link", { desde });
     if (!r?.link) return avisar("precisa-humano", { motivo: `a Shopee pediu para confirmar a identidade por e-mail, e ${r?.erro ?? "o link não chegou"}` });
-    avisar("verificacao-link-aberto");
+    // O link abre em OUTRA aba. Esta aqui é a que termina o login quando o
+    // e-mail é confirmado — abrir o link nela (como era) aprovava o login na
+    // Shopee ("Tentativa de login aprovada") e jogava fora a aba que ia
+    // concluí-lo: a conta voltava para a tela de entrar.
     try { sessionStorage.setItem("esteira-depois-do-link", "1"); } catch {}
-    location.href = r.link;
+    await pedir("abrir-aba", { url: r.link });
+    avisar("verificacao-link-aberto");
+    // Espera esta aba sair da verificação (a Shopee leva para onde a pessoa ia).
+    const t1 = Date.now();
+    while (/\/verify\//.test(location.pathname) && Date.now() - t1 < 90_000)
+      await new Promise((res) => setTimeout(res, 1500));
+    if (/\/verify\//.test(location.pathname))
+      return avisar("precisa-humano", { motivo: "o link do e-mail foi aberto, mas a Shopee não liberou esta janela — confira se aparece \"Tentativa de login aprovada\"" });
+    avisar("login-ok", { via: "link do e-mail" });
+    if (!/\/user\/purchase/.test(location.pathname)) location.href = "https://shopee.com.br/user/purchase?type=7";
   }
 
   // Depois do link a Shopee pode parar numa página de "verificado". Volta

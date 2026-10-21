@@ -18,6 +18,26 @@
   "content_scripts": [
     {
       "matches": [
+        "https://shopee.com.br/verify/*"
+      ],
+      "js": [
+        "ivs-escuta.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://shopee.com.br/verify/*"
+      ],
+      "js": [
+        "ponte.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
         "https://shopee.com.br/user/purchase*"
       ],
       "js": [

@@ -135,12 +135,23 @@ export async function obterCodigo(endereco, inicioEpoch, {
  */
 export function extrairLink(html) {
   if (!html) return null;
-  const links = [...String(html).matchAll(/href\s*=\s*["']([^"']+)["']/gi)]
-    .map((m) => m[1].replace(/&amp;/g, "&"))
-    .filter((u) => /^https:\/\/([a-z0-9-]+\.)*shopee\.com\.br\//i.test(u))
-    .filter((u) => !/(help|unsubscribe|descadastr|privacy|privacidade|facebook|instagram|twitter|youtube|app-download|\/m\/|\.png|\.jpg)/i.test(u));
-  const verifica = links.find((u) => /(verify|verif|ivs|authenticat|confirm|token|link)/i.test(u));
-  return verifica ?? null;
+  const limpa = (t) => String(t).replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/\s+/g, " ").trim();
+  const ancoras = [...String(html).matchAll(/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+    .map((m) => ({ url: m[1].replace(/&amp;/g, "&"), texto: limpa(m[2]),
+                   antes: limpa(String(html).slice(Math.max(0, m.index - 300), m.index)).slice(-80) }))
+    .filter((a) => /^https:\/\//i.test(a.url));
+  // 1) O e-mail real da Shopee (21/10/2026, "Verificação necessária: nova
+  //    tentativa de login"): "Se é você, por favor clique AQUI para confirmar".
+  //    Os links vêm embrulhados pelo rastreador do SendGrid
+  //    (u…ct.sendgrid.net/ls/click), sem "shopee" no endereço — por isso o
+  //    filtro antigo, que exigia shopee.com.br, não achava nada.
+  const confirma = ancoras.find((a) => /^(aqui|clique aqui|confirmar|sim,? sou eu|verificar)$/i.test(a.texto) &&
+    /(se [eé] voc[eê]|confirm|verific)[^.]*clique$|clique$/i.test(a.antes) && /se [eé] voc[eê]|confirm|verific/i.test(a.antes));
+  if (confirma) return confirma.url;
+  // 2) Link direto da Shopee que fala em verificar.
+  const direto = ancoras.find((a) => /^https:\/\/([a-z0-9-]+\.)*shopee\.com\.br\//i.test(a.url) &&
+    /(verify|verif|ivs|authenticat|confirm|token)/i.test(a.url) && !/help\.|unsubscribe|privac/i.test(a.url));
+  return direto?.url ?? null;
 }
 
 export async function obterLink(endereco, inicioEpoch, {

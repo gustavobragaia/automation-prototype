@@ -78,6 +78,16 @@ chrome.runtime.onMessage.addListener((msg, remetente, responder) => {
     return true;   // resposta assíncrona
   }
 
+  // O link de confirmação do e-mail abre numa aba própria, ao lado: a aba que
+  // pediu a verificação é a que termina o login, e não pode sair do lugar.
+  if (msg?.pedido === "abrir-aba") {
+    chrome.tabs.create({ url: msg.url, active: false }, (aba) => {
+      responder({ ok: true });
+      setTimeout(() => chrome.tabs.remove(aba.id).catch?.(() => {}), 20_000);
+    });
+    return true;
+  }
+
   // Pedidos que esperam resposta (credencial, código de verificação).
   if (msg?.pedido) {
     const rota = ["otp", "link", "caixa"].includes(msg.pedido) ? msg.pedido : "credencial";

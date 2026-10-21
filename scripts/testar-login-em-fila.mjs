@@ -92,19 +92,29 @@ limparTrava();
 const sessao = {};
 const avisosIvs = [];
 let senhasPedidas = 0, linkPedido = 0, caixaAntes = false;
+let cliqueRoboPega = true, pessoaClica = () => {};
+const abasAbertas = [];
 function abrirPagina(caminho) {
   const loc = { pathname: caminho, _href: "https://shopee.com.br" + caminho, navegou: null,
     get href() { return this._href; }, set href(v) { this.navegou = v; } };
   const campo = () => ({ value: "", focus() {}, blur() {}, dispatchEvent() {} });
   const usuario = campo(), senha = campo();
-  const el = (texto, aoClicar = () => {}) => ({ innerText: texto, click: aoClicar,
+  const el = (texto, aoClicar = () => {}) => ({ innerText: texto, click: aoClicar, tagName: "DIV", className: "x",
+    closest: () => null, parentElement: null, dispatchEvent() {},
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 1, height: 1 }), contains: () => true });
   const entrar = el("Entrar", () => setTimeout(() => { loc.pathname = "/verify/ivs"; }, 100));
-  const viaEmail = el("Verificar via link por E-mail", () => avisosIvs.push({ tipo: "clicou-email" }));
+  // cliqueRobo: a Shopee aceita o clique do script? (em 21/10, não aceitava)
+  let enviado = false;
+  const viaEmail = el("Verificar via link por E-mail", () => {
+    avisosIvs.push({ tipo: "clicou-email" });
+    if (cliqueRoboPega) { enviado = true; loc.pathname = "/verify/email-link"; }
+  });
+  pessoaClica = () => { enviado = true; loc.pathname = "/verify/email-link"; };
   const doc = {
     body: { innerText: "" },
-    querySelector: (q) => loc.pathname === "/buyer/login" ? (/loginKey/.test(q) ? usuario : /password/.test(q) ? senha : null) : null,
-    querySelectorAll: () => loc.pathname === "/verify/ivs" ? [viaEmail] : [entrar],
+    querySelector: (q) => loc.pathname === "/buyer/login" ? (/loginKey/.test(q) ? usuario : /password/.test(q) ? senha : null)
+      : (loc.pathname === "/verify/ivs" && /aria-label="Verificar via link/.test(q) && !enviado) ? viaEmail : null,
+    querySelectorAll: () => loc.pathname === "/verify/ivs" ? (enviado ? [] : [viaEmail]) : [entrar],
     elementFromPoint: () => entrar,
   };
   const chrome = { runtime: { sendMessage: (msg, responder) => {
@@ -113,26 +123,35 @@ function abrirPagina(caminho) {
     if (msg.pedido === "credencial") { senhasPedidas++;
       try { return responder(entregarCredencial(160)); } catch (e) { return responder({ erro: e.message, repetida: e.repetida }); } }
     if (msg.pedido === "caixa") { caixaAntes = !avisosIvs.some((a) => a.tipo === "clicou-email"); return responder({ ok: true }); }
-    if (msg.pedido === "link") { linkPedido++; return responder({ link: "https://shopee.com.br/verify/link?token=abc" }); }
+    if (msg.pedido === "link") { linkPedido++; return responder({ link: "https://u1.ct.sendgrid.net/ls/click?upn=abc" }); }
+    if (msg.pedido === "abrir-aba") {
+      abasAbertas.push(msg.url);
+      // a Shopee aprova e a aba que esperava segue sozinha
+      setTimeout(() => { loc.pathname = "/"; }, 5);
+      return responder({ ok: true });
+    }
     avisosIvs.push(msg);
     if (msg.tipo === "login-iniciado") marcarTentativa(160);   // como o coletor faz
     if (["login-ok", "login-falhou", "precisa-humano"].includes(msg.tipo)) soltarTrava(160);
   } } };
   const storage = { getItem: (k) => sessao[k] ?? null, setItem: (k, v) => { sessao[k] = String(v); }, removeItem: (k) => { delete sessao[k]; } };
   const lento = (fn) => (f, t, ...a) => fn(f, Math.max(0, (t ?? 0) / RAPIDO), ...a);
-  const ctx = { chrome, document: doc, location: loc, sessionStorage: storage, Object,
+  const ctx = { chrome, document: doc, location: loc, sessionStorage: storage, Object, window: {},
+    getComputedStyle: () => ({ cursor: "pointer" }), PointerEvent: class {}, MouseEvent: class {},
     Event: class {}, setTimeout: lento(setTimeout), setInterval: lento(setInterval), clearInterval,
     Promise, Date, Math, Number, String, Array, Set, JSON, RegExp };
   vm.createContext(ctx); vm.runInContext(FONTE, ctx);
   return loc;
 }
 const p1 = abrirPagina("/buyer/login");
-for (let i = 0; i < 300 && !p1.navegou; i++) await new Promise((r) => setTimeout(r, 10));
-tudo &= ok(!avisosIvs.some((a) => a.tipo === "login-ok"), "sair do login para /verify/ivs NÃO é \"entrei\"");
+for (let i = 0; i < 600 && !p1.navegou; i++) await new Promise((r) => setTimeout(r, 10));
+tudo &= ok(avisosIvs.filter((a) => a.tipo === "login-ok").every((a) => a.via === "link do e-mail"),
+  "sair do login para /verify/ivs NÃO é \"entrei\" — só conta como login depois do link do e-mail");
 tudo &= ok(avisosIvs.some((a) => a.tipo === "clicou-email") && linkPedido === 1,
   "clica em \"Verificar via link por E-mail\" e busca o link na caixa");
 tudo &= ok(caixaAntes, "ativa a caixa de e-mail ANTES de pedir o envio (caixa não ativada perde a mensagem)");
-tudo &= ok(p1.navegou === "https://shopee.com.br/verify/link?token=abc", "abre o link do e-mail na própria aba");
+tudo &= ok(abasAbertas[0] === "https://u1.ct.sendgrid.net/ls/click?upn=abc" && p1.navegou === "https://shopee.com.br/user/purchase?type=7",
+  "abre o link do e-mail em OUTRA aba; a aba que esperava termina o login e vai para Minhas Compras");
 // a Shopee devolve para o login mesmo assim: a senha NÃO sai de novo
 const p2 = abrirPagina("/buyer/login");
 for (let i = 0; i < 300 && !avisosIvs.some((a) => a.tipo === "precisa-humano"); i++) await new Promise((r) => setTimeout(r, 10));
@@ -140,6 +159,23 @@ tudo &= ok(senhasPedidas === 2 && avisosIvs.filter((a) => a.tipo === "login-inic
   "segunda ida ao login: a senha é negada, o robô não entra de novo (antes: 6 logins em 30 s)");
 tudo &= ok(avisosIvs.some((a) => a.tipo === "precisa-humano"), "e vira \"precisa de você\", com a janela aberta");
 void p2;
+
+// A Shopee ignora o clique do script (o que acontece de verdade): o robô
+// pede o clique a uma pessoa, espera, e depois segue sozinho até o link.
+console.log("\n\x1b[1mA Shopee ignora o clique do robô no botão do e-mail\x1b[0m");
+novoToken(); limparTrava();
+for (const k of Object.keys(sessao)) delete sessao[k];
+avisosIvs.length = 0; linkPedido = 0; cliqueRoboPega = false;
+const p3 = abrirPagina("/buyer/login");
+// o robô espera até 6 s (relógio de verdade) a página mudar depois do clique
+for (let i = 0; i < 1000 && !avisosIvs.some((a) => a.tipo === "precisa-humano"); i++) await new Promise((r) => setTimeout(r, 10));
+const pediu = avisosIvs.find((a) => a.tipo === "precisa-humano"); if (process.env.DEPURA) console.log(avisosIvs.map((a) => a.tipo + ":" + (a.motivo ?? "")).join("\n"), "links", linkPedido);
+tudo &= ok(/clique em "Verificar via link por E-mail"/.test(pediu?.motivo ?? "") && linkPedido === 0,
+  "não força o clique: pede a uma pessoa, dizendo exatamente onde clicar");
+pessoaClica();
+for (let i = 0; i < 600 && !p3.navegou; i++) await new Promise((r) => setTimeout(r, 10));
+tudo &= ok(linkPedido === 1 && abasAbertas.length === 2 && p3.navegou === "https://shopee.com.br/user/purchase?type=7",
+  "a pessoa clica uma vez; o robô percebe, busca o link no e-mail e abre sozinho");
 
 // Aba restaurada pelo perfil pega a senha e é fechada pela fila antes de
 // entrar (conta 122, 21/10). A aba de verdade ainda tem direito à tentativa.
