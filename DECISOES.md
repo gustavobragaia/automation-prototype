@@ -719,3 +719,21 @@ sessões caíam em massa:
 
 Resultado: 14 contas lidas, 93 de 94 pedidos com rastreio (o 94º não está
 na conta indicada pela planilha). As outras ficaram para a chave paga.
+
+## 21/10/2026 (tarde) — v0.1.7: feedback do Matheus depois da 0.1.6
+
+Plano e revisão em `PLANO-0.1.7.md`. O que mudou:
+
+- **E-mail na caixa dado como "não chegou"** (conta 167: link às 16:01:38,
+  robô desistiu às 16:04). O robô aceitava só e-mail com horário depois do
+  pedido, e o horário vinha do relógio do Windows do cliente. Agora: foto da
+  caixa antes do "Entrar" e aceita qualquer e-mail novo; pula os da Shopee
+  sem link ("Novo login"); espera até 3 min com no máximo 13 consultas; cada
+  consulta renova o prazo da fila; "Reenviar" uma vez; o erro diz se o
+  relógio está adiantado.
+- **Histórico**: o dia aberto não era refeito ao recarregar.
+- **Achar a janela da conta**: aba "Shopee N" do AdsPower mantida, título
+  "Conta N · …", e a janela vem para a frente em "precisa de você".
+- **Progresso** na coleta (etapa 2) e na escrita (etapa 4), "Ver todos".
+- **Avisos não somem** (7 dias), log em arquivo (14 dias), "Exportar
+  diagnóstico" sem senha, chaves ou dados de cliente.
