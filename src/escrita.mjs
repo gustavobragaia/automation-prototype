@@ -42,6 +42,9 @@ export function gravarRegistro(reg, arq = ARQ_REGISTRO) {
  */
 export async function escreverRastreios(contas, coletas, {
   escrever = false, notificar = false, conexao, aoLog = () => {},
+  // A tela mostra "Conferindo…" e "Escrevendo 8 de 40…": a escrita passa de
+  // um minuto num lote grande, e sem isso parecia travada.
+  aoProgresso = () => {},
 } = {}) {
   const { linhas, resumo } = conciliar(contas, coletas);
   const registro = lerRegistro();
@@ -72,6 +75,7 @@ export async function escreverRastreios(contas, coletas, {
 
   if (!prontos.length) return { escritos: 0, falhas: 0, pulados: 0, pendencias, planejado: [], resumo };
 
+  if (escrever) aoProgresso({ fase: "conferindo", total: prontos.length });
   const naShopify = await pedidosPorNumero(prontos.map((l) => normalizarNumero(l.p.pedido)), { conexao });
   aoLog(`${naShopify.size} de ${new Set(prontos.map((l) => normalizarNumero(l.p.pedido))).size} número(s) encontrado(s) na loja`);
 
@@ -107,6 +111,8 @@ export async function escreverRastreios(contas, coletas, {
 
   let escritos = 0, falhas = 0;
   const gravados = [];   // só o que a Shopify aceitou de verdade
+  const passo = () => aoProgresso({ fase: "escrevendo", feitos: escritos + falhas, total: planejado.length, escritos, falhas });
+  passo();
   for (const { num, l, alvo, codigos } of planejado) {
     try {
       const f = await enviar(montarEntrada({
@@ -128,6 +134,7 @@ export async function escreverRastreios(contas, coletas, {
       anotar(l, "falha-ao-escrever", { erro: e.message });
       aoLog(`${alvo.pedido}: ERRO ao escrever — ${e.message}`);
     }
+    passo();
   }
   return { escritos, falhas, pulados, pendencias, planejado, gravados, resumo };
 }

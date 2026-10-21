@@ -228,6 +228,7 @@ export async function rodarCiclo({ contas, escrever = true, simular = false,
     }
 
     const res = await escreverRastreios(contasDoDia, lerColetas(), {
+      aoProgresso: (p) => emitir("escrita:progresso", p),
       escrever,
       notificar: process.env.NOTIFICAR_CLIENTE === "1",
       aoLog,

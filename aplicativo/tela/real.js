@@ -244,6 +244,7 @@ function rodada(){
   // A escuta começa antes de qualquer rodada: o coletor sobe junto com o app
   // e já emite por conta própria enquanto o cliente ainda está na etapa 1.
   window.esteira.aoEvento(function(e){
+    if (e.tipo === "escrita:progresso") return TELA.escritaProgresso(e);
     if (e.tipo === "rodada:inicio") return TELA.rodada.montar(e.contas || []);
     if (e.tipo === "rodada:fim") {
       TELA.rodada.terminar(e);

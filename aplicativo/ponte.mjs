@@ -500,7 +500,7 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
       try {
         const { contas, coletas } = await contasEColetas();
         const r = await escreverRastreios(contas, coletas,
-          { escrever: true, notificar, aoLog });
+          { escrever: true, notificar, aoLog, aoProgresso: (p) => emitir("escrita:progresso", p) });
 
         // A carteira anda nos dois sentidos, igual à rodada: entra quem
         // ficou pendente, sai quem a Shopify aceitou. `gravados`, não
