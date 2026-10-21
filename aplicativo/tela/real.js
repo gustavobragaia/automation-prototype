@@ -466,12 +466,22 @@ function atualizacao(){
 /* ── Alertas: o sino no topo da barra lateral ── */
 async function alertas(){
   TELA.alertas(await pedir("alertas:ler"));
+  var resolvidos = function(){ pedir("alertas:resolvidos").then(TELA.alertasResolvidos).catch(function(){}); };
+  resolvidos();
+  GANCHOS.exportarDiagnostico = async function(){
+    var hoje = new Date().toISOString().slice(0, 10);
+    var caminho = await window.esteira.salvarComo("diagnostico-esteira-" + hoje + ".txt", "txt");
+    if (!caminho) return;
+    try { await pedir("diagnostico:exportar", { caminho: caminho });
+          TELA.avisar("Diagnóstico salvo", "Mande o arquivo " + caminho.split(/[\\/]/).pop() + " para o suporte."); }
+    catch (e) { TELA.avisar("Não consegui exportar o diagnóstico", e.message); }
+  };
   GANCHOS.dispensarAlerta = function(id){
-    pedir("alertas:dispensar", id).then(TELA.alertas)
+    pedir("alertas:dispensar", id).then(function(l){ TELA.alertas(l); resolvidos(); })
       .catch(function(e){ TELA.avisar("Não consegui dispensar o alerta", e.message); });
   };
   window.esteira.aoEvento(function(e){
-    if (e.tipo === "alerta:resolvido") return TELA.alertaResolvido(e.id);
+    if (e.tipo === "alerta:resolvido") { TELA.alertaResolvido(e.id); return resolvidos(); }
     if (e.tipo !== "alerta:novo") return;
     TELA.alertaNovo(e.alerta, e.novo);
     // Erro novo merece aviso do sistema; "precisa de você" já tem o seu.

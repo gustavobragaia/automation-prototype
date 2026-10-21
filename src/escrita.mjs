@@ -128,7 +128,9 @@ export async function escreverRastreios(contas, coletas, {
       gravarRegistro(registro);
       gravados.push(l.p.pedido);
       escritos++;
-      aoLog(`${alvo.pedido} · ${alvo.nome} · ${f.trackingInfo.map((x) => x.number).join(", ")}`);
+      // Sem o nome do cliente: o log vai para arquivo e para o diagnóstico
+      // que o cliente manda. O número do pedido basta para achar.
+      aoLog(`${alvo.pedido} · conta ${l.conta} · ${f.trackingInfo.map((x) => x.number).join(", ")}`);
     } catch (e) {
       falhas++;
       anotar(l, "falha-ao-escrever", { erro: e.message });

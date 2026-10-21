@@ -47,19 +47,42 @@ export function alertar(a) {
   return alerta;
 }
 
-/** O problema sumiu (a chave voltou a funcionar, a conta foi lida). */
-export function resolver(id) {
+// Resolvido não some: vai para "Resolvidos nos últimos 7 dias", com o texto
+// original. O Matheus não conseguiu dizer qual aviso apareceu em 3 contas
+// porque os avisos tinham sumido (21/10).
+const arquivoResolvidos = () => emEstado("alertas-resolvidos.json");
+const SETE_DIAS = 7 * 24 * 3600_000;
+function lerResolvidos() {
+  try { return JSON.parse(readFileSync(arquivoResolvidos(), "utf8")); } catch { return []; }
+}
+function guardarResolvido(a, comoSaiu) {
+  const agora = Date.now();
+  const lista = [{ ...a, resolvidoEm: agora, comoSaiu }, ...lerResolvidos()]
+    .filter((x) => agora - x.resolvidoEm < SETE_DIAS).slice(0, 200);
+  try { writeFileSync(arquivoResolvidos(), JSON.stringify(lista, null, 2)); } catch {}
+}
+
+function tirar(id, comoSaiu) {
   const lista = ler();
   const i = lista.findIndex((x) => x.id === id);
   if (i < 0) return false;
-  lista.splice(i, 1);
+  const [a] = lista.splice(i, 1);
   gravar(lista);
+  guardarResolvido(a, comoSaiu);
   try { emitir("alerta:resolvido", { id }); } catch {}
   return true;
 }
 
+/** O problema sumiu (a chave voltou a funcionar, a conta foi lida). */
+export const resolver = (id) => tirar(id, "resolvido");
+
 /** A pessoa leu e dispensou. Se acontecer de novo, volta. */
-export const dispensar = resolver;
+export const dispensar = (id) => tirar(id, "dispensado");
+
+/** Os que saíram nos últimos 7 dias, do mais recente ao mais antigo. */
+export function alertasResolvidos() {
+  return lerResolvidos().filter((x) => Date.now() - x.resolvidoEm < SETE_DIAS);
+}
 
 export function lerAlertas() { return ler(); }
 

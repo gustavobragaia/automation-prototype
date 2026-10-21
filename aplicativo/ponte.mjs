@@ -25,7 +25,9 @@ import { resolverManual, prepararManual } from "../src/manual.mjs";
 import { lerAjustes, salvarAjustes, aplicarNoAmbiente, SEGREDOS,
          faltaConfigurar } from "../src/ajustes.mjs";
 import { aoEvento, emitir } from "../src/eventos.mjs";
-import { lerAlertas, dispensar } from "../src/alertas.mjs";
+import { lerAlertas, dispensar, alertasResolvidos } from "../src/alertas.mjs";
+import { montarDiagnostico } from "../src/diagnostico.mjs";
+import { writeFileSync as gravarArquivo } from "node:fs";
 import { pedirParada } from "../src/fila.mjs";
 import net from "node:net";
 import { diaLocal } from "../src/datas.mjs";
@@ -178,6 +180,16 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
     // ── alertas: o sino no topo da barra lateral ───────────────────────
     "alertas:ler": async () => lerAlertas(),
     "alertas:dispensar": async (id) => { dispensar(String(id ?? "")); return lerAlertas(); },
+    "alertas:resolvidos": async () => alertasResolvidos(),
+
+    // "Exportar diagnóstico" (Ajustes): um .txt para o cliente mandar.
+    "diagnostico:exportar": ({ caminho, versao } = {}) => tentar(async () => {
+      if (!caminho) throw new Error("nenhum lugar escolhido para salvar");
+      let v = versao;
+      try { v ??= JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version; } catch {}
+      gravarArquivo(caminho, montarDiagnostico({ versao: v }));
+      return { caminho };
+    }),
 
     "ajustes:ler": async () => {
       const a = lerAjustes();

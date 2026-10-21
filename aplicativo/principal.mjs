@@ -73,6 +73,7 @@ process.env.TRABALHO_DIR ??= TRABALHO;
 process.env.ESTADO_DIR ??= ESTADO;
 
 const { iniciarColetor } = await import("../src/coletor.mjs");
+const logDiario = await import("../src/log-diario.mjs");
 const { construir } = await import("./ponte.mjs");
 const { aplicarNoAmbiente } = await import("../src/ajustes.mjs");
 aplicarNoAmbiente();   // a chave do AdsPower vira ADSPOWER_API_KEY antes de alguém pedir
@@ -89,6 +90,8 @@ function registrar(msg) {
   // Também no terminal: se a janela não abrir, este é o único lugar onde dá
   // pra ver o que aconteceu — e é justamente aí que a gente mais precisa.
   console.log("[esteira] " + linha.msg);
+  // em arquivo também: o log da memória some ao fechar o app
+  logDiario?.gravarLinha(linha.msg);
   if (logs.length > 2000) logs.shift();
   janela?.webContents.send("log", linha);
 }
@@ -196,8 +199,8 @@ app.whenReady().then(async () => {
   // tela nunca vê o disco, só recebe o caminho escolhido — ou null, se a
   // pessoa desistiu.
   ipcMain.handle("salvar-como", async (_e, { nome, tipo } = {}) => {
-    const filtros = tipo === "csv"
-      ? [{ name: "CSV", extensions: ["csv"] }]
+    const filtros = tipo === "csv" ? [{ name: "CSV", extensions: ["csv"] }]
+      : tipo === "txt" ? [{ name: "Texto", extensions: ["txt"] }]
       : [{ name: "Planilha", extensions: ["xlsx"] }];
     const r = await dialog.showSaveDialog(janela, {
       defaultPath: join(app.getPath("downloads"), String(nome ?? "esteira.xlsx")),
