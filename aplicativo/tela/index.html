@@ -2324,7 +2324,8 @@ function pintaEscrita(){
     // não ajuda ninguém a conferir, e o que importa é a amostra bater.
     var mostra=verTodos?A_ESCREVER:A_ESCREVER.slice(0,12);
     $("tbEscrita").innerHTML=mostra.map(function(x){
-      return '<tr><td class="mono forte">'+esc(x.p)+'</td><td>'+esc(x.c)+'</td>'+
+      return '<tr><td class="mono forte">'+esc(x.p)+'</td><td>'+esc(x.c)+
+        (x.g?'<div class="ter" style="font-size:12px" title="O mesmo cliente fez mais de um pedido de mesmo valor nesta conta. Trocar os rastreios entre eles dá no mesmo; o 1º pedido ficou com a 1ª compra feita na Shopee.">pedidos iguais do mesmo cliente · pela ordem da compra</div>':'')+'</td>'+
         '<td class="ter num">'+esc(x.ct)+'</td><td class="mono">'+esc(x.r)+'</td>'+
         '<td class="ter">'+esc(x.tr)+'</td></tr>';}).join("")+
       (A_ESCREVER.length>12
@@ -3062,7 +3063,7 @@ window.TELA = {
   // reconheceu e o rastreio que vai ser gravado.
   escrita: function(dados){
     A_ESCREVER=((dados&&dados.itens)||[]).map(function(x){
-      return { p:x.pedido, c:x.nome, ct:x.conta,
+      return { p:x.pedido, c:x.nome, ct:x.conta, g:Boolean(x.gemeos),
                r:(x.codigos||[]).join(" · "), tr:x.transportadora||"—" };
     });
     prontos=A_ESCREVER.length;

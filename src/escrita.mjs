@@ -81,43 +81,65 @@ export async function escreverRastreios(contas, coletas, {
 
   const planejado = [];
   let pulados = 0;
-  // Pedido com 2 produtos vem em 2 linhas da planilha (19 em 200 na planilha
-  // da Chomps de 21/10). Uma escrita por PEDIDO: a segunda linha mandava o
-  // mesmo rastreio de novo, a Shopify recusava ("já enviado") e o pedido ia
-  // parar na conferência como falha.
-  const jaPlanejado = new Set();
   // Já atendido na Shopify (pelo robô antes, ou colado à mão): não há o que
   // escrever, e o pedido tem que SAIR da carteira. Antes era só "pulado", e
   // ficava na conferência para sempre (Matheus, 22/10: "pedidos de 2 dias
   // atrás que já foram resolvidos").
   const jaAtendidos = [];
+
+  // Uma escrita por PEDIDO, com os rastreios de TODAS as linhas dele.
+  // Pedido com 2 produtos vem em 2 linhas (19 em 200 na planilha de 21/10):
+  // a 2ª linha mandava o mesmo rastreio de novo e a Shopify recusava. E o
+  // mesmo pedido pode ter sido comprado em DUAS contas (#165688, 16/10:
+  // 2 linhas na conta 236 e 1 na 237): antes só a 1ª linha valia, e o rastreio
+  // da outra conta sumia sem aviso — nem Shopify, nem conferência.
+  const porNumero = new Map();
   for (const l of prontos) {
     const num = normalizarNumero(l.p.pedido);
-    if (jaPlanejado.has(num)) continue;
+    if (!porNumero.has(num)) porNumero.set(num, []);
+    porNumero.get(num).push(l);
+  }
+  // Uma parte do pedido ainda sem rastreio (ou em dúvida): escrever só a
+  // outra fecharia a entrega na Shopify, e a que falta não entraria mais.
+  // O pedido espera inteiro, e as duas partes saem juntas.
+  const comParteFaltando = new Set(pendencias.map((p) => normalizarNumero(p.pedido)).filter(Boolean));
+
+  for (const [num, ls] of porNumero) {
+    const l = ls[0];
     const alvo = naShopify.get(num);
 
-    if (!alvo) { anotar(l, "nao-existe-na-loja"); continue; }
+    if (!alvo) { ls.forEach((x) => anotar(x, "nao-existe-na-loja")); continue; }
     if (registro[num]?.fulfillmentId || alvo.situacao === "FULFILLED") {
-      pulados++; jaPlanejado.add(num); jaAtendidos.push(l.p.pedido); continue;
+      pulados++; jaAtendidos.push(l.p.pedido); continue;
     }
     if (alvo.situacao && alvo.situacao !== "UNFULFILLED") { pulados++; continue; }
-    if (!alvo.fulfillmentOrderId) { anotar(l, "sem-fulfillment-order"); continue; }
+    if (!alvo.fulfillmentOrderId) { ls.forEach((x) => anotar(x, "sem-fulfillment-order")); continue; }
+    if (comParteFaltando.has(num)) { ls.forEach((x) => anotar(x, "parte-pendente")); continue; }
 
-    const t = parseTracking(l.codigo.replace(/ · /g, " - "));
-    const codigos = (t.codes ?? []).map((c) => (typeof c === "string" ? c : c.code));
-    if (!codigos.length) { anotar(l, "rastreio-nao-reconhecido"); continue; }
-    if (codigos.some((c) => PARECE_SIMULADO.test(c))) { anotar(l, "rastreio-simulado"); continue; }
+    const vistos = new Set(), codigos = [];
+    for (const x of ls) {
+      const t = parseTracking(x.codigo.replace(/ · /g, " - "));
+      for (const c of t.codes ?? []) {
+        const k = typeof c === "string" ? c : c.code;
+        if (!vistos.has(k)) { vistos.add(k); codigos.push(c); }
+      }
+    }
+    const numeros = codigos.map((c) => (typeof c === "string" ? c : c.code));
+    if (!numeros.length) { ls.forEach((x) => anotar(x, "rastreio-nao-reconhecido")); continue; }
+    if (numeros.some((c) => PARECE_SIMULADO.test(c))) { ls.forEach((x) => anotar(x, "rastreio-simulado")); continue; }
 
     // a conferência que importa: o destinatário é o mesmo nos dois lados?
-    const naShopee = normNome(l.achado?.nome ?? l.p.nome);
+    // (em TODAS as linhas: cada conta comprou para alguém)
     const naLoja = normNome(alvo.nome);
-    if (naLoja && naShopee !== naLoja) {
-      anotar(l, "nome-nao-confere", { shopee: l.achado?.nome ?? l.p.nome, shopify: alvo.nome });
+    const divergentes = ls.filter((x) => naLoja && normNome(x.achado?.nome ?? x.p.nome) !== naLoja);
+    if (divergentes.length) {
+      for (const x of ls)
+        if (divergentes.includes(x)) anotar(x, "nome-nao-confere", { shopee: x.achado?.nome ?? x.p.nome, shopify: alvo.nome });
+        else anotar(x, "parte-pendente");
       continue;
     }
 
-    planejado.push({ num, l, alvo, codigos: t.codes });
-    jaPlanejado.add(num);
+    planejado.push({ num, l, alvo, codigos, contas: [...new Set(ls.map((x) => x.conta))] });
   }
 
   if (!escrever)
@@ -127,7 +149,7 @@ export async function escreverRastreios(contas, coletas, {
   const gravados = [];   // só o que a Shopify aceitou de verdade
   const passo = () => aoProgresso({ fase: "escrevendo", feitos: escritos + falhas, total: planejado.length, escritos, falhas });
   passo();
-  for (const { num, l, alvo, codigos } of planejado) {
+  for (const { num, l, alvo, codigos, contas: deContas } of planejado) {
     try {
       const f = await enviar(montarEntrada({
         fulfillmentOrderId: alvo.fulfillmentOrderId,
@@ -136,7 +158,7 @@ export async function escreverRastreios(contas, coletas, {
         notificar,
       }), { conexao });
       registro[num] = {
-        fulfillmentId: f.id, pedido: alvo.pedido, conta: l.conta,
+        fulfillmentId: f.id, pedido: alvo.pedido, conta: l.conta, contas: deContas,
         codigos: f.trackingInfo.map((x) => x.number), em: new Date().toISOString(),
       };
       gravarRegistro(registro);
@@ -144,7 +166,7 @@ export async function escreverRastreios(contas, coletas, {
       escritos++;
       // Sem o nome do cliente: o log vai para arquivo e para o diagnóstico
       // que o cliente manda. O número do pedido basta para achar.
-      aoLog(`${alvo.pedido} · conta ${l.conta} · ${f.trackingInfo.map((x) => x.number).join(", ")}`);
+      aoLog(`${alvo.pedido} · conta ${deContas.join(" + ")} · ${f.trackingInfo.map((x) => x.number).join(", ")}`);
     } catch (e) {
       falhas++;
       anotar(l, "falha-ao-escrever", { erro: e.message });

@@ -40,12 +40,19 @@ sec("1. EDESIO (conta 162): dois pedidos, duas compras, a soma bate");
   tudo &= ok(!l.some((x) => x.motivo), "nenhum dos dois vai para a conferência");
 }
 
-sec("2. HAROLDO (conta 163): dois pedidos de R$ 31,99 — não dá para saber qual é qual");
+sec("2. HAROLDO (conta 163): dois pedidos de R$ 31,99 — pedidos iguais, pela ordem da compra");
 {
+  // Antes: empate, os dois iam para a conferência e ficavam lá (54 dos 67
+  // que o Matheus resolveu à mão em 22/10 eram assim). Trocar os rastreios
+  // entre dois pedidos iguais do mesmo cliente dá o mesmo resultado; o 1º
+  // pedido fica com a 1ª compra feita na Shopee.
+  const compraEm = (nome, valor, codigo, criadoEm) => ({ ...compra(nome, valor, codigo), criadoEm });
   const l = rodar(163, [linha(165184, "HAROLDO DEDA", 31.99), linha(165185, "HAROLDO DEDA", 31.99)],
-    [compra("Haroldo Deda", 30.5, "BR000000000001A"), compra("Haroldo Deda", 33.48, "BR000000000002A")]);
-  tudo &= ok(l.every((x) => x.estado === "ambiguo" && !x.codigo), "os dois ficam para você (empate), sem rastreio escrito");
-  tudo &= ok(l.every((x) => x.motivo?.candidatos?.length === 2), "com os dois candidatos para escolher");
+    [compraEm("Haroldo Deda", 33.48, "BR000000000002A", 1760000200), compraEm("Haroldo Deda", 30.5, "BR000000000001A", 1760000100)]);
+  const a = de(l, 165184)[0], b = de(l, 165185)[0];
+  tudo &= ok(a.estado === "ok-total" && a.codigo === "BR000000000001A", `#165184 (o 1º) fica com a compra mais antiga (${a.codigo || a.estado})`);
+  tudo &= ok(b.estado === "ok-total" && b.codigo === "BR000000000002A", `#165185 fica com a outra (${b.codigo || b.estado})`);
+  tudo &= ok(a.gemeos && b.gemeos, "e os dois vêm marcados como pedidos iguais (\"gemeos\")");
 }
 
 sec("3. Pedido de 2 produtos comprados separados, soma com 1 centavo de diferença");

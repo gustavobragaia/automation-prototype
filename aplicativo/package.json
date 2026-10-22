@@ -1,7 +1,7 @@
 {
   "name": "esteira",
   "productName": "Esteira",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "private": true,
   "type": "module",
   "description": "Rastreios da Shopee para a Shopify, na máquina do operador",
@@ -13,7 +13,7 @@
     "ensaio": "electron ensaio.mjs",
     "ensaio:ajustes": "electron ensaio-ajustes.mjs",
     "ensaio:arranque": "electron ensaio-arranque.mjs",
-    "ensaios": "npm run ensaio:arranque && npm run ensaio && npm run ensaio:ajustes && npm run ensaio:chave && npm run ensaio:retry && npm run ensaio:historico && npm run ensaio:progresso && npm run ensaio:escrita && npm run ensaio:diagnostico && npm run ensaio:conferencia && npm run ensaio:feedback && npm run ensaio:freio",
+    "ensaios": "npm run ensaio:arranque && npm run ensaio && npm run ensaio:ajustes && npm run ensaio:chave && npm run ensaio:retry && npm run ensaio:historico && npm run ensaio:progresso && npm run ensaio:escrita && npm run ensaio:diagnostico && npm run ensaio:conferencia && npm run ensaio:feedback && npm run ensaio:freio && npm run ensaio:iguais",
     "ensaio:chave": "electron ensaio-chave.mjs",
     "ensaio:retry": "electron ensaio-retry.mjs",
     "ensaio:historico": "electron ensaio-historico.mjs",
@@ -22,7 +22,8 @@
     "ensaio:diagnostico": "electron ensaio-diagnostico.mjs",
     "ensaio:conferencia": "electron ensaio-conferencia.mjs",
     "ensaio:feedback": "electron ensaio-feedback.mjs",
-    "ensaio:freio": "electron ensaio-freio.mjs"
+    "ensaio:freio": "electron ensaio-freio.mjs",
+    "ensaio:iguais": "electron ensaio-pedidos-iguais.mjs"
   },
   "devDependencies": {
     "electron": "^34.0.0",

@@ -111,8 +111,23 @@ const numeroDo = (p) => String(p?.pedido ?? "").match(/(\d{3,})/)?.[1] ?? String
 
 /**
  * O melhor jeito de dividir as compras entre os pedidos, se for claro.
- * @param pedidos [{ valor }]   @param compras [{ valor }]
- * @returns null | number[]  (para cada compra, o índice do pedido)
+ *
+ * "Claro" é: nenhuma divisão REALMENTE diferente fica a menos de R$ 0,50 da
+ * melhor. Trocar os rastreios entre dois pedidos de mesmo valor do mesmo
+ * cliente não é uma divisão diferente — dá o mesmo resultado, para a mesma
+ * pessoa, no mesmo endereço. Antes isso contava como empate e o par ficava
+ * para sempre na conferência: na Chomps, 54 dos 67 pedidos que o Matheus
+ * resolveu à mão na Shopify eram pares assim (GEORGINA MARIA, conta 220:
+ * #165569 e #165570, R$ 23,99 cada). Nesses, o 1º pedido fica com a 1ª
+ * compra feita na Shopee (`criadoEm`), e o resultado vem com `gemeos`.
+ *
+ * Empate de verdade continua para a pessoa: valores que não decidem
+ * (30 + 20,2 contra 25 + 25,2), ou compras que mudam de pedido entre pedidos
+ * de valores DIFERENTES — mesmo que as compras tenham o mesmo valor.
+ *
+ * @param pedidos [{ valor, numero? }]   @param compras [{ valor, criadoEm?, orderId? }]
+ * @returns null | number[]  (para cada compra, o índice do pedido; `.gemeos`
+ *          quando houve pedidos/compras intercambiáveis)
  */
 export function pareamentoClaro(pedidos, compras) {
   const n = pedidos.length, m = compras.length;
@@ -121,23 +136,77 @@ export function pareamentoClaro(pedidos, compras) {
   const total = (xs) => xs.reduce((t, x) => t + Number(x.valor), 0);
   if (Math.abs(total(pedidos) - total(compras)) > TOLERANCIA_SOMA) return null;
 
-  let melhor = null, custoMelhor = Infinity, custoSegundo = Infinity;
-  const atual = new Array(m).fill(0);
-  const avaliar = () => {
+  const centavos = (v) => Math.round(Number(v) * 100);
+  const custoDe = (atual) => {
     const somas = new Array(n).fill(0), qtd = new Array(n).fill(0);
     atual.forEach((i, k) => { somas[i] += Number(compras[k].valor); qtd[i]++; });
-    if (qtd.some((q) => q === 0)) return;              // todo pedido fica com alguma
-    const custo = somas.reduce((t, s, i) => t + Math.abs(s - Number(pedidos[i].valor)), 0);
-    if (custo < custoMelhor - 1e-9) { custoSegundo = custoMelhor; custoMelhor = custo; melhor = [...atual]; }
-    else if (custo < custoSegundo) custoSegundo = custo;
+    if (qtd.some((q) => q === 0)) return null;          // todo pedido fica com alguma
+    return somas.reduce((t, s, i) => t + Math.abs(s - Number(pedidos[i].valor)), 0);
   };
-  const percorrer = (k) => {
-    if (k === m) return avaliar();
-    for (let i = 0; i < n; i++) { atual[k] = i; percorrer(k + 1); }
+  // O que cada divisão "entrega": para cada valor de pedido, QUAIS compras
+  // cada pedido daquele valor recebe. Duas divisões com a mesma assinatura só
+  // diferem por trocar os rastreios entre pedidos de valor idêntico. Compras
+  // de mesmo valor NÃO são intercambiáveis: duas compras de R$ 25 podem ser
+  // produtos diferentes, e trocá-las entre um pedido de R$ 30 e um de R$ 20
+  // seria escrever errado.
+  // "Mesmo valor" é até R$ 0,05 de diferença (a mesma tolerância das somas):
+  // #165264/#165265 são R$ 19,49 e R$ 19,50 — o mesmo produto, arredondado.
+  const ordemValor = pedidos.map((_, i) => i).sort((a, b) => Number(pedidos[a].valor) - Number(pedidos[b].valor));
+  const classe = new Array(n);
+  ordemValor.forEach((i, pos) => {
+    const anterior = ordemValor[pos - 1];
+    classe[i] = pos > 0 && Number(pedidos[i].valor) - Number(pedidos[anterior].valor) <= TOLERANCIA_SOMA + 1e-9
+      ? classe[anterior] : centavos(pedidos[i].valor);
+  });
+  const assinatura = (atual) => {
+    const porPedido = pedidos.map(() => []);
+    atual.forEach((i, k) => porPedido[i].push(k));
+    const porValor = new Map();
+    porPedido.forEach((vs, i) => {
+      const chave = classe[i];
+      if (!porValor.has(chave)) porValor.set(chave, []);
+      porValor.get(chave).push(vs.sort((a, b) => a - b).join("+"));
+    });
+    return [...porValor].sort((a, b) => a[0] - b[0]).map(([v, l]) => `${v}:${l.sort().join("|")}`).join(";");
   };
-  percorrer(0);
-  if (!melhor) return null;
-  if (custoSegundo - custoMelhor < FOLGA_PAREAMENTO) return null;   // empate ou quase
+  const todas = (fn) => {
+    const atual = new Array(m).fill(0);
+    const ir = (k) => { if (k === m) return fn(atual); for (let i = 0; i < n; i++) { atual[k] = i; ir(k + 1); } };
+    ir(0);
+  };
+
+  let custoMelhor = Infinity;
+  todas((a) => { const c = custoDe(a); if (c != null && c < custoMelhor) custoMelhor = c; });
+  if (custoMelhor === Infinity) return null;
+
+  // A ordem das compras e dos pedidos, para escolher entre divisões
+  // equivalentes: o pedido de número menor fica com a compra mais antiga.
+  const rankCompra = compras.map((c, k) => k)
+    .sort((a, b) => (Number(compras[a].criadoEm) || 0) - (Number(compras[b].criadoEm) || 0) ||
+                    String(compras[a].orderId ?? "").localeCompare(String(compras[b].orderId ?? "")) || a - b);
+  const posCompra = new Array(m); rankCompra.forEach((k, pos) => { posCompra[k] = pos; });
+  const ordemPedido = pedidos.map((p, i) => i)
+    .sort((a, b) => String(pedidos[a].numero ?? "").localeCompare(String(pedidos[b].numero ?? ""), undefined, { numeric: true }) || a - b);
+  const chaveCronologica = (atual) => ordemPedido.map((i) =>
+    Math.min(...atual.map((pi, k) => (pi === i ? posCompra[k] : Infinity)))).join(",");
+
+  // Toda divisão a menos de R$ 0,50 da melhor tem que ENTREGAR o mesmo que
+  // ela (mesma assinatura); senão é dúvida de verdade. Divisões equivalentes
+  // têm exatamente o mesmo custo, então uma um pouco mais cara já cai aqui.
+  let melhor = null, chaveMelhor = null, assinaturaMelhor = null, alternativas = 0, duvida = false;
+  todas((a) => {
+    if (duvida) return;
+    const c = custoDe(a);
+    if (c == null || c >= custoMelhor + FOLGA_PAREAMENTO) return;
+    const sig = assinatura(a);
+    if (assinaturaMelhor === null) assinaturaMelhor = sig;
+    else if (sig !== assinaturaMelhor) { duvida = true; return; }
+    alternativas++;
+    const chave = chaveCronologica(a);
+    if (!melhor || chave.localeCompare(chaveMelhor, undefined, { numeric: true }) < 0) { melhor = [...a]; chaveMelhor = chave; }
+  });
+  if (duvida || !melhor) return null;
+  if (alternativas > 1) melhor.gemeos = true;
   return melhor;
 }
 
@@ -166,7 +235,7 @@ function parearPorCliente(linhas, coletas) {
     const porNumero = new Map();
     for (const l of doGrupo) {
       const num = numeroDo(l.p);
-      if (!porNumero.has(num)) porNumero.set(num, { valor: l.p.valor ?? null, linhas: [] });
+      if (!porNumero.has(num)) porNumero.set(num, { valor: l.p.valor ?? null, numero: num, linhas: [] });
       porNumero.get(num).linhas.push(l);
     }
     const pedidos = [...porNumero.values()];
@@ -184,6 +253,9 @@ function parearPorCliente(linhas, coletas) {
         l.partes = minhas.length > 1 ? minhas : undefined;
         l.codigo = minhas.flatMap((c) => c.codigos).join(" · ");
         l.candidatos = compras.length;
+        // pedidos iguais do mesmo cliente: qual rastreio vai em qual foi
+        // pela ordem da compra na Shopee (ver pareamentoClaro)
+        if (par.gemeos) l.gemeos = true; else delete l.gemeos;
         delete l.motivo;
       }
     });
@@ -353,6 +425,12 @@ export const MOTIVOS = {
     grupo: "precisa",
     texto: "A Shopify recusou a escrita.",
     acao: "Nada foi gravado. Tente de novo; se repetir, veja a mensagem da Shopify.",
+  },
+  "parte-pendente": {
+    rotulo: "esperando a outra parte",
+    grupo: "sozinho",
+    texto: "Parte deste pedido foi comprada em outra conta (ou em outra linha) e ainda não tem rastreio, ou está em dúvida.",
+    acao: "O robô escreve todos os rastreios juntos quando a outra parte ficar pronta. Se ela estiver em \"Precisa de você\", resolva lá.",
   },
   "conta-nao-lida": {
     rotulo: "conta não foi lida",

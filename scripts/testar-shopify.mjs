@@ -109,7 +109,8 @@ tudo &= ok(!/pedidosAbertos/.test(ciclo), "o ciclo não casa mais contra os pedi
 const escrita = readFileSync(new URL("../src/escrita.mjs", import.meta.url), "utf8");
 tudo &= ok(/PARECE_SIMULADO/.test(escrita), "a proteção contra rastreio simulado sobreviveu à unificação");
 tudo &= ok(/normalizarNumero/.test(escrita), "a escrita busca o pedido pelo número, não por nome");
-tudo &= ok(/naShopee !== naLoja/.test(escrita), "a conferência de nome continua barrando antes de escrever");
+tudo &= ok(/normNome\(x\.achado\?\.nome \?\? x\.p\.nome\) !== naLoja/.test(escrita) && /divergentes\.length/.test(escrita),
+           "a conferência de nome continua barrando antes de escrever (em todas as linhas do pedido)");
 tudo &= ok(/registro\[num\]\?\.fulfillmentId/.test(escrita), "a idempotência continua no caminho único");
 
 sec("só sai da carteira o que a Shopify aceitou");

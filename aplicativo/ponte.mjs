@@ -519,7 +519,10 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
       return {
         resumo, pulados,
         itens: planejado.map((p) => ({
-          pedido: p.l.p.pedido, conta: p.l.conta,
+          pedido: p.l.p.pedido, conta: (p.contas ?? [p.l.conta]).join(" + "),
+          // pedidos iguais do mesmo cliente: o rastreio de cada um saiu da
+          // ordem da compra na Shopee, e a pessoa precisa saber disso
+          gemeos: Boolean(p.l.gemeos),
           nome: p.alvo?.nome ?? p.l.p.nome,
           codigos: (p.codigos ?? []).map((c) => (typeof c === "string" ? c : c.code)),
           transportadora: transportadoraDe(

@@ -818,3 +818,44 @@ que já foi aberta e não foi lida aparece como não lida.
 Testes: `testar-freio.mjs` (mutação: 9 defeitos plantados; o único não pego
 era código redundante, removido) e `ensaio-freio.mjs`. `npm test`: 806;
 ensaios: 133.
+
+## 22/10/2026 — v0.1.12: pedidos iguais do mesmo cliente, e pedido comprado em duas contas
+
+**O que o Matheus viu.** A planilha "modelo-esteira_filtrado" (18 pedidos de
+16/10 sem rastreio na Shopify) passava pela coleta e a etapa 4 tinha 0 para
+escrever. 16 dos 18 eram de cliente com 2 pedidos na mesma conta; em 6 pares
+os dois tinham o MESMO valor (conta 220: #165569 e #165570, R$ 23,99 cada).
+O `pareamentoClaro` exigia R$ 0,50 entre a melhor divisão e a segunda — e
+trocar os rastreios entre dois pedidos iguais dá exatamente o mesmo custo:
+empate eterno, conferência para sempre. Dos 67 pedidos que a 0.1.10 tirou da
+conferência por já estarem atendidos (resolvidos à mão), 54 eram pares assim.
+Também #165264/#165265 (R$ 19,49 e R$ 19,50) e #165280/#165281 (1 centavo).
+
+**A regra.** Empate só é dúvida se a outra divisão ENTREGA outra coisa. A
+"assinatura" de uma divisão: para cada classe de valor de pedido (até R$ 0,05
+é o mesmo valor), quais compras cada pedido recebe. Trocar entre pedidos de
+mesma classe não muda a assinatura → não é dúvida. Compras de mesmo valor NÃO
+são intercambiáveis (podem ser produtos diferentes): R$ 30 e R$ 20 contra duas
+de R$ 25 continua para a pessoa; o pedido de 2 unidades + 1 contra 3 compras
+iguais também. Entre as equivalentes, o 1º pedido (número menor) fica com a
+1ª compra feita na Shopee (`pc_processing_info.create_time`, agora em
+`criadoEm`); a etapa 4 mostra "pedidos iguais do mesmo cliente · pela ordem
+da compra". Por que é seguro: mesmo cliente, mesmo endereço, mesmo valor — o
+pior caso é o rastreio de um pacote no pedido gêmeo, e os dois chegam à mesma
+pessoa. Prova de que a ordem vale: MARCELO FREITAS, conta 132 (#164951 ↔
+12:58:07, #164953 ↔ 13:01:29). Quando as compras são do mesmo segundo (um
+checkout só), decide de forma estável pelo id.
+
+**Segundo defeito, achado no teste do dia 16 inteiro.** #165688 tinha 2 linhas
+na conta 236 e 1 na 237. A escrita fazia um fulfillment por pedido com os
+rastreios da 1ª linha: o da 237 sumia sem aviso (nem Shopify, nem
+conferência). Agora o fulfillment leva os rastreios de TODAS as linhas do
+pedido; se uma parte ainda não está pronta, o pedido espera inteiro
+("esperando a outra parte") — escrever só uma fecharia a entrega na Shopify.
+O nome é conferido em todas as linhas.
+
+Testes: `testar-pedidos-iguais.mjs` (reproduz o bug com o código antigo: 0 de
+12; com a correção, a planilha real filtrada e as dos dias 16, 2 e 6: tudo
+escrito, cada fulfillment no pedido certo; mutação: 10 defeitos plantados, 10
+pegos depois de fechar 2 buracos do teste) e `ensaio-pedidos-iguais.mjs`
+(janela, da conferência à escrita). `npm test`: 833; ensaios: 139.

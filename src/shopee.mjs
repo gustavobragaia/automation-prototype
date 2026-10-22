@@ -56,6 +56,9 @@ export function extrairPedido(detalhe, { orderId } = {}) {
     // "despachado" = já existe pelo menos um código
     despachado: codigos.length > 0,
     statusBruto: txt(d.status?.status_label?.text),
+    // quando a compra foi feita (segundos). Desempata pedidos iguais do
+    // mesmo cliente: o 1º pedido da Shopify fica com a 1ª compra.
+    criadoEm: Number(d.pc_processing_info?.create_time) || null,
   };
 }
 
