@@ -10,6 +10,7 @@ import { pedirTrava, soltarTrava, donoAtual } from "./trava-login.mjs";
 import { receberToken } from "./shopify-oauth.mjs";
 import { emitir } from "./eventos.mjs";
 import { alertar, resolver } from "./alertas.mjs";
+import { podeLogar, registrarLogin, emailChegou, emailNaoChegou } from "./freio-email.mjs";
 import { join } from "node:path";
 import { DIR_COLETAS, DIR_EVENTOS, DIR_LOGIN, coletaDaConta, loginDaConta } from "./caminhos.mjs";
 
@@ -22,12 +23,29 @@ const FOTO_VALE_MS = 10 * 60_000;
 
 // A marca de login da conta, que a fila lê para saber se espera ou desiste.
 // "precisa de você" recente não é sobrescrito por um aviso menor.
-function marcar(conta, tipo, motivo = null) {
+function marcar(conta, tipo, motivo = null, extra = {}) {
   let anterior = null;
   try { anterior = JSON.parse(readFileSync(loginDaConta(conta), "utf8")); } catch {}
   const segura = anterior?.tipo === "precisa-humano" && Date.now() - anterior.em < 10 * 60_000 &&
     !/^(precisa-humano|login-ok)/.test(tipo);
-  if (!segura) writeFileSync(loginDaConta(conta), JSON.stringify({ tipo, motivo, em: Date.now() }, null, 2));
+  if (!segura) writeFileSync(loginDaConta(conta), JSON.stringify({ tipo, motivo, em: Date.now(), ...extra }, null, 2));
+}
+
+const hora = (ms) => new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+// O e-mail da Shopee chegou ou não: é o que o freio dos logins usa.
+function aoEmailChegar() {
+  if (emailChegou().soltou) resolver("freio-email");
+}
+function aoEmailNaoChegar(aoLog) {
+  const r = emailNaoChegou();
+  if (!r.freou) return;
+  aoLog(`freio: e-mails da Shopee não estão chegando — logins pausados até ${hora(r.ate)}`);
+  alertar({ id: "freio-email", nivel: "atencao",
+    titulo: "Os e-mails da Shopee pararam de chegar",
+    texto: `Os e-mails de verificação de 2 contas seguidas não chegaram. Isso acontece quando muitas contas pedem verificação em pouco tempo, e passa sozinho. Os logins estão pausados até ${hora(r.ate)}.`,
+    acao: "Não precisa fazer nada: as contas que já estão logadas continuam sendo lidas, e as que precisam de login voltam sozinhas depois da pausa." });
+  emitir("freio:ligado", { ate: r.ate });
 }
 
 // "Senha inválida" numa conta. Se outra conta já entrou com a mesma senha
@@ -83,6 +101,18 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
             return res.end(JSON.stringify({ soltou, dono: donoAtual() }));
           }
           const r = pedirTrava(conta);
+          // Login NOVO (não a renovação de quem já está logando) passa pelo
+          // freio: cada login pode virar um e-mail de verificação. Só quem
+          // ganhou a vez é conferido — quem espera a vez ainda não vai logar.
+          if (r.meu && !r.renovou) {
+            const f = podeLogar(conta);
+            if (!f.ok) {
+              soltarTrava(conta);
+              aoLog(`conta ${conta}: login adiado até ${hora(f.ate)} — ${f.motivo}`);
+              return res.end(JSON.stringify({ meu: false, adiar: true, ate: f.ate, motivo: `${f.motivo} (volta às ${hora(f.ate)})` }));
+            }
+            registrarLogin();
+          }
           if (r.meu && r.roubou) aoLog(`conta ${conta}: assumiu a vez (a anterior passou do tempo)`);
           else if (!r.meu) aoLog(`conta ${conta}: esperando a conta ${r.dono} terminar o login`);
           return res.end(JSON.stringify(r));
@@ -118,6 +148,7 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
               // a espera pode passar de 3 min: cada consulta renova o prazo da fila
               aCadaConsulta: (n) => marcar(conta, "verificacao-esperando-email", `consulta ${n} à caixa`) });
             aoLog(`conta ${conta}: link de verificação obtido ("${r.assunto}")`);
+            aoEmailChegar();
             return res.end(JSON.stringify({ link: r.link }));
           } catch (e) {
             if (e.html) writeFileSync(join(DIR_EVENTOS, `${Date.now()}-email-sem-link-${conta}.html`), e.html);
@@ -130,6 +161,7 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         const r = await obterCodigo(credencialDaConta(conta).email, desde, { antes: fotos.get(String(conta))?.foto ?? null,
           aCadaConsulta: (n) => marcar(conta, "otp-esperando-codigo", `consulta ${n} à caixa`) });
         aoLog(`conta ${conta}: código obtido em ${r.tentativas} tentativa(s)`);
+        aoEmailChegar();
         return res.end(JSON.stringify({ codigo: r.codigo }));
       } catch (e) {
         res.statusCode = 500;
@@ -199,7 +231,8 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
         // "verificacao-*" também: a espera do e-mail pode passar de 3 min, e
         // cada passo dela renova o prazo da fila.
         if (/^(login-|otp-|verificacao-|precisa-humano|nao-autenticado|coleta-falhou|sessao-caida)/.test(m.tipo ?? "")) {
-          marcar(conta, m.tipo, m.motivo ?? null);
+          marcar(conta, m.tipo, m.motivo ?? null, m.ate ? { ate: m.ate } : {});
+          if (/^login-falhou/.test(m.tipo) && /não chegou/.test(m.motivo ?? "")) aoEmailNaoChegar(aoLog);
 
           // A tela precisa separar dois casos que no log parecem o mesmo:
           // o robô vai resolver sozinho, ou a rodada parou esperando uma

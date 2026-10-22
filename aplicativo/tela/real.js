@@ -238,7 +238,7 @@ async function ler(caminho){
 var ESTADO_DO_EVENTO = {
   "conta:abrindo": "abrindo", "conta:aberta": "abrindo", "conta:logando": "logando",
   "conta:humano": "humano", "conta:lendo": "lendo", "conta:feita": "feita",
-  "conta:falhou": "falhou", "conta:repetindo": "repetindo",
+  "conta:falhou": "falhou", "conta:repetindo": "repetindo", "conta:adiada": "adiada",
 };
 function rodada(){
   // A escuta começa antes de qualquer rodada: o coletor sobe junto com o app

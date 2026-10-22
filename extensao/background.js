@@ -43,7 +43,7 @@ const travaGlobal = (acao) => {
 
 // Desfechos do login. Soltar a vez aqui é o que faz a fila andar; sem isto
 // os outros perfis só entrariam quando a trava expirasse.
-const FIM_DO_LOGIN = new Set(["login-ok", "login-falhou", "precisa-humano"]);
+const FIM_DO_LOGIN = new Set(["login-ok", "login-falhou", "precisa-humano", "login-adiado"]);
 
 chrome.runtime.onMessage.addListener((msg, remetente, responder) => {
   if (msg?.pedido === "login-ligado") {
@@ -76,7 +76,9 @@ chrome.runtime.onMessage.addListener((msg, remetente, responder) => {
         // de content script que nem rodou.
         contar(meu ? "login-assumido" : "login-cedido",
                { aba, de: meu ? null : "rodada", dono: r?.dono ?? null });
-        responder({ ok: meu });
+        // "adiar": o freio dos logins (src/freio-email.mjs) não deixa
+        // começar um login agora; o login.js para e a fila volta depois.
+        responder({ ok: meu, adiar: r?.adiar === true, ate: r?.ate ?? null, motivo: r?.motivo ?? null });
       })
       .catch((e) => { contar("login-cedido", { aba, de: "erro", erro: String(e) });
                       responder({ ok: false }); });

@@ -24,6 +24,8 @@ export const TIPOS = new Set([
   "conta:feita",      // { conta, pedidos, segundos, precisouLogin }
   "conta:falhou",     // { conta, erro, tentativas, natureza }
   "conta:repetindo",  // { conta, tentativa, de, motivo } — voltou para o fim da fila
+  "conta:adiada",     // { conta, ate, motivo } — o freio dos logins não deixou logar agora
+  "freio:ligado",     // { ate } — os e-mails da Shopee pararam de chegar; logins pausados
   "escrita:progresso", // { fase: "conferindo"|"escrevendo", feitos, total, escritos, falhas }
   "alerta:novo",      // { alerta, novo } — src/alertas.mjs
   "alerta:resolvido", // { id }

@@ -758,7 +758,7 @@ details.cred summary:hover{color:var(--tinta)}
 .pc-barra{display:flex;height:8px;border-radius:6px;overflow:hidden;background:var(--sup-3)}
 .pc-barra i{display:block;height:100%;transition:width .3s ease}
 .pc-barra .lidas{background:var(--ok)} .pc-barra .falharam{background:var(--erro)}
-.pc-barra .esperando{background:var(--atencao)} .pc-barra .repetindo{background:color-mix(in srgb,var(--atencao) 55%,var(--sup-3))}
+.pc-barra .pausadas{background:var(--tinta-3)} .pc-barra .esperando{background:var(--atencao)} .pc-barra .repetindo{background:color-mix(in srgb,var(--atencao) 55%,var(--sup-3))}
 .pc-barra .andando{background:var(--marca)}
 .pc-txt{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
 .pc-txt .total{font-weight:600;margin-right:6px}
@@ -1763,6 +1763,7 @@ function linhaConta(c){
   else if(e==="logando"){ situacao=est("andando","o robô está logando"); }
   else if(e==="humano") situacao=est("at","precisa de você");
   else if(e==="repetindo") situacao='<span title="'+esc(c.motivo||"")+'">'+est("at","vai tentar de novo · "+c.tentativa+"ª de "+c.de)+'</span>';
+  else if(e==="adiada") situacao='<span title="'+esc(c.motivo||"")+'">'+est("at","login pausado · volta às "+(c.ate?new Date(c.ate).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"—"))+'</span>';
   else if(e==="falhou") situacao=est("er", (c.erro ? "falhou: "+c.erro : "falhou")+(c.tentativas>1?" ("+c.tentativas+" tentativas)":""));
   else if(e==="lendo"){ situacao=est("andando","lendo pedidos"); entrada=feita; }
   else { situacao=est("ok","coletada"); entrada=feita;
@@ -1776,11 +1777,12 @@ function linhaConta(c){
 }
 // Em que grupo cada conta está agora. Conta pelo estado ATUAL: uma conta
 // que esperou alguém e depois foi lida conta como lida, não nos dois.
-var GRUPO_DO_ESTADO={feita:"lidas",falhou:"falharam",humano:"esperando",repetindo:"repetindo",
+var GRUPO_DO_ESTADO={feita:"lidas",falhou:"falharam",humano:"esperando",repetindo:"repetindo",adiada:"pausadas",
   abrindo:"andando",logando:"andando",lendo:"andando",fila:"fila"};
 // [grupo, singular, plural, cor]
 var GRUPOS_COLETA=[["lidas","lida","lidas","var(--ok)"],["andando","em andamento","em andamento","var(--marca)"],
   ["esperando","esperando você","esperando você","var(--atencao)"],["repetindo","tentando de novo","tentando de novo","var(--atencao)"],
+  ["pausadas","com login pausado","com login pausado","var(--tinta-3)"],
   ["falharam","falhou","falharam","var(--erro)"],["fila","na fila","na fila","var(--tinta-3)"]];
 var filtroColeta="";
 function grupoDa(c){ return GRUPO_DO_ESTADO[estadoConta[c.n]]||"fila"; }
@@ -1789,7 +1791,7 @@ function pintaProgresso(){
   cx.hidden=!total||(!rodando&&!coletou);
   if(cx.hidden) return;
   var n={}; CONTAS_RODADA.forEach(function(c){ var g=grupoDa(c); n[g]=(n[g]||0)+1; });
-  $("pcBarra").innerHTML=["lidas","falharam","esperando","repetindo","andando"].map(function(g){
+  $("pcBarra").innerHTML=["lidas","falharam","esperando","repetindo","pausadas","andando"].map(function(g){
     return n[g]?'<i class="'+g+'" style="width:'+(n[g]/total*100)+'%"></i>':""; }).join("");
   $("pcBarra").setAttribute("aria-label",(n.lidas||0)+" de "+total+" contas lidas");
   $("pcTxt").innerHTML='<span class="total">'+(n.lidas||0)+" de "+total+' contas lidas</span>'+
@@ -3137,6 +3139,7 @@ window.TELA = {
         if(dados.erro!=null) c.erro=dados.erro;
         if(dados.tentativa!=null){ c.tentativa=dados.tentativa; c.de=dados.de; c.motivo=dados.motivo; }
         if(dados.tentativas!=null) c.tentativas=dados.tentativas;
+        if(dados.ate!=null){ c.ate=dados.ate; c.motivo=dados.motivo; }
       }
       // "o robô está logando" já prova que a sessão tinha morrido, antes
       // mesmo de a conta terminar — senão a coluna fica mentindo no meio.

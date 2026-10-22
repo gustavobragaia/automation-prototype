@@ -121,7 +121,7 @@ export async function processarConta({ serial, userId, conta }, {
       await dormir(2000);
       if (existsSync(arq) && statSync(arq).mtimeMs > antes) return arq;
       const p = prazoDaConta({ comecou, agora: Date.now(), timeoutMs, marca: lerMarca(conta) });
-      if (p.desistir) throw new Error(`conta ${conta}: ${p.desistir}`);
+      if (p.desistir) throw Object.assign(new Error(`conta ${conta}: ${p.desistir}`), p.adiarAte ? { adiarAte: p.adiarAte } : {});
       if (Date.now() >= p.limite)
         throw new Error(`conta ${conta}: nada chegou ao coletor em ${Math.round((p.limite - comecou) / 1000)}s`);
     }
@@ -171,6 +171,10 @@ export function prazoDaConta({ comecou, agora, timeoutMs, marca }) {
     if (agora >= limite) return { ...base, desistir: `a Shopee pediu uma pessoa e ninguém resolveu em ${Math.round(ESPERA_HUMANO_MS / 60000)} min${motivo}` };
     return { limite: Math.max(base.limite, limite), desistir: null };
   }
+  // O freio dos logins não deixou esta conta logar agora: ela volta para o
+  // fim da fila e só abre de novo depois de `ate`. Não é falha.
+  if (/^login-adiado/.test(marca.tipo))
+    return { ...base, desistir: `login adiado${motivo}`, adiarAte: Number(marca.ate) || agora + 15 * 60_000 };
   if (/^login-falhou/.test(marca.tipo)) return { ...base, desistir: `o login automático falhou${motivo}` };
   if (/^coleta-falhou/.test(marca.tipo)) return { ...base, desistir: `a coleta não leu nenhum pedido${motivo}` };
   if (/^sessao-caida/.test(marca.tipo))
@@ -241,6 +245,28 @@ export function tipoDaFalha(mensagem) {
  * Roda a fila com concorrência limitada e pausa aleatória entre contas.
  * `processar` existe para os testes; a rodada de verdade usa processarConta.
  */
+/**
+ * A conta provavelmente está deslogada: a última vez que o robô mexeu com o
+ * login dela terminou sem entrar (precisa de você, login falhou, adiado…), e
+ * ela não foi lida depois disso. Essas vão para o FIM da fila: as de sessão
+ * viva são lidas primeiro, sem depender de e-mail nenhum da Shopee
+ * (rodada de 21/10: o e-mail travou depois de ~35 verificações numa hora).
+ */
+export function provavelDeslogada(conta) {
+  const m = lerMarca(conta);
+  if (!m?.tipo || /^login-ok/.test(m.tipo)) return false;
+  const arq = coletaDaConta(conta);
+  const lidaDepois = existsSync(arq) && statSync(arq).mtimeMs > Number(m.em ?? 0);
+  return !lidaDepois;
+}
+
+/** Sessão viva primeiro, provável login no fim; dentro de cada grupo, a ordem de antes. */
+export function ordenarParaFila(contas) {
+  const vivas = [], deslogadas = [];
+  for (const c of contas) (provavelDeslogada(c.conta) ? deslogadas : vivas).push(c);
+  return [...vivas, ...deslogadas];
+}
+
 // A fila que está rodando agora, para "Tentar de novo" no meio da rodada.
 let filaAtual = null;
 
@@ -269,7 +295,10 @@ export function repetirNaRodada(conta) {
 
 export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pausaMax = 12_000, aoLog = () => {},
                                           processar = processarConta } = {}) {
-  const pendentes = contas.map((c) => ({ c, tentativa: 1, naoAntesDe: 0 }));
+  const ordem = ordenarParaFila(contas);
+  const deslogadas = contas.filter((c) => provavelDeslogada(c.conta)).length;
+  if (deslogadas) aoLog(`${deslogadas} conta(s) que precisavam de login na última vez vão para o fim da fila`);
+  const pendentes = ordem.map((c) => ({ c, tentativa: 1, naoAntesDe: 0 }));
   const resultados = [];
   const andando = new Set();
   let emAndamento = 0;
@@ -294,8 +323,14 @@ export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pau
     while (pendentes.length || emAndamento) {
       if (pararPedido) {
         // As que sobraram não viram falha: ninguém tentou abrir.
-        for (const resto of pendentes.splice(0))
+        for (const resto of pendentes.splice(0)) {
           aoLog(`conta ${resto.c.conta}: fora da rodada — parada pedida`);
+          // Quem já foi aberta e não foi lida (esperando a 2ª tentativa, ou
+          // adiada pelo freio) tem que aparecer no fim, com "Tentar de novo
+          // só essas", e não sumir. Só some quem nunca chegou a abrir.
+          const erro = resto.adiada ?? resto.ultimoErro;
+          if (erro) resultados.push({ ...resto.c, ok: false, erro, tentativas: Math.max(1, resto.tentativa - (resto.adiada ? 0 : 1)), natureza: "passageira" });
+        }
         return;
       }
       const item = proxima();
@@ -315,6 +350,13 @@ export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pau
           ...resumoDaColeta(c.conta, arq, comecou),
         });
       } catch (e) {
+        if (e.adiarAte && !pararPedido) {
+          // Adiada pelo freio dos logins: não gastou login nem tentativa.
+          pendentes.push({ c, tentativa, naoAntesDe: e.adiarAte, manual, adiada: e.message });
+          aoLog(`${e.message} — a conta volta para a fila às ${new Date(e.adiarAte).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
+          emitir("conta:adiada", { conta: c.conta, ate: e.adiarAte, motivo: e.message });
+          continue;
+        }
         // "natureza", e não "tipo": emitir() junta os dados ao evento, e um
         // campo "tipo" apagava o "conta:falhou" — a tela não via a falha.
         const natureza = tipoDaFalha(e.message);
@@ -324,7 +366,7 @@ export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pau
         repetir = natureza === "passageira" && !manual && tentativa < (doEmail ? 2 : TENTATIVAS()) && !pararPedido;
         if (repetir) {
           const pausa = doEmail ? PAUSA_EMAIL_MS() : PAUSA_REPETIR_MS();
-          pendentes.push({ c, tentativa: tentativa + 1, naoAntesDe: Date.now() + pausa });
+          pendentes.push({ c, tentativa: tentativa + 1, naoAntesDe: Date.now() + pausa, ultimoErro: e.message });
           liberarLogin(c.conta);   // a próxima tentativa pode entrar de novo (no máx. 2 logins por rodada)
           const de = doEmail ? 2 : TENTATIVAS();
           aoLog(`conta ${c.conta}: falhou (${e.message}) — vai tentar de novo no fim da fila (${tentativa + 1}ª de ${de}` +

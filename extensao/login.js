@@ -92,6 +92,9 @@
     for (;;) {
       const t = await pedir("travar-login");
       if (t?.ok) return true;
+      // O freio dos logins: a Shopee está segurando os e-mails, ou já foram
+      // logins demais nesta hora. Não loga; a fila tenta esta conta depois.
+      if (t?.adiar) { avisar("login-adiado", { motivo: t.motivo, ate: t.ate }); return false; }
       if (!/\/buyer\/login/.test(location.pathname)) return false;   // saiu do login: nada a fazer
       await new Promise((r) => setTimeout(r, 6000));
     }
@@ -341,7 +344,9 @@
       jaTentou = true;
       pedir("login-ligado").then((r) => {
         if (r?.ok === false) return avisar("precisa-humano", { motivo: "a Shopee pediu para confirmar a identidade" });
-        pedir("travar-login").then(() => verificarIdentidade(Math.floor(Date.now() / 1000)))
+        pedir("travar-login").then((t) => t?.adiar
+          ? avisar("login-adiado", { motivo: t.motivo, ate: t.ate })
+          : verificarIdentidade(Math.floor(Date.now() / 1000)))
           .catch((e) => avisar("precisa-humano", { motivo: `erro no login.js: ${e?.message ?? e}` }));
       });
       return;

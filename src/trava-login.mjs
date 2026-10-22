@@ -34,9 +34,10 @@ export function pedirTrava(conta, agora = Date.now()) {
 
   if (dono === null || expirou(agora) || dono === n) {
     const roubou = dono !== null && dono !== n;
+    const renovou = dono === n;
     dono = n; desde = agora;
     if (roubou) espera.length = 0;
-    return { meu: true, dono, haMs: 0, roubou };
+    return { meu: true, dono, haMs: 0, roubou, renovou };
   }
   if (!espera.includes(n)) espera.push(n);
   return { meu: false, dono, haMs: agora - desde };

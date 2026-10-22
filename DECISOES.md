@@ -788,3 +788,33 @@ e fila de verdade).
 **Publicado como v0.1.10.** Mais um cenário fixo: a conta que falhou e foi
 lida depois sai da conferência ("conta não foi lida" → resolvido → etapa 4).
 `npm test`: 772 verificações; ensaios de janela: 128.
+
+## 22/10/2026 — v0.1.11: o freio dos logins (diagnóstico da rodada de 21/10)
+
+**O que o diagnóstico mostrou.** Não era a caixa nem o robô: era volume. Às
+18h30, 23 verificações e todas certas; depois de ~35 numa hora, os e-mails da
+Shopee passaram a chegar com 15-30 min de atraso ou nunca (19h30-22h30: 53 de
+74 falharam); às 23h, 19 de 19 certas. A 246 recebeu o link às 19:40:48, 6 s
+antes de a janela fechar; a 222 nunca recebeu. Das 55 contas que falharam,
+45 passaram mais tarde. Se é a Shopee ou o caminho até o givmail que segura,
+os dados não dizem — a resposta é a mesma.
+
+**O que mudou** (`src/freio-email.mjs`, conferido na trava de login do
+coletor, só quando a conta GANHA a vez):
+- ritmo: no máximo 25 logins por hora (`LIMITE_LOGINS_HORA`);
+- freio: 2 e-mails seguidos que não chegam pausam os logins 45 min
+  (`PAUSA_FREIO_MS`); depois, uma conta de teste decide se volta; alerta
+  "Os e-mails da Shopee pararam de chegar", que some sozinho;
+- conta barrada pelo freio não loga (o `login.js` nem pede a senha) e volta
+  para a fila na hora certa, sem gastar tentativa — "login pausado · volta às";
+- contas cuja última tentativa terminou sem entrar vão para o fim da fila:
+  as de sessão viva são lidas primeiro, sem depender de e-mail.
+O estado do freio fica em arquivo: reabrir o app não solta a pausa.
+
+**Furo antigo achado pelo ensaio:** com "Parar", a conta que esperava a 2ª
+tentativa sumia do resultado (e do "Tentar de novo só essas"). Agora toda conta
+que já foi aberta e não foi lida aparece como não lida.
+
+Testes: `testar-freio.mjs` (mutação: 9 defeitos plantados; o único não pego
+era código redundante, removido) e `ensaio-freio.mjs`. `npm test`: 806;
+ensaios: 133.
