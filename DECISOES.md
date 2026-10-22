@@ -784,3 +784,7 @@ de 15 min (`PAUSA_EMAIL_MS`), uma vez só (2 tentativas = os 2 logins da rodada)
 Testes: `testar-feedback-22-10.mjs` (provado por mutação: 6 defeitos plantados,
 6 pegos) e `ensaio-feedback.mjs` (janela de verdade, ponte, carteira, coletor
 e fila de verdade).
+
+**Publicado como v0.1.10.** Mais um cenário fixo: a conta que falhou e foi
+lida depois sai da conferência ("conta não foi lida" → resolvido → etapa 4).
+`npm test`: 772 verificações; ensaios de janela: 128.

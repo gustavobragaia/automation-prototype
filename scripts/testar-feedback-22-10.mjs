@@ -47,7 +47,7 @@ globalThis.fetch = async (url, opcoes = {}) => {
   const nums = [...String(corpo.variables?.q ?? "").matchAll(/name:(\d+)/g)].map((m) => m[1]);
   return resp({ orders: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: nums.map((n) => ({
     name: "#" + n, id: "gid://O/" + n, createdAt: "2026-10-20T10:00:00Z", displayFulfillmentStatus: SITUACAO[n] ?? "UNFULFILLED",
-    shippingAddress: { name: "Cliente Teste", zip: "01000000" }, totalPriceSet: { shopMoney: { amount: "1" } },
+    shippingAddress: { name: n === "180001" ? "CARLA SOUZA" : "Cliente Teste", zip: "01000000" }, totalPriceSet: { shopMoney: { amount: "1" } },
     lineItems: { nodes: [] }, fulfillmentOrders: { nodes: [{ id: "gid://FO/" + n, status: SITUACAO[n] === "FULFILLED" ? "CLOSED" : "OPEN" }] } })) } });
 };
 
@@ -226,6 +226,40 @@ sec("3b. O login.js na página \"Verificar Identidade\"");
   tudo &= ok(falhou && /e-mail de verificação da Shopee não chegou \(pedido às \d\d:\d\d, reenviado às \d\d:\d\d, desistiu às \d\d:\d\d\)/.test(falhou.motivo),
     `desiste dizendo os horários: "${falhou?.motivo?.slice(0, 95)}…"`);
   tudo &= ok(!p.avisos.some((a) => a.tipo === "precisa-humano"), "como falha (a fila tenta de novo), não \"precisa de você\"");
+}
+
+sec("4. A conta que falhou e foi lida depois sai da conferência");
+{
+  // a 1ª tentativa da 232 falhou (senha): o pedido dela foi para a
+  // conferência como "conta não foi lida". Depois do "Tentar de novo", ela
+  // é lida — e a conferência tem que mostrar isso, sem o motivo velho.
+  const { default: ExcelJS } = await import("../src/excel.mjs");
+  const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet("PEDIDOS");
+  ws.addRow(["DATA", "NÚMERO DO PEDIDO", "NOME DO CLIENTE", "VALOR PAGO", "CÓDIGO DE RASTREIO", "ONDE FOI FEITO O PEDIDO"]);
+  ws.addRow(["22/10", "Pedido #180001", "CARLA SOUZA", 45.9, null, "shopee 232"]);
+  const planilha = join(dir, "planilha-232.xlsx"); await wb.xlsx.writeFile(planilha);
+  guardarPendentes([{ pedido: "Pedido #180001", conta: 232, nome: "CARLA SOUZA", valor: 45.9,
+    motivo: { codigo: "conta-nao-lida", grupo: "precisa" } }]);
+  const { construir } = await import("../aplicativo/ponte.mjs");
+  const ponte = construir({});
+  const des = (r) => (r && "ok" in r && "dado" in r ? r.dado : r);
+  await ponte["planilha:ler"]({ caminho: planilha });
+  let c = des(await ponte["conferencia:listar"]({}));
+  tudo &= ok(c.pendencias.some((i) => i.pedido === "Pedido #180001" && i.motivo.codigo === "conta-nao-lida"),
+    "antes de a 232 ser lida: \"conta não foi lida\" na conferência");
+  const { DIR_COLETAS } = await import("../src/caminhos.mjs");
+  const { mkdirSync } = await import("node:fs");
+  mkdirSync(DIR_COLETAS, { recursive: true });
+  writeFileSync(join(DIR_COLETAS, "conta-232.json"), JSON.stringify({ conta: "232", listas: [{ ok: true }], pedidos: [{ orderId: "1", bruto: { data: {
+    address: { shipping_name: "Carla Souza", shipping_address: "Rua A, 1, São Paulo, SP, 01000000" },
+    info_card: { order_id: "1", final_total: 4590000 },
+    pc_shipping: { forder_shipping_info_list: [{ tracking_number: "BR123456789BR" }] } } } }] }));
+  c = des(await ponte["conferencia:listar"]({}));
+  tudo &= ok(!c.pendencias.some((i) => i.pedido === "Pedido #180001"), "depois de lida: sai de \"Precisa de você\"");
+  tudo &= ok(c.resolvidosAgora.some((r) => r.pedido === "Pedido #180001"), "e aparece como resolvido, indo para a etapa 4");
+  const esc = des(await ponte["escrita:listar"]({}));
+  tudo &= ok(esc.itens.some((i) => i.pedido === "Pedido #180001" && i.codigos.join() === "BR123456789BR"),
+    "na etapa 4, com o rastreio lido na 2ª tentativa");
 }
 
 console.log(tudo ? "\n\x1b[32m\x1b[1m  feedback de 22/10: ok\x1b[0m\n" : "\n\x1b[31m\x1b[1m  feedback de 22/10: FALHOU\x1b[0m\n");
