@@ -118,8 +118,8 @@ sec("só sai da carteira o que a Shopify aceitou");
 tudo &= ok(/const gravados = \[\]/.test(escrita), "a escrita acumula o que foi gravado de fato");
 tudo &= ok(/gravados\.push/.test(escrita), "e só depois do enviar() dar certo");
 const cicloTxt = readFileSync(new URL("../src/ciclo.mjs", import.meta.url), "utf8");
-tudo &= ok(/baixarPendentes\(res\.gravados/.test(cicloTxt),
-           "o ciclo baixa pela lista de gravados, não pela de planejados");
+tudo &= ok(/baixarPendentes\([^;]*res\.gravados/.test(cicloTxt),
+           "o ciclo baixa pela lista de gravados (e dos já atendidos), não pela de planejados");
 tudo &= ok(!/baixarPendentes\([^)]*planejado/.test(cicloTxt),
            "e não usa planejado em lugar nenhum para baixar");
 

@@ -38,7 +38,7 @@ export function gravarRegistro(reg, arq = ARQ_REGISTRO) {
  * @param contas    saída de lerPendentes().contas
  * @param coletas   Map<conta, pedidos> de lerColetas()
  * @param escrever  false = dry-run
- * @returns { escritos, falhas, pulados, pendencias, planejado }
+ * @returns { escritos, falhas, pulados, pendencias, planejado, gravados, jaAtendidos }
  */
 export async function escreverRastreios(contas, coletas, {
   escrever = false, notificar = false, conexao, aoLog = () => {},
@@ -86,13 +86,20 @@ export async function escreverRastreios(contas, coletas, {
   // mesmo rastreio de novo, a Shopify recusava ("já enviado") e o pedido ia
   // parar na conferência como falha.
   const jaPlanejado = new Set();
+  // Já atendido na Shopify (pelo robô antes, ou colado à mão): não há o que
+  // escrever, e o pedido tem que SAIR da carteira. Antes era só "pulado", e
+  // ficava na conferência para sempre (Matheus, 22/10: "pedidos de 2 dias
+  // atrás que já foram resolvidos").
+  const jaAtendidos = [];
   for (const l of prontos) {
     const num = normalizarNumero(l.p.pedido);
     if (jaPlanejado.has(num)) continue;
     const alvo = naShopify.get(num);
 
     if (!alvo) { anotar(l, "nao-existe-na-loja"); continue; }
-    if (registro[num]?.fulfillmentId) { pulados++; continue; }
+    if (registro[num]?.fulfillmentId || alvo.situacao === "FULFILLED") {
+      pulados++; jaPlanejado.add(num); jaAtendidos.push(l.p.pedido); continue;
+    }
     if (alvo.situacao && alvo.situacao !== "UNFULFILLED") { pulados++; continue; }
     if (!alvo.fulfillmentOrderId) { anotar(l, "sem-fulfillment-order"); continue; }
 
@@ -114,7 +121,7 @@ export async function escreverRastreios(contas, coletas, {
   }
 
   if (!escrever)
-    return { escritos: 0, falhas: 0, pulados, pendencias, planejado, gravados: [], resumo };
+    return { escritos: 0, falhas: 0, pulados, pendencias, planejado, gravados: [], jaAtendidos, resumo };
 
   let escritos = 0, falhas = 0;
   const gravados = [];   // só o que a Shopify aceitou de verdade
@@ -145,5 +152,5 @@ export async function escreverRastreios(contas, coletas, {
     }
     passo();
   }
-  return { escritos, falhas, pulados, pendencias, planejado, gravados, resumo };
+  return { escritos, falhas, pulados, pendencias, planejado, gravados, jaAtendidos, resumo };
 }

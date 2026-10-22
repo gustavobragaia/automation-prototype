@@ -13,14 +13,15 @@
     "ensaio": "electron ensaio.mjs",
     "ensaio:ajustes": "electron ensaio-ajustes.mjs",
     "ensaio:arranque": "electron ensaio-arranque.mjs",
-    "ensaios": "npm run ensaio:arranque && npm run ensaio && npm run ensaio:ajustes && npm run ensaio:chave && npm run ensaio:retry && npm run ensaio:historico && npm run ensaio:progresso && npm run ensaio:escrita && npm run ensaio:diagnostico && npm run ensaio:conferencia",
+    "ensaios": "npm run ensaio:arranque && npm run ensaio && npm run ensaio:ajustes && npm run ensaio:chave && npm run ensaio:retry && npm run ensaio:historico && npm run ensaio:progresso && npm run ensaio:escrita && npm run ensaio:diagnostico && npm run ensaio:conferencia && npm run ensaio:feedback",
     "ensaio:chave": "electron ensaio-chave.mjs",
     "ensaio:retry": "electron ensaio-retry.mjs",
     "ensaio:historico": "electron ensaio-historico.mjs",
     "ensaio:progresso": "electron ensaio-progresso.mjs",
     "ensaio:escrita": "electron ensaio-escrita.mjs",
     "ensaio:diagnostico": "electron ensaio-diagnostico.mjs",
-    "ensaio:conferencia": "electron ensaio-conferencia.mjs"
+    "ensaio:conferencia": "electron ensaio-conferencia.mjs",
+    "ensaio:feedback": "electron ensaio-feedback.mjs"
   },
   "devDependencies": {
     "electron": "^34.0.0",

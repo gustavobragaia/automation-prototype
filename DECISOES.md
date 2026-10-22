@@ -755,3 +755,32 @@ A conferência mostra a carteira (o que ficou da rodada anterior). Depois da
 Agora o que a conciliação de agora resolve sai da lista com um aviso e vai
 para a etapa 4. O que a Shopify barrou continua. As etapas 3 e 4 são
 refeitas ao serem abertas (antes, só no fim da rodada).
+
+## 22/10/2026 — Feedback do Matheus depois da rodada de 2 dias juntos
+
+**Conferência com pedido já resolvido.** Um pedido só saía da carteira quando o
+robô escrevia ou alguém decidia na conferência. O que foi colado à mão na
+Shopify ficava lá para sempre, e a etapa 4 só "pulava". Agora: ao abrir a
+etapa 3 (e no botão "Conferir na Shopify e limpar"), a carteira inteira é
+consultada na Shopify, só leitura, numa consulta por 20 pedidos. O que está
+`FULFILLED` sai, com aviso e "Desfazer". Parcial fica. A etapa 4 também tira o
+já atendido. Não há "limpar tudo" às cegas: apagaria pedidos ainda sem rastreio.
+
+**Senha errada numa conta só (232).** O alerta dizia "a Shopee recusou a senha
+das contas" e mandava para Ajustes. Agora, se outra conta entrou com a senha na
+rodada, o alerta é da conta ("a senha da conta 232 é diferente da padrão"), com
+o botão "Tentar de novo a conta 232", que põe a conta no fim da fila **desta**
+rodada (`repetirNaRodada`). A pessoa agiu, então a conta ganha um login de novo
+(`zerarLogins`). O alerta geral só aparece com 2+ recusas e nenhuma entrada.
+
+**E-mail de verificação que não chega.** As caixas recebem normalmente (231 e
+232, hoje, em menos de 1 min). Sem o diagnóstico da rodada não dá para dizer
+se a Shopee segurou o envio ou se a caixa não recebeu. Mudou: o robô olha a
+caixa em 3 pedaços de 3 min (~10 min, o tempo da janela), não numa espera só,
+porque o Chrome mata o service worker aos 5 min. Se não chegar, é falha
+passageira com os horários no motivo; a conta volta para o fim da fila depois
+de 15 min (`PAUSA_EMAIL_MS`), uma vez só (2 tentativas = os 2 logins da rodada).
+
+Testes: `testar-feedback-22-10.mjs` (provado por mutação: 6 defeitos plantados,
+6 pegos) e `ensaio-feedback.mjs` (janela de verdade, ponte, carteira, coletor
+e fila de verdade).

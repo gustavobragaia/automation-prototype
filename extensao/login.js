@@ -246,6 +246,9 @@
       await pedir("travar-login");
     }
     avisar("verificacao-email-pedida", { motivo: (document.body?.innerText ?? "").replace(/\s+/g, " ").slice(0, 300) });
+    const hora = () => new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const pedidoAs = hora();
+    let reenviadoAs = null;
 
     let r = await pedir("link", { desde });
     // Não chegou: pede à Shopee para mandar de novo, UMA vez. A página
@@ -260,10 +263,26 @@
       if (reenviar) {
         await pedir("travar-login");
         reenviar.click();
+        reenviadoAs = hora();
         avisar("verificacao-reenviada", { motivo: "o e-mail não chegou; pedi à Shopee para mandar de novo" });
+      }
+      // Continua olhando a caixa pelo tempo que a janela ficaria aberta
+      // esperando uma pessoa (~10 min): na rodada de 2 dias da Chomps
+      // (21/10), o e-mail não chegou em 3 min em várias contas. Se ele chegar
+      // no minuto 7, o robô segue sozinho. Em pedaços de 3 min: uma espera
+      // só, longa, o Chrome mata o service worker no meio (5 min).
+      for (let i = 0; i < 2 && !r?.link && /não chegou/.test(r?.erro ?? ""); i++) {
+        await pedir("travar-login");
         r = await pedir("link", { desde });
       }
     }
+    if (!r?.link && /não chegou/.test(r?.erro ?? ""))
+      // Não é "precisa de você": a pessoa não teria o que fazer na janela
+      // sem o e-mail. A fila põe a conta no fim, com uma pausa longa, e tenta
+      // uma vez mais. Os horários vão no motivo, para o diagnóstico dizer se
+      // foi a Shopee que não mandou ou a caixa que não recebeu.
+      return avisar("login-falhou", { motivo: `o e-mail de verificação da Shopee não chegou (pedido às ${pedidoAs}` +
+        (reenviadoAs ? `, reenviado às ${reenviadoAs}` : "") + `, desistiu às ${hora()}) — ${r.erro}` });
     if (!r?.link) return avisar("precisa-humano", { motivo: `a Shopee pediu para confirmar a identidade por e-mail, e ${r?.erro ?? "o link não chegou"}` });
     // O link abre em OUTRA aba. Esta aqui é a que termina o login quando o
     // e-mail é confirmado — abrir o link nela (como era) aprovava o login na

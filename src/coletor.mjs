@@ -3,7 +3,8 @@
 
 import { createServer } from "node:http";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
-import { tokenValido, credencialDaConta, entregarCredencial, marcarTentativa } from "./credenciais.mjs";
+import { tokenValido, credencialDaConta, entregarCredencial, marcarTentativa,
+         registrarEntrou, registrarSenhaRecusada, situacaoDaSenha } from "./credenciais.mjs";
 import { obterCodigo, obterLink, fotoDaCaixa } from "./otp.mjs";
 import { pedirTrava, soltarTrava, donoAtual } from "./trava-login.mjs";
 import { receberToken } from "./shopify-oauth.mjs";
@@ -27,6 +28,31 @@ function marcar(conta, tipo, motivo = null) {
   const segura = anterior?.tipo === "precisa-humano" && Date.now() - anterior.em < 10 * 60_000 &&
     !/^(precisa-humano|login-ok)/.test(tipo);
   if (!segura) writeFileSync(loginDaConta(conta), JSON.stringify({ tipo, motivo, em: Date.now() }, null, 2));
+}
+
+// "Senha inválida" numa conta. Se outra conta já entrou com a mesma senha
+// nesta rodada, a senha errada é a DESTA conta (alguém a trocou), e o
+// conserto é nela — não em Ajustes. Antes o alerta dizia "a Shopee recusou a
+// senha das contas" e mandava para Ajustes (conta 232, 22/10). O alerta
+// geral só aparece quando nenhuma conta entrou e mais de uma foi recusada.
+function alertarSenha(conta) {
+  registrarSenhaRecusada(conta);
+  const { entraram, recusadas } = situacaoDaSenha();
+  alertar({ id: `conta-senha-${conta}`, nivel: "erro", conta: Number(conta),
+    titulo: entraram
+      ? `A senha da conta ${conta} é diferente da padrão`
+      : `A Shopee recusou a senha na conta ${conta}`,
+    texto: entraram
+      ? `Outras contas entraram com a senha padrão nesta rodada, e a ${conta} não: a senha dela foi trocada.`
+      : `A Shopee respondeu "senha inválida" na conta ${conta}.`,
+    acao: `Entre na conta ${conta} à mão (no perfil dela no AdsPower), troque a senha para a padrão e clique em "Tentar de novo a conta ${conta}". ` +
+      "Com a rodada ainda rodando, ela volta para o fim da fila desta rodada.",
+    rerodar: [Number(conta)], rotuloRerodar: `Tentar de novo a conta ${conta}` });
+  if (!entraram && recusadas.length >= 2)
+    alertar({ id: "shopee-senha", nivel: "erro",
+      titulo: "A Shopee recusou a senha das contas",
+      texto: `Nas contas ${recusadas.join(", ")}, a Shopee respondeu "senha inválida", e nenhuma conta entrou com a senha nesta rodada. O robô usa a mesma senha para todas; se ela mudou, nenhuma conta deslogada consegue entrar.`,
+      acao: "Confira a senha em Ajustes → Contas da Shopee → 2, e o padrão do e-mail (prefixo e domínio).", ir: "ajustes" });
 }
 
 export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
@@ -152,6 +178,7 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
           const conta = m.conta ?? "sem-conta";
           writeFileSync(coletaDaConta(conta), JSON.stringify(m, null, 2));
           resolver(`conta-humano-${conta}`);   // leu: ninguém mais precisa agir nela
+          resolver(`conta-senha-${conta}`);
           aoLog(`conta ${conta}: ${(m.pedidos ?? []).length} pedido(s) em ${m.duracaoMs} ms · ${String(m.pagina ?? "").slice(0, 55)}`);
           return;
         }
@@ -188,12 +215,13 @@ export function iniciarColetor({ porta = 3000, aoLog = () => {} } = {}) {
               acao: `Procure a janela "Conta ${conta}" (o robô a traz para a frente). Ela fica aberta por 10 minutos; resolva lá e, quando a página voltar para Minhas Compras, o robô lê sozinho.` });
           } else if (/^(coleta-falhou|login-falhou|sessao-caida)/.test(m.tipo)) {
             // falhas: quem avisa a tela é a fila, ao desistir da conta
-            if (/^login-falhou/.test(m.tipo) && /senha inv[aá]lida/.test(m.motivo ?? ""))
-              alertar({ id: "shopee-senha", nivel: "erro",
-                titulo: "A Shopee recusou a senha das contas",
-                texto: `Na conta ${conta}, a Shopee respondeu "senha inválida". O robô usa a mesma senha para todas; se ela mudou, nenhuma conta deslogada consegue entrar.`,
-                acao: "Confira a senha em Ajustes → Contas da Shopee → 2, e o padrão do e-mail (prefixo e domínio).", ir: "ajustes" });
+            if (/^login-falhou/.test(m.tipo) && /senha inv[aá]lida/.test(m.motivo ?? "")) alertarSenha(conta);
           } else {
+            if (/^login-ok/.test(m.tipo)) {
+              registrarEntrou(conta);
+              // uma conta entrou com a senha: ela não está errada para todas
+              resolver("shopee-senha");
+            }
             emitir("conta:logando", { conta });
           }
         }

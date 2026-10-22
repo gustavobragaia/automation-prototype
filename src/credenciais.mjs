@@ -31,10 +31,18 @@ const jaEntregue = new Map();     // conta → logins começados nesta rodada
 const permitidos = new Map();     // conta → logins permitidos (1; 2 depois de um retry)
 const MAX_LOGINS = 2;
 
+// Quem entrou e quem teve a senha recusada nesta rodada. Se outra conta
+// entrou com a mesma senha, a recusada é daquela conta só — alguém trocou a
+// senha dela —, e não "a senha das contas" (conta 232, 22/10).
+const entraram = new Set();
+const senhaRecusada = new Set();
+
 export function novoToken() {
   tokenAtual = randomBytes(24).toString("hex");
   jaEntregue.clear();
   permitidos.clear();
+  entraram.clear();
+  senhaRecusada.clear();
   // O ID de uma extensão descompactada vem do CAMINHO. Reusar a mesma pasta
   // fazia o Chrome reaproveitar o service worker em cache do perfil — com o
   // token da rodada anterior, e a credencial era recusada como inválida.
@@ -120,4 +128,20 @@ export function marcarTentativa(conta) {
 export function liberarLogin(conta) {
   const n = Number(conta);
   permitidos.set(n, Math.min(MAX_LOGINS, (permitidos.get(n) ?? 1) + 1));
+}
+
+/** A pessoa pediu para tentar de novo (corrigiu a conta à mão): a conta
+ *  recomeça com direito a um login, mesmo que já tenha usado os dois. */
+export function zerarLogins(conta) {
+  const n = Number(conta);
+  jaEntregue.delete(n);
+  permitidos.delete(n);
+  senhaRecusada.delete(n);
+}
+
+export function registrarEntrou(conta) { entraram.add(Number(conta)); }
+export function registrarSenhaRecusada(conta) { senhaRecusada.add(Number(conta)); }
+/** { entraram: quantas contas entraram com a senha, recusadas: [contas] } */
+export function situacaoDaSenha() {
+  return { entraram: entraram.size, recusadas: [...senhaRecusada] };
 }

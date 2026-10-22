@@ -241,7 +241,7 @@ export async function rodarCiclo({ contas, escrever = true, simular = false,
     guardarPendentes(pendencias);
     // `gravados`, não `planejado`: o que a Shopify recusou TEM que continuar
     // na carteira, senão some amanhã.
-    const baixados = baixarPendentes(res.gravados ?? []);
+    const baixados = baixarPendentes([...(res.gravados ?? []), ...(res.jaAtendidos ?? [])]);
     if (baixados) aoLog(`${baixados} pedido(s) saíram da lista de pendentes`);
 
     const precisa = pendencias.filter((p) => p.motivo.grupo === "precisa").length;

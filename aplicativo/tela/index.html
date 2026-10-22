@@ -993,7 +993,12 @@ details.cred summary:hover{color:var(--tinta)}
   </div></div>
 
   <div class="bloco">
-    <div class="rotulo"><h2>Precisa de você</h2><span class="dir" id="ctPrecisa"></span></div>
+    <div class="rotulo"><h2>Precisa de você</h2><span class="dir"><span id="ctPrecisa"></span>
+      <button class="btn peq" id="bLimparConf" style="margin-left:8px" title="Pergunta à Shopify quais destes pedidos já foram atendidos e tira esses daqui">Conferir na Shopify e limpar</button></span></div>
+    <div class="aviso" id="confNaShopify" hidden style="margin-bottom:12px">
+      <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+      <span id="confNaShopifyTxt"></span>
+      <button class="btn peq" id="bDesfazerLimpeza" style="margin-left:8px">Desfazer</button></div>
     <div class="aviso" id="confResolvidos" hidden style="margin-bottom:12px">
       <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
       <span id="confResolvidosTxt"></span></div>
@@ -2867,7 +2872,7 @@ function pintaAlertas(){
       (a.acao?'<div class="a"><b>O que fazer:</b> '+esc(a.acao)+'</div>':"")+
       '<div class="meta"><span class="esq">'+quandoAlerta(a.em)+(a.vezes>1?" · "+a.vezes+" vezes":"")+'</span>'+
       (a.ir?'<button class="btn peq" data-ir="'+esc(a.ir)+'">Abrir '+esc(a.ir==="ajustes"?"Ajustes":a.ir)+'</button>':"")+
-      (a.rerodar&&a.rerodar.length?'<button class="btn peq pri" data-rerodar="'+esc(a.rerodar.join(","))+'">Tentar de novo só essas ('+a.rerodar.length+')</button>':"")+
+      (a.rerodar&&a.rerodar.length?'<button class="btn peq pri" data-rerodar="'+esc(a.rerodar.join(","))+'">'+esc(a.rotuloRerodar||('Tentar de novo só essas ('+a.rerodar.length+')'))+'</button>':"")+
       '<button class="btn peq" data-dispensar="'+esc(a.id)+'">Dispensar</button></div></div></div>';
   }).join(""):'<div class="pa-vazio">'+ICO_SINO_OK+'<b>Nenhum alerta</b>Quando algo impedir o robô de trabalhar, aparece aqui com o que fazer.</div>';
 }
@@ -2908,6 +2913,13 @@ $("listaAlertas").addEventListener("click",function(e){
     GANCHOS.rerodar(de_novo.dataset.rerodar.split(",").map(Number).filter(function(n){return n>0;})); }
 });
 GANCHOS.aoAbrirEtapa=function(){};
+$("bLimparConf").addEventListener("click",function(){ GANCHOS.limparConferencia(false); });
+$("bDesfazerLimpeza").addEventListener("click",function(){
+  var nums=[]; try{ nums=JSON.parse($("confNaShopify").dataset.pedidos||"[]"); }catch(e){}
+  GANCHOS.desfazerLimpeza(nums);
+});
+GANCHOS.limparConferencia=function(){ avisar("Conferir na Shopify","protótipo: nada roda aqui"); };
+GANCHOS.desfazerLimpeza=function(){};
 GANCHOS.rerodar=function(contas){ avisar("Tentar de novo", "Contas "+contas.join(", ")+" (protótipo: nada roda aqui)"); };
 $("bDiagnostico").addEventListener("click",function(){ GANCHOS.exportarDiagnostico(); });
 GANCHOS.exportarDiagnostico=function(){ avisar("Exportar diagnóstico","Protótipo: nada a exportar aqui."); };
@@ -3082,6 +3094,17 @@ window.TELA = {
     itens.forEach(function(x){ cx.appendChild(itemDaConferencia(x)); });
     marcarIrmaos();
     pintaRevisao();
+  },
+
+  // Os que já estavam atendidos na Shopify e saíram da conferência. A
+  // lista fica guardada no aviso para o "Desfazer".
+  confNaShopify: function(sairam){
+    var nums=[]; (sairam||[]).forEach(function(x){ if(nums.indexOf(x.pedido)<0) nums.push(x.pedido); });
+    $("confNaShopify").hidden=!nums.length;
+    $("confNaShopify").dataset.pedidos=JSON.stringify(nums);
+    if(!nums.length) return;
+    $("confNaShopifyTxt").innerHTML='<b>'+nums.length+(nums.length>1?" pedidos já estavam atendidos na Shopify":" pedido já estava atendido na Shopify")+
+      '</b> e '+(nums.length>1?"saíram":"saiu")+' da conferência: '+esc(nums.map(function(p){return p.replace(/^Pedido /,"");}).join(", "))+'.';
   },
 
   // ── a rodada de verdade ──

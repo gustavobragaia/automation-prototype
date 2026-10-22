@@ -291,7 +291,22 @@ function rodada(){
   // planilhas, só as contas que não foram lidas. As outras não são abertas de
   // novo, e o que já foi lido delas continua valendo na conferência.
   GANCHOS.rerodar = async function(numeros){
-    if (await pedir("rodada:emCurso")) return TELA.avisar("Já tem uma rodada em andamento", "Espere ela terminar.");
+    // Com a fila desta rodada ainda andando, a conta volta para o fim dela
+    // (a pessoa corrigiu a senha à mão e não quer esperar o fim). Sem fila
+    // andando, começa uma rodada só com essas.
+    try {
+      var r = await pedir("rodada:repetir", { contas: numeros });
+      if (r.naFila.length) TELA.avisar("De volta à fila",
+        (r.naFila.length > 1 ? "As contas " + r.naFila.join(", ") + " voltaram" : "A conta " + r.naFila[0] + " voltou") +
+        " para o fim da fila desta rodada.");
+      var POR_QUE = { "ja-na-fila": "já está na fila ou abrindo agora", "nao-falhou": "não falhou nesta rodada" };
+      r.fora.filter(function(f){ return f.motivo !== "sem-rodada"; }).forEach(function(f){
+        TELA.avisar("Conta " + f.conta + " não voltou para a fila", POR_QUE[f.motivo] || f.motivo);
+      });
+      numeros = r.fora.filter(function(f){ return f.motivo === "sem-rodada"; }).map(function(f){ return f.conta; });
+      if (!numeros.length) return;
+    } catch (e) { return TELA.avisar("Não consegui pôr de volta na fila", e.message); }
+    if (await pedir("rodada:emCurso")) return TELA.avisar("A coleta desta rodada já terminou", "Clique de novo quando a rodada acabar.");
     try {
       var todas = await pedir("rodada:contas", []);
       var contas = todas.filter(function(c){ return numeros.indexOf(Number(c.conta)) >= 0; });
@@ -343,8 +358,38 @@ async function carregarEscrita(quieto){
     TELA.avisar("Não consegui montar a etapa 4", e.message);
   }
 }
+// O que já foi atendido na Shopify (resolvido por fora) sai da conferência.
+// `quieto`: ao abrir a etapa, sem loja conectada ou sem rede, não é erro —
+// a conferência só fica como estava.
+var limpando = false;
+GANCHOS.limparConferencia = async function(quieto){
+  if (limpando) return;
+  limpando = true;
+  var botao = document.getElementById("bLimparConf");
+  if (!quieto) { botao.disabled = true; botao.textContent = "Conferindo na Shopify…"; }
+  try {
+    var r = await pedir("conferencia:limparShopify");
+    if (r.sairam.length) { TELA.confNaShopify(r.sairam); await carregarConferencia(true); recarregar(); }
+    else if (!quieto) TELA.avisar("Nada para limpar", "Nenhum pedido da conferência está atendido na Shopify.");
+  } catch (e) {
+    console.error("[esteira] limpar conferência:", e.message);
+    if (!quieto) TELA.avisar("Não consegui conferir na Shopify", e.message);
+  } finally {
+    limpando = false;
+    botao.disabled = false; botao.textContent = "Conferir na Shopify e limpar";
+  }
+};
+GANCHOS.desfazerLimpeza = async function(pedidos){
+  var falhou = [];
+  for (var i = 0; i < pedidos.length; i++) {
+    try { await pedir("conferencia:desfazer", { pedido: pedidos[i] }); } catch (e) { falhou.push(pedidos[i]); }
+  }
+  TELA.confNaShopify([]);
+  await carregarConferencia(true); recarregar();
+  if (falhou.length) TELA.avisar("Não deu para desfazer todos", falhou.join(", "));
+};
 GANCHOS.aoAbrirEtapa = function(t){
-  if (t === "3") carregarConferencia(true);
+  if (t === "3") carregarConferencia(true).then(function(){ return GANCHOS.limparConferencia(true); });
   if (t === "4") carregarEscrita(true);
 };
 

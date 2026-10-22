@@ -13,6 +13,7 @@ import { conexaoAtiva, ESCOPOS, normalizarLoja, salvarConexao, provarCredenciais
 import { identidadeDaLoja, escoposConcedidos } from "../src/shopify.mjs";
 import { lerPendentes } from "../src/planilha.mjs";
 import { escreverRastreios } from "../src/escrita.mjs";
+import { tirarJaAtendidos } from "../src/carteira-shopify.mjs";
 import { transportadoraDe } from "../src/shopify.mjs";
 import { guardarPendentes, baixarPendentes } from "../src/estado.mjs";
 import { pendentesAbertos, historico, adiarPendente, encerrarPendente, motivosDaRodada,
@@ -25,10 +26,10 @@ import { resolverManual, prepararManual } from "../src/manual.mjs";
 import { lerAjustes, salvarAjustes, aplicarNoAmbiente, SEGREDOS,
          faltaConfigurar } from "../src/ajustes.mjs";
 import { aoEvento, emitir } from "../src/eventos.mjs";
-import { lerAlertas, dispensar, alertasResolvidos } from "../src/alertas.mjs";
+import { lerAlertas, dispensar, alertasResolvidos, resolver as resolverAlerta } from "../src/alertas.mjs";
 import { montarDiagnostico } from "../src/diagnostico.mjs";
 import { writeFileSync as gravarArquivo } from "node:fs";
-import { pedirParada } from "../src/fila.mjs";
+import { pedirParada, repetirNaRodada } from "../src/fila.mjs";
 import net from "node:net";
 import { diaLocal } from "../src/datas.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -418,6 +419,15 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
       }
     }),
 
+    // Tira da carteira o que já está atendido na Shopify (resolvido por
+    // fora, à mão). Só leitura lá. A tela chama ao abrir a etapa 3 e no
+    // botão "Conferir na Shopify e limpar".
+    "conferencia:limparShopify": () => tentar(async () => {
+      const sairam = await tirarJaAtendidos();
+      if (sairam.length) aoLog(`${sairam.length} pedido(s) já atendidos na Shopify saíram da conferência: ${sairam.map((x) => x.pedido).join(", ")}`);
+      return { sairam };
+    }),
+
     // Desfazer o que dá para desfazer: devolve o pedido à carteira de hoje.
     "conferencia:desfazer": ({ pedido }) => tentar(async () => {
       if (!reabrirPendente(pedido)) throw new Error("esse pedido não dá mais para desfazer");
@@ -448,6 +458,16 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
       return [...porConta.values()];
     }),
     "rodada:emCurso": async () => Boolean(rodadaEmCurso),
+    // "Tentar de novo" com a rodada rodando: volta para o fim desta fila.
+    "rodada:repetir": ({ contas = [] } = {}) => tentar(async () => {
+      const naFila = [], fora = [];
+      for (const n of contas.map(Number).filter((x) => x > 0)) {
+        const r = repetirNaRodada(n);
+        if (r === "na-fila") { naFila.push(n); resolverAlerta(`conta-senha-${n}`); }
+        else fora.push({ conta: n, motivo: r });
+      }
+      return { naFila, fora };
+    }),
     "rodada:parar": async () => {
       if (!rodadaEmCurso) return false;
       pedirParada();
@@ -521,7 +541,7 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
         // `planejado` — o que ela recusou TEM que continuar na carteira,
         // senão some amanhã.
         guardarPendentes(r.pendencias);
-        const baixados = baixarPendentes(r.gravados ?? []);
+        const baixados = baixarPendentes([...(r.gravados ?? []), ...(r.jaAtendidos ?? [])]);
         aoLog(`${r.escritos} escrito(s) · ${r.falhas} falha(s) · ${r.pulados} pulado(s)` +
               (baixados ? ` · ${baixados} saíram da carteira` : ""));
         return { escritos: r.escritos, falhas: r.falhas, pulados: r.pulados,

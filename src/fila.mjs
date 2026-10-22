@@ -11,7 +11,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 // custaram caro neste projeto.
 import { abrirPerfil, fecharPerfil, statusPerfil, BASE, KEY } from "./adspower.mjs";
 import { soltarTrava } from "./trava-login.mjs";
-import { novoToken, limparToken, extensaoDaConta, liberarLogin } from "./credenciais.mjs";
+import { novoToken, limparToken, extensaoDaConta, liberarLogin, zerarLogins } from "./credenciais.mjs";
 import { emitir } from "./eventos.mjs";
 import { coletaDaConta, loginDaConta } from "./caminhos.mjs";
 
@@ -219,6 +219,12 @@ export function paradaPedida() { return pararPedido; }
 // repetir não resolve e só piora a conta. Vai direto para o alerta.
 export const TENTATIVAS = () => Math.max(1, Number(process.env.TENTATIVAS_CONTA ?? 3));
 const PAUSA_REPETIR_MS = () => Number(process.env.PAUSA_REPETIR_MS ?? 30_000);
+// O e-mail de verificação que não chegou: a Shopee segura o envio quando
+// muitas contas pedem verificação juntas. Tentar logo em seguida pediria
+// outro e-mail no mesmo aperto; espera um tempo e tenta UMA vez mais (o
+// segundo login da conta na rodada).
+const EMAIL_NAO_CHEGOU = /e-mail de verificação da Shopee não chegou/;
+const PAUSA_EMAIL_MS = () => Number(process.env.PAUSA_EMAIL_MS ?? 15 * 60_000);
 
 const PRECISA_DE_PESSOA = new RegExp([
   "pediu uma pessoa", "captcha", "verificação de imagem", "senha inv[aá]lida", "conta bloquead",
@@ -235,11 +241,39 @@ export function tipoDaFalha(mensagem) {
  * Roda a fila com concorrência limitada e pausa aleatória entre contas.
  * `processar` existe para os testes; a rodada de verdade usa processarConta.
  */
+// A fila que está rodando agora, para "Tentar de novo" no meio da rodada.
+let filaAtual = null;
+
+/**
+ * Põe de volta no fim da fila DESTA rodada uma conta que já falhou nela.
+ * É o botão do alerta: a pessoa corrigiu a senha da conta à mão, e a conta
+ * volta sem esperar a rodada acabar (Matheus, 22/10, conta 232). A pessoa
+ * agiu, então a conta ganha mais um login mesmo que já tenha usado os dois.
+ * @returns {"na-fila"|"ja-na-fila"|"sem-rodada"|"nao-falhou"}
+ */
+export function repetirNaRodada(conta) {
+  const f = filaAtual;
+  if (!f || pararPedido) return "sem-rodada";
+  const n = Number(conta);
+  if (f.pendentes.some((p) => Number(p.c.conta) === n) || f.andando.has(n)) return "ja-na-fila";
+  const i = f.resultados.findIndex((r) => Number(r.conta) === n && !r.ok);
+  if (i < 0) return "nao-falhou";
+  const { ok, erro, tentativas = 1, natureza, arq, ...c } = f.resultados.splice(i, 1)[0];
+  void ok; void erro; void natureza; void arq;
+  f.pendentes.push({ c, tentativa: tentativas + 1, naoAntesDe: 0, manual: true });
+  zerarLogins(n);
+  f.aoLog(`conta ${n}: de volta ao fim da fila, a pedido (${tentativas + 1}ª tentativa)`);
+  emitir("conta:repetindo", { conta: n, tentativa: tentativas + 1, de: tentativas + 1, motivo: "pedido por você" });
+  return "na-fila";
+}
+
 export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pausaMax = 12_000, aoLog = () => {},
                                           processar = processarConta } = {}) {
   const pendentes = contas.map((c) => ({ c, tentativa: 1, naoAntesDe: 0 }));
   const resultados = [];
+  const andando = new Set();
   let emAndamento = 0;
+  filaAtual = { pendentes, resultados, andando, aoLog };
 
   pararPedido = false;   // uma parada de ontem não cancela a rodada de hoje
 
@@ -266,8 +300,9 @@ export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pau
       }
       const item = proxima();
       if (!item) { await dormir(500); continue; }
-      const { c, tentativa } = item;
+      const { c, tentativa, manual } = item;
       emAndamento++;
+      andando.add(Number(c.conta));
       const comecou = Date.now();
       let repetir = false;
       try {
@@ -283,13 +318,18 @@ export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pau
         // "natureza", e não "tipo": emitir() junta os dados ao evento, e um
         // campo "tipo" apagava o "conta:falhou" — a tela não via a falha.
         const natureza = tipoDaFalha(e.message);
-        repetir = natureza === "passageira" && tentativa < TENTATIVAS() && !pararPedido;
+        // A tentativa pedida à mão não se repete sozinha: se falhar, volta
+        // para a pessoa, que é quem sabe o que mudou na conta.
+        const doEmail = EMAIL_NAO_CHEGOU.test(e.message);
+        repetir = natureza === "passageira" && !manual && tentativa < (doEmail ? 2 : TENTATIVAS()) && !pararPedido;
         if (repetir) {
-          const pausa = PAUSA_REPETIR_MS();
+          const pausa = doEmail ? PAUSA_EMAIL_MS() : PAUSA_REPETIR_MS();
           pendentes.push({ c, tentativa: tentativa + 1, naoAntesDe: Date.now() + pausa });
           liberarLogin(c.conta);   // a próxima tentativa pode entrar de novo (no máx. 2 logins por rodada)
-          aoLog(`conta ${c.conta}: falhou (${e.message}) — vai tentar de novo no fim da fila (${tentativa + 1}ª de ${TENTATIVAS()})`);
-          emitir("conta:repetindo", { conta: c.conta, tentativa: tentativa + 1, de: TENTATIVAS(), motivo: e.message });
+          const de = doEmail ? 2 : TENTATIVAS();
+          aoLog(`conta ${c.conta}: falhou (${e.message}) — vai tentar de novo no fim da fila (${tentativa + 1}ª de ${de}` +
+                (doEmail ? `, daqui a ${Math.round(pausa / 60_000)} min` : "") + ")");
+          emitir("conta:repetindo", { conta: c.conta, tentativa: tentativa + 1, de, motivo: e.message });
         } else {
           resultados.push({ ...c, ok: false, erro: e.message, tentativas: tentativa, natureza });
           aoLog(`conta ${c.conta}: FALHOU — ${e.message}${tentativa > 1 ? ` (depois de ${tentativa} tentativas)` : ""}`);
@@ -297,6 +337,7 @@ export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pau
         }
       } finally {
         emAndamento--;
+        andando.delete(Number(c.conta));
         // Rede de segurança: se o perfil morreu antes de soltar a vez, a
         // fila inteira ficaria esperando a trava expirar.
         soltarTrava(c.conta);
@@ -308,6 +349,7 @@ export async function rodarFila(contas, { concorrencia = 3, pausaMin = 4000, pau
   try {
     await Promise.all(Array.from({ length: Math.min(concorrencia, contas.length) }, () => trabalhador()));
   } finally {
+    filaAtual = null;
     limparToken();   // fora da rodada, o coletor não entrega credencial nenhuma
   }
   return resultados;
