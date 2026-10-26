@@ -859,3 +859,40 @@ Testes: `testar-pedidos-iguais.mjs` (reproduz o bug com o código antigo: 0 de
 escrito, cada fulfillment no pedido certo; mutação: 10 defeitos plantados, 10
 pegos depois de fechar 2 buracos do teste) e `ensaio-pedidos-iguais.mjs`
 (janela, da conferência à escrita). `npm test`: 833; ensaios: 139.
+
+## 26/10/2026 — v0.1.13: link de rastreio do parcelsapp
+
+**O problema.** O link que ia no pedido (rastreamento.correios.com.br/app/
+index.php?objeto=) parou de funcionar: abre o formulário vazio com captcha. E
+a transportadora ia como "Correios" para os BR26…, que são da Shopee Express
+(o parcelsapp mostra "Shopee Express Brazil"). A Chomps pediu o parcelsapp.
+
+**O que mudou.**
+- Link: `https://parcelsapp.com/pt/tracking/<código>` em todo rastreio (lote e
+  "colei o rastreio"). `/pt-br/` redireciona para o inglês; `/pt/` é o certo.
+  Ressalva medida: com SPXLM17442804 o parcelsapp não achou nada (3 SPX em 880).
+- Transportadora: "Shopee Xpress" para BR26 e SPX; "Correios" só para o formato
+  dos Correios (AA123456789BR); mistura vira "Outros". O leitor de rastreio
+  rotulava BR26 como "correios" — agora "shopee" (rótulo próprio: o
+  "shopee-xpress" conta os SPX no run-proof).
+- Ajustes → "Link de rastreio": aceita o endereço puro (o código vai no fim)
+  ou com {codigo}; recusa sem https:// ao salvar; vazio volta ao parcelsapp.
+- "Corrigir o link dos pedidos já escritos" (`src/corrigir-links.mjs`), em dois
+  passos: conferir (só lê) e trocar. Só no que o robô escreveu (registro), só
+  link quebrado (link à mão fica), pula cancelado, sem avisar o cliente,
+  confere o que a Shopify gravou, espera o THROTTLED.
+
+**Medido na loja de teste (26/10), e que mudou o plano:** a Shopify SUBSTITUI o
+rastreio inteiro ao atualizar — mandar 1 de 2 códigos apagou o outro. Por isso
+a correção lê e reenvia todos. O link que o robô manda vale mais que o que a
+Shopify gera pela transportadora; sem link, com "Correios", ela põe
+correios.com.br/rastreamento (inútil). Na loja de teste: escrita real com 1 e 2
+códigos e correção de 1, 3 códigos e um com link à mão — tudo certo, e rodar de
+novo não mudou nada.
+
+**Defeito achado no teste:** `numeros.map(urlRastreio)` passava o índice como
+modelo do link; todo pedido com mais de um rastreio teria falhado na escrita.
+
+Testes: `testar-link-rastreio.mjs` (Shopify de mentira com a substituição;
+mutação: 11 plantados, 10 pegos — o 11º era código redundante, removido) e
+`ensaio-link-rastreio.mjs`. `npm test`: 869; ensaios: 145.

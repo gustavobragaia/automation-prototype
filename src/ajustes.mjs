@@ -35,6 +35,7 @@ const PADRAO = {
   emailFaixa: 0,              // a partir deste número vale o prefixo de cima
   emailDominio: "",
   codigoChave: "",            // RapidAPI: lê o código de verificação no e-mail
+  linkRastreio: "",           // vazio = parcelsapp (src/shopify.mjs, LINK_RASTREIO_PADRAO)
   loginAutomatico: true,      // se o robô entra sozinho quando a sessão cai
 
   // Rodada
@@ -69,6 +70,14 @@ export function lerAjustes() {
 }
 
 export function salvarAjustes(mudancas = {}) {
+  // O link de rastreio vai no pedido de cada cliente final: um link torto
+  // aqui viraria centenas de links tortos. Recusa ao salvar, não na escrita.
+  if (mudancas.linkRastreio != null) {
+    const l = String(mudancas.linkRastreio).trim();
+    if (l && !/^https:\/\/[^\s/]+\.[^\s]+$/i.test(l))
+      throw new Error("o link de rastreio precisa começar com https:// e não pode ter espaços (ex.: https://parcelsapp.com/pt/tracking)");
+    mudancas = { ...mudancas, linkRastreio: l };
+  }
   const atual = lerAjustes();
   for (const [c, v] of Object.entries(mudancas)) {
     if (CAMPOS.includes(c)) atual[c] = v;
@@ -97,12 +106,15 @@ const NO_AMBIENTE = {
   emailFaixa: "SHOPEE_FAIXA_PREFIXO",
   emailDominio: "SHOPEE_EMAIL_DOMINIO",
   codigoChave: "RAPIDAPI_KEY",
+  linkRastreio: "LINK_RASTREIO",
 };
 
 // Campos em que VAZIO é uma resposta, não a falta de uma. "Nenhum segundo
 // prefixo" quer dizer que todas as contas usam o mesmo começo de e-mail —
 // e isso precisa chegar ao robô, senão o padrão da Chomps volta sozinho.
-const VAZIO_VALE = new Set(["emailPrefixoAlto"]);
+// O link de rastreio apagado volta ao padrão (parcelsapp): vazio tem que
+// chegar ao robô, senão o último link digitado continuaria valendo.
+const VAZIO_VALE = new Set(["emailPrefixoAlto", "linkRastreio"]);
 
 // O que ainda falta preencher para uma rodada poder acontecer.
 //

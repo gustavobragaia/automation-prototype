@@ -75,6 +75,23 @@ async function ajustes(){
     pedir("ajustes:verSegredo", qual).then(pronto).catch(function(){ pronto(""); });
   };
 
+  // O link de rastreio: salva ao sair do campo, e mostra como fica com um
+  // código de verdade. Link inválido é recusado ao salvar (src/ajustes.mjs).
+  var campoLink = $("ajLink");
+  campoLink.value = a.linkRastreio || "";
+  var mostrarExemplo = function(){
+    pedir("links:exemplo", { link: campoLink.value.trim() })
+      .then(function(r){ $("ajLinkEx").textContent = r.link; })
+      .catch(function(e){ $("ajLinkEx").textContent = "— " + e.message; });
+  };
+  mostrarExemplo();
+  campoLink.addEventListener("input", mostrarExemplo);
+  campoLink.addEventListener("change", function(){
+    pedir("ajustes:salvar", { linkRastreio: campoLink.value.trim() })
+      .then(function(novo){ TELA.ajustes(novo); })
+      .catch(function(e){ TELA.avisar("Não consegui guardar o link", e.message); });
+  });
+
   var simples = [["shPrefixo","emailPrefixo"],["shPrefixoAlto","emailPrefixoAlto"],
                  ["shDominio","emailDominio"],["shFaixa","emailFaixa"],
                  ["adsBase","adspowerBase"]];
@@ -245,6 +262,8 @@ function rodada(){
   // e já emite por conta própria enquanto o cliente ainda está na etapa 1.
   window.esteira.aoEvento(function(e){
     if (e.tipo === "escrita:progresso") return TELA.escritaProgresso(e);
+    if (e.tipo === "links:progresso")
+      return linksMostra("Trocando… " + e.feitos + " de " + e.total + (e.falhas ? " · " + e.falhas + " falha(s)" : ""), false);
     if (e.tipo === "rodada:inicio") return TELA.rodada.montar(e.contas || []);
     if (e.tipo === "rodada:fim") {
       TELA.rodada.terminar(e);
@@ -388,6 +407,45 @@ GANCHOS.desfazerLimpeza = async function(pedidos){
   await carregarConferencia(true); recarregar();
   if (falhou.length) TELA.avisar("Não deu para desfazer todos", falhou.join(", "));
 };
+// o `esc` da tela mora dentro do escopo dela; este arquivo tem o seu
+function esc(t){ return String(t == null ? "" : t).replace(/[&<>"']/g, function(c){
+  return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+
+// Corrigir o link dos pedidos já escritos: conferir (só lê) e, depois de
+// ver o número, trocar. Nada muda na Shopify antes do 2º clique.
+function linksMostra(txt, comBotoes){
+  document.getElementById("linksRes").hidden = false;
+  document.getElementById("linksTxt").innerHTML = txt;
+  document.getElementById("linksBotoes").hidden = !comBotoes;
+}
+GANCHOS.conferirLinks = async function(){
+  var b = document.getElementById("bConferirLinks");
+  b.disabled = true; b.textContent = "Conferindo…";
+  try {
+    var r = await pedir("links:conferir");
+    if (!r.aCorrigir) linksMostra("<b>Nada para trocar.</b> " + r.jaCertos + " pedido(s) escritos pelo robô já estão com o link certo.", false);
+    else {
+      document.getElementById("bCorrigirLinks").textContent = "Trocar " + r.aCorrigir;
+      linksMostra("<b>" + r.aCorrigir + " pedido(s) com o link antigo</b> (de " + r.total + " escritos pelo robô; " + r.jaCertos + " já certos)." +
+        (r.exemplo ? "<br>Ex.: " + esc(r.exemplo.pedido) + " passa a abrir <span class=\"mono\">" + esc(r.exemplo.para) + "</span>." : "") +
+        "<br>Os códigos não mudam e o cliente não recebe aviso.", true);
+    }
+  } catch (e) { linksMostra("Não consegui conferir: " + esc(e.message), false); }
+  finally { b.disabled = false; b.textContent = "Conferir"; }
+};
+GANCHOS.corrigirLinks = async function(){
+  var b = document.getElementById("bCorrigirLinks");
+  b.disabled = true;
+  linksMostra("Trocando…", false);
+  try {
+    var r = await pedir("links:corrigir");
+    linksMostra("<b>" + r.corrigidos + " pedido(s) com o link novo.</b>" + (r.falhas.length
+      ? "<br>Não deu em " + r.falhas.length + ": " + r.falhas.map(function(f){ return esc(f.pedido) + " (" + esc(f.erro) + ")"; }).join("; ")
+      : ""), false);
+  } catch (e) { linksMostra("Não consegui trocar: " + esc(e.message), false); }
+  finally { b.disabled = false; }
+};
+
 GANCHOS.aoAbrirEtapa = function(t){
   if (t === "3") carregarConferencia(true).then(function(){ return GANCHOS.limparConferencia(true); });
   if (t === "4") carregarEscrita(true);

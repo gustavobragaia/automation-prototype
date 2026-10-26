@@ -1301,6 +1301,26 @@ details.cred summary:hover{color:var(--tinta)}
           <button class="btn" id="bTestar">Testar</button></div>
       </div>
 
+      <div class="bloco" id="blLink">
+        <div class="rotulo"><h2>Rastreio no pedido</h2></div>
+        <label class="campo" style="display:block"><span>Link de rastreio</span>
+          <input id="ajLink" spellcheck="false" placeholder="https://parcelsapp.com/pt/tracking">
+          <em>O site que abre quando o cliente clica no rastreio. O código vai no fim do endereço
+            (ou onde estiver escrito <b>{codigo}</b>). Em branco, vale o parcelsapp.</em></label>
+        <p class="ter" style="font-size:12px;margin:6px 0 14px">Fica assim: <span class="mono" id="ajLinkEx">—</span></p>
+        <div class="op"><div><div class="t">Corrigir o link dos pedidos já escritos</div>
+          <div class="d">Troca o link antigo (o dos Correios, que parou de funcionar) pelo de cima, nos pedidos
+            que o robô já escreveu na Shopify. Os códigos ficam os mesmos, o cliente não recebe aviso, e link
+            que você colocou à mão não é mexido.</div></div>
+          <button class="btn" id="bConferirLinks">Conferir</button></div>
+        <div class="aviso" id="linksRes" hidden style="margin-top:10px">
+          <svg viewBox="0 0 24 24"><path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg>
+          <span id="linksTxt"></span>
+          <span id="linksBotoes" hidden style="margin-left:8px">
+            <button class="btn peq pri" id="bCorrigirLinks">Trocar</button>
+            <button class="btn peq" id="bCancelarLinks">Cancelar</button></span></div>
+      </div>
+
       <div class="bloco">
         <div class="rotulo"><h2>Primeiros passos</h2></div>
         <div class="op"><div><div class="t">O guia de configuração</div>
@@ -2923,6 +2943,11 @@ $("bDesfazerLimpeza").addEventListener("click",function(){
 });
 GANCHOS.limparConferencia=function(){ avisar("Conferir na Shopify","protótipo: nada roda aqui"); };
 GANCHOS.desfazerLimpeza=function(){};
+$("bConferirLinks").addEventListener("click",function(){ GANCHOS.conferirLinks(); });
+$("bCorrigirLinks").addEventListener("click",function(){ GANCHOS.corrigirLinks(); });
+$("bCancelarLinks").addEventListener("click",function(){ $("linksRes").hidden=true; });
+GANCHOS.conferirLinks=function(){ avisar("Corrigir links","protótipo: nada roda aqui"); };
+GANCHOS.corrigirLinks=function(){};
 GANCHOS.rerodar=function(contas){ avisar("Tentar de novo", "Contas "+contas.join(", ")+" (protótipo: nada roda aqui)"); };
 $("bDiagnostico").addEventListener("click",function(){ GANCHOS.exportarDiagnostico(); });
 GANCHOS.exportarDiagnostico=function(){ avisar("Exportar diagnóstico","Protótipo: nada a exportar aqui."); };

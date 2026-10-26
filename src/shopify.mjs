@@ -13,7 +13,7 @@ export async function obterToken({ token, conexao } = {}) {
   return tokenDaConexao(conexao ?? conexaoAtiva());
 }
 
-async function graphql(query, variables = {}, { conexao, token } = {}) {
+export async function graphql(query, variables = {}, { conexao, token } = {}) {
   const c = conexao ?? conexaoAtiva();
   if (!c?.loja) throw new Error("nenhuma loja Shopify conectada — rode: npm run conectar");
   const t = token ?? (await tokenDaConexao(c));
@@ -168,21 +168,46 @@ export function montarEntrada({ fulfillmentOrderId, codigos, transportadora, not
     trackingInfo:
       numeros.length === 1
         ? { number: numeros[0], company: transportadora, url: urlRastreio(numeros[0]) }
-        : { numbers: numeros, company: transportadora, urls: numeros.map(urlRastreio) },
+        // (n) => …, e não .map(urlRastreio): o map passaria o índice como modelo
+        : { numbers: numeros, company: transportadora, urls: numeros.map((n) => urlRastreio(n)) },
   };
 }
 
-export function urlRastreio(codigo) {
-  if (/^SPX/i.test(codigo)) return `https://spx.com.br/track?${new URLSearchParams({ key: codigo })}`;
-  return `https://rastreamento.correios.com.br/app/index.php?${new URLSearchParams({ objeto: codigo })}`;
+// O link de rastreio que vai no pedido. O dos Correios
+// (rastreamento.correios.com.br/app/index.php?objeto=) parou de funcionar —
+// mostra o formulário vazio com captcha — e nem era a transportadora certa:
+// os BR26… são da Shopee Express. O cliente (Chomps, 26/10/2026) pediu o
+// parcelsapp, que mostra o histórico inteiro sem captcha.
+//
+// Configurável em Ajustes ("Link de rastreio"), para o cliente trocar
+// sozinho se esse site também mudar. Aceita o endereço puro (o código vai no
+// fim, depois de uma barra) ou com {codigo} onde o código entra.
+export const LINK_RASTREIO_PADRAO = "https://parcelsapp.com/pt/tracking";
+
+export function modeloDeLink(modelo = process.env.LINK_RASTREIO) {
+  const m = String(modelo ?? "").trim() || LINK_RASTREIO_PADRAO;
+  if (!/^https:\/\/[^\s/]+\.[^\s]+/i.test(m)) throw new Error(`o link de rastreio precisa começar com https:// (está "${m}")`);
+  return m;
 }
 
+export function urlRastreio(codigo, modelo) {
+  const m = modeloDeLink(modelo);
+  const c = encodeURIComponent(String(codigo).trim());
+  return m.includes("{codigo}") ? m.split("{codigo}").join(c) : `${m.replace(/\/+$/, "")}/${c}`;
+}
+
+// Shopee Express para os da Shopee (BR26… e SPX…), Correios só para código
+// dos Correios de verdade (AA123456789BR). Mistura vira "Outros". O link que
+// o robô manda vale mais que o que a Shopify gera pela transportadora
+// (testado na loja de teste em 26/10), então o nome é só o que o cliente lê.
 export function transportadoraDe(codigos) {
-  const tipos = new Set(codigos.map((c) => (typeof c === "string" ? inferir(c) : c.carrier)));
-  if (tipos.size === 1) return [...tipos][0] === "shopee-xpress" ? "Shopee Xpress" : "Correios";
+  const tipos = new Set(codigos.map((c) => tipoDe(c)));
+  if (tipos.size === 1) return [...tipos][0] === "correios" ? "Correios" : "Shopee Xpress";
   return "Outros";
 }
-const inferir = (c) => (/^SPX/i.test(c) ? "shopee-xpress" : "correios");
+const CORREIOS_DE_VERDADE = /^[A-Z]{2}\d{9}BR$/i;
+// pelo formato, e não pelo rótulo do leitor: vale para código solto também
+const tipoDe = (c) => (CORREIOS_DE_VERDADE.test(typeof c === "string" ? c : c.code) ? "correios" : "shopee");
 
 export async function enviar(entrada, opts = {}) {
   if (opts.dryRun)

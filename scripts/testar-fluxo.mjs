@@ -206,7 +206,7 @@ tudo &= ok(lote.itens.length === 1,
 tudo &= ok(lote.itens[0]?.pedido === "#1001", "e é o que casou redondo, o #1001");
 tudo &= ok(lote.itens[0]?.codigos?.includes("BR260000000005X"),
   "com o rastreio que a Shopee tinha");
-tudo &= ok(lote.itens[0]?.transportadora === "Correios", "e a transportadora resolvida pelo código");
+tudo &= ok(lote.itens[0]?.transportadora === "Shopee Xpress", "e a transportadora resolvida pelo código (BR26 é Shopee Express)");
 tudo &= ok(escritas3.length === 0, "e NADA foi escrito só por listar");
 
 sec("12 · escrever o lote");

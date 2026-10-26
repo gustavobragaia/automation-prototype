@@ -39,7 +39,10 @@ export function parseTracking(raw) {
   // ordem importa: o padrão mais específico primeiro
   take(SPX, "shopee-xpress");
   take(CORREIOS, "correios");
-  take(SHOPEE_BR, "correios");
+  // BR + 12 dígitos é da Shopee Express, não dos Correios: o parcelsapp
+  // mostra "Shopee Express Brazil" (BR2620456593785, 21/10/2026). Rótulo
+  // próprio, e não "shopee-xpress": esse conta os SPX no run-proof.
+  take(SHOPEE_BR, "shopee");
 
   if (codes.length === 0) {
     return { codes: [], status: "nao-reconhecido", raw: texto };

@@ -14,6 +14,8 @@ import { identidadeDaLoja, escoposConcedidos } from "../src/shopify.mjs";
 import { lerPendentes } from "../src/planilha.mjs";
 import { escreverRastreios } from "../src/escrita.mjs";
 import { tirarJaAtendidos } from "../src/carteira-shopify.mjs";
+import { planejarCorrecao, corrigirLinks } from "../src/corrigir-links.mjs";
+import { urlRastreio, modeloDeLink } from "../src/shopify.mjs";
 import { transportadoraDe } from "../src/shopify.mjs";
 import { guardarPendentes, baixarPendentes } from "../src/estado.mjs";
 import { pendentesAbertos, historico, adiarPendente, encerrarPendente, motivosDaRodada,
@@ -75,6 +77,7 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
   // arranque: o coletor sobe antes da rodada e emite por conta própria.
   if (enviar) aoEvento(enviar);
   let rodadaEmCurso = null;
+  let planoDeLinks = null, correcaoEmCurso = false;
   // As planilhas que o cliente escolheu nesta sessão, na ordem. A rodada
   // sai daqui e não de PLANILHA no ambiente: quem instala o app não tem .env.
   let planilhas = [];
@@ -417,6 +420,33 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
         default:
           throw new Error(`decisão desconhecida: ${decisao}`);
       }
+    }),
+
+    // ── o link de rastreio dos pedidos já escritos ───────────────────
+    // Em dois passos, de propósito: "conferir" só lê a Shopify e diz quantos
+    // mudariam; "corrigir" troca exatamente o que foi mostrado. Pedidos da
+    // loja de produção — a pessoa vê o número antes de qualquer mudança.
+    "links:exemplo": ({ link } = {}) => tentar(async () => ({
+      link: urlRastreio("BR2620456593785", modeloDeLink(link || undefined)) })),
+    "links:conferir": () => tentar(async () => {
+      if (correcaoEmCurso) throw new Error("a correção já está acontecendo");
+      planoDeLinks = await planejarCorrecao();
+      const { aCorrigir, jaCertos, cancelados, naoAchados, total } = planoDeLinks;
+      aoLog(`links de rastreio: ${total} pedido(s) escritos pelo robô · ${aCorrigir.length} com link quebrado · ${jaCertos} já certos`);
+      return { aCorrigir: aCorrigir.length, jaCertos, cancelados, naoAchados, total,
+               exemplo: aCorrigir[0] ? { pedido: aCorrigir[0].pedido, de: aCorrigir[0].de[0]?.url, para: aCorrigir[0].para.urls[0] } : null };
+    }),
+    "links:corrigir": () => tentar(async () => {
+      if (!planoDeLinks) throw new Error("confira antes de corrigir");
+      if (correcaoEmCurso) throw new Error("a correção já está acontecendo");
+      correcaoEmCurso = true;
+      try {
+        const r = await corrigirLinks(planoDeLinks, { aoProgresso: (p) => emitir("links:progresso", p) });
+        aoLog(`links de rastreio: ${r.corrigidos} corrigido(s) · ${r.falhas.length} falha(s)` +
+              (r.falhas.length ? ` — ${r.falhas.map((f) => `${f.pedido}: ${f.erro}`).join("; ")}` : ""));
+        planoDeLinks = null;
+        return r;
+      } finally { correcaoEmCurso = false; }
     }),
 
     // Tira da carteira o que já está atendido na Shopify (resolvido por

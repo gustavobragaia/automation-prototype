@@ -91,10 +91,12 @@ tudo &= ok(errou, "sem código, falha antes de chamar a Shopify");
 
 sec("transportadora e link de rastreio");
 tudo &= ok(transportadoraDe(["SPXLM10000001"]) === "Shopee Xpress", "código SPX é Shopee Xpress");
-tudo &= ok(transportadoraDe(["BR260000000005X"]) === "Correios", "código BR é Correios");
-tudo &= ok(transportadoraDe(["BR260000000005X", "SPXLM10000001"]) === "Outros", "misturado é Outros");
-tudo &= ok(urlRastreio("SPXLM10000001").includes("spx.com.br"), "link do SPX aponta para a Shopee Xpress");
-tudo &= ok(urlRastreio("BR260000000005X").includes("correios"), "link do BR aponta para os Correios");
+tudo &= ok(transportadoraDe(["BR260000000005X"]) === "Shopee Xpress", "código BR26 é da Shopee Express (não Correios)");
+tudo &= ok(transportadoraDe(["AN900000001BR"]) === "Correios", "código dos Correios de verdade é Correios");
+tudo &= ok(transportadoraDe(["BR260000000005X", "SPXLM10000001"]) === "Shopee Xpress", "BR26 com SPX: os dois da Shopee");
+tudo &= ok(transportadoraDe(["BR260000000005X", "AN900000001BR"]) === "Outros", "Shopee com Correios é Outros");
+tudo &= ok(urlRastreio("SPXLM10000001") === "https://parcelsapp.com/pt/tracking/SPXLM10000001", "link do SPX: parcelsapp");
+tudo &= ok(urlRastreio("BR260000000005X") === "https://parcelsapp.com/pt/tracking/BR260000000005X", "link do BR: parcelsapp (o dos Correios parou de funcionar)");
 
 sec("uma implementação só");
 // O bug que isto previne: o ciclo de produção tinha a PRÓPRIA função de
