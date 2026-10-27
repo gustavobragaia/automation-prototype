@@ -14,6 +14,7 @@ import { identidadeDaLoja, escoposConcedidos } from "../src/shopify.mjs";
 import { lerPendentes } from "../src/planilha.mjs";
 import { escreverRastreios } from "../src/escrita.mjs";
 import { tirarJaAtendidos } from "../src/carteira-shopify.mjs";
+import { copiarPlanilha, travaDaRodada } from "../src/planilha-copia.mjs";
 import { planejarCorrecao, corrigirLinks } from "../src/corrigir-links.mjs";
 import { urlRastreio, modeloDeLink } from "../src/shopify.mjs";
 import { transportadoraDe } from "../src/shopify.mjs";
@@ -81,6 +82,11 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
   // As planilhas que o cliente escolheu nesta sessão, na ordem. A rodada
   // sai daqui e não de PLANILHA no ambiente: quem instala o app não tem .env.
   let planilhas = [];
+  // arquivo que a pessoa escolheu → a cópia guardada pelo Esteira
+  const copiaDe = new Map();
+  // as contas que a montagem da rodada tirou das planilhas: a rodada só abre
+  // essas (trava contra abrir o AdsPower inteiro, como em 27/10)
+  let contasDaPlanilha = new Set();
   let escritaEmCurso = false;
   let diagnosticoEmCurso = null;
   const diagnosticarDeVerdade = (cfg) => tentar(async () => {
@@ -245,9 +251,17 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
 
     // ── planilha e carteira ───────────────────────────────────────────
     "planilha:ler": ({ caminho, aba }) => tentar(async () => {
-      const r = await lerPendentes(caminho, { aba });
-      if (!planilhas.includes(caminho)) planilhas.push(caminho);
-      abas.set(caminho, r.aba);
+      // A cópia é o que vale daqui em diante (src/planilha-copia.mjs): o
+      // original sumiu de Downloads duas vezes na Chomps. Escolher o mesmo
+      // arquivo de novo (editado) troca a cópia antiga pela nova, no mesmo lugar.
+      const copia = copiarPlanilha(caminho);
+      const r = await lerPendentes(copia, { aba });
+      const antiga = copiaDe.get(caminho);
+      if (antiga && planilhas.includes(antiga)) planilhas[planilhas.indexOf(antiga)] = copia;
+      else planilhas.push(copia);
+      copiaDe.set(caminho, copia);
+      abas.set(copia, r.aba);
+      aoLog(`planilha escolhida: ${caminho} · ${r.total} linha(s), ${r.contas.length} conta(s) · cópia em ${copia}`);
       return {
         aba: r.aba, total: r.total, pendentes: r.pendentes.length,
         contas: r.contas.map((c) => ({ conta: c.conta, pedidos: c.pedidos.length })),
@@ -466,7 +480,10 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
 
     // ── a rodada ──────────────────────────────────────────────────────
     "planilha:esquecer": async ({ caminho }) => {
-      planilhas = caminho ? planilhas.filter((p) => p !== caminho) : [];
+      // a tela conhece o arquivo original; a lista guarda a cópia
+      const alvo = caminho ? (copiaDe.get(caminho) ?? caminho) : null;
+      planilhas = alvo ? planilhas.filter((p) => p !== alvo) : [];
+      if (caminho) copiaDe.delete(caminho); else copiaDe.clear();
       return planilhas.length;
     },
 
@@ -485,6 +502,7 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
       // A aba Contas mostra o perfil de cada conta; o mapa custa uma
       // varredura de 972 perfis, então guarda o que esta rodada resolveu.
       guardarPerfis(porConta);
+      contasDaPlanilha = new Set([...porConta.keys()].map(Number));
       return [...porConta.values()];
     }),
     "rodada:emCurso": async () => Boolean(rodadaEmCurso),
@@ -522,7 +540,10 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
         throw new Error(`o coletor não está atendendo em 127.0.0.1:${porta} — ` +
                         "feche e abra o Esteira; se persistir, alguma coisa tomou a porta");
       if (concorrencia) process.env.CONCORRENCIA = String(concorrencia);
-      // As planilhas que a pessoa escolheu vão junto: sem isto a rodada
+      // As travas de 26 e 27/10 (src/planilha-copia.mjs): planilha
+      // acessível, e nenhuma conta de fora dela.
+      const trava = travaDaRodada({ planilhas, contas: contas ?? [], daPlanilha: contasDaPlanilha });
+      if (trava) throw new Error(trava);
       // relê o PLANILHA do ambiente, que no app é o .env do projeto.
       rodadaEmCurso = rodarCiclo({ contas, escrever, planilhas, aoLog })
         .finally(() => { rodadaEmCurso = null; });

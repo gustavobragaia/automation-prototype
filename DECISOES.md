@@ -896,3 +896,39 @@ modelo do link; todo pedido com mais de um rastreio teria falhado na escrita.
 Testes: `testar-link-rastreio.mjs` (Shopify de mentira com a substituição;
 mutação: 11 plantados, 10 pegos — o 11º era código redundante, removido) e
 `ensaio-link-rastreio.mjs`. `npm test`: 869; ensaios: 145.
+
+## 27/10/2026 — v0.1.14: a planilha que some de Downloads
+
+**O que aconteceu.** O Matheus escolheu "modelo-esteira_filtrado (2).xlsx" em
+Downloads (255 pedidos, 35 contas: 453–487). Quando a rodada foi montar a lista,
+o arquivo não estava mais lá ("File not found" no log), e `descobrirContas` caiu
+no modo de terminal "sem planilha → todos os perfis do AdsPower": 500 contas
+(777, 779, 781…), nenhuma da planilha. Em 26/10 12:48 a "(8)" sumiu no MEIO
+da rodada: a coleta terminou e o cruzamento falhou ("escrita não realizada"),
+só no log. Por que o arquivo some (re-download, limpeza de Downloads), não dá
+para saber daqui — o defeito é o Esteira depender dele e, sem ele, fazer o pior.
+
+**O que mudou.**
+- `src/planilha-copia.mjs`: ao escolher, a planilha é copiada para
+  `trabalho/planilhas/` e a lista de planilhas aponta para a cópia — rodada,
+  conferência, etapa 4 e fim da rodada leem a cópia sem mudar nada. "Tirar
+  planilha" funciona pelo original (mapa original → cópia); escolher de novo
+  (editada) troca a cópia no mesmo lugar. Cópias com mais de 30 dias saem; a
+  data da cópia é a de agora (no Windows a cópia herda a do original).
+- `descobrirContas`: planilha pedida que não existe é ERRO. A varredura do
+  AdsPower inteiro só existe no terminal, sem planilha nenhuma.
+- `travaDaRodada`, antes de abrir o primeiro navegador: planilha acessível, e
+  toda conta da rodada tem que ter vindo da planilha (o "Tentar de novo só
+  essas", que manda um pedaço, passa).
+- O cruzamento que falha no fim da rodada vira alerta no sino
+  ("rodada-sem-cruzar"), e some quando uma rodada cruza.
+- O log registra a planilha escolhida, o original e a cópia.
+
+Testes: `testar-planilha-sumida.mjs` (com o código da 0.1.13 a rodada montava
+com os 200 perfis do AdsPower de mentira; agora, as 3 da planilha). Mutação: 10
+plantados, 9 pegos aqui; o 10º (a cópia herdar a data velha) só acontece no
+Windows, onde o `npm test` também roda no build. A mutação "sem trava de
+contas" fez a rodada começar com os 200 perfis — o teste ganhou um tempo
+máximo para falhar em vez de travar. `ensaio-planilha-sumida.mjs`: escolher,
+apagar de Downloads, "Iniciar coleta": a tabela mostra 3 contas.
+`npm test`: 885; ensaios: 147.

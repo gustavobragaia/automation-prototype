@@ -53,6 +53,12 @@ export async function descobrirContas(args = [], {
     return lista;
   }
 
+  // Planilha PEDIDA (o app sempre pede) que não existe é erro, nunca a
+  // varredura do AdsPower inteiro: em 27/10/2026 a planilha sumiu de Downloads
+  // e a rodada abriu 500 contas, nenhuma da planilha.
+  if (planilhaPedida && !existsSync(planilhaPedida))
+    // o nome que a pessoa conhece, sem o carimbo da cópia (src/planilha-copia.mjs)
+    throw new Error(`a planilha "${planilhaPedida.split(/[\\/]/).pop().replace(/^\d{10,}-/, "")}" não está mais acessível — escolha de novo na etapa 1`);
   const planilha = planilhaPedida ?? process.env.PLANILHA;
   if (planilha && existsSync(planilha)) {
     // Quem escolheu o arquivo manda. As variáveis de ambiente são o modo
@@ -234,6 +240,7 @@ export async function rodarCiclo({ contas, escrever = true, simular = false,
       aoLog,
     });
     escritos = res.escritos; falhasEscrita = res.falhas; pulados = res.pulados;
+    resolver("rodada-sem-cruzar");   // cruzou: o aviso de uma rodada anterior sai
     pendencias = res.pendencias;
 
     // A carteira anda nos dois sentidos: entra quem ficou pendente, sai
@@ -259,6 +266,11 @@ export async function rodarCiclo({ contas, escrever = true, simular = false,
   } catch (e) {
     aoLog(`escrita não realizada: ${e.message}`);
     falhasEscrita++;
+    // Ia só para o log, e ninguém via: a rodada de 26/10 12:48 se perdeu assim.
+    alertar({ id: "rodada-sem-cruzar", nivel: "erro",
+      titulo: "A rodada coletou, mas não conseguiu cruzar com a planilha",
+      texto: `O que foi lido na Shopee está guardado. O cruzamento com a planilha falhou: ${e.message}`,
+      acao: "Escolha a planilha de novo na etapa 1 e abra a etapa 3: a conferência e a escrita usam o que já foi coletado, sem abrir as contas de novo." });
   }
 
   salvar(estado);
