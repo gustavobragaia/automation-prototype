@@ -965,3 +965,24 @@ Ele não quer escrita: quer o código para colar na aba dele.
   da conta ou app fechado não apagam o código. Sai quando ele cola na aba (a
   linha deixa de ser pendente).
 - Linha sem conta aparece ("falta a conta"), em vez de sumir.
+
+## 29/10/2026 — v0.1.16: o que a conferência escreve, e rastreio repetido
+
+O Matheus achou que o "Usar este" não estava indo para a escrita. Estava: a
+conferência escreve na Shopify **na hora do clique**, e por isso esses pedidos
+nunca entravam na lista da etapa 4 (que é só a escrita em lote).
+
+- A etapa 4 ganhou "Já escritos na conferência · hoje" (`escritosNaConferencia`,
+  do registro de escritas, `origem: "manual"`, dia local). Não entra na
+  contagem do lote: já foram.
+- No mesmo print, dois pares de pedidos ficaram com o mesmo rastreio. A
+  escrita em lote recusa isso; a conferência não tinha proteção nenhuma.
+  Agora `resolverManual` para quando o código já está no registro em OUTRO
+  pedido e devolve `repetidos`; a tela pergunta, e só escreve com "Escrever
+  mesmo assim" (`aceitarRepetido`). **Avisa, não bloqueia**: uma compra só na
+  Shopee pode cobrir dois pedidos do mesmo cliente.
+- A pergunta não é erro: a ponte devolve `precisaConfirmar`, o pedido fica na
+  conferência com os botões soltos, e no par de irmãos o segundo espera.
+- "Colei o rastreio" mostra o mesmo aviso no quadro de conferir.
+- Testes: `scripts/testar-repetido.mjs` e `aplicativo/ensaio-repetido.mjs`;
+  teste de mutação nos dois guardas (servidor e tela).

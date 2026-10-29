@@ -566,6 +566,7 @@ function conferencia(){
     var r = await pedir("conferencia:decidir", {
       pedido: pedido, decisao: ordem.decisao, texto: ordem.texto,
       conta: ordem.conta, motivo: ordem.motivo, ate: ordem.ate,
+      aceitarRepetido: Boolean(ordem.aceitarRepetido),
     });
     recarregar();
     return r;
@@ -574,7 +575,8 @@ function conferencia(){
     var r = await pedir("manual:conferir", { pedido: pedido, texto: texto });
     if (!r || !r.ok) return { ok: false, erro: (r && r.erro) || "a Shopify não respondeu" };
     return { ok: true, pedido: r.alvo && r.alvo.pedido, nome: r.alvo && r.alvo.nome,
-             cep: r.alvo && r.alvo.cep, codigos: r.codigos, transportadora: r.transportadora };
+             cep: r.alvo && r.alvo.cep, codigos: r.codigos, transportadora: r.transportadora,
+             repetidos: r.repetidos || [] };
   };
   GANCHOS.desfazer = async function(pedido){
     var r = await pedir("conferencia:desfazer", { pedido: pedido });

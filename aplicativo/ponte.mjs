@@ -26,7 +26,7 @@ import { lerColetas, conciliar, MOTIVOS, separarJaResolvidos } from "../src/conc
 import { lerDetalhe } from "../src/armazenamento/detalhe.mjs";
 import { rodarCiclo, descobrirContas } from "../src/ciclo.mjs";
 import { iniciarConexao, conexaoEmAndamento, cancelarConexao } from "../src/shopify-oauth.mjs";
-import { resolverManual, prepararManual } from "../src/manual.mjs";
+import { resolverManual, prepararManual, escritosNaConferencia } from "../src/manual.mjs";
 import { lerAjustes, salvarAjustes, aplicarNoAmbiente, SEGREDOS,
          faltaConfigurar } from "../src/ajustes.mjs";
 import { aoEvento, emitir } from "../src/eventos.mjs";
@@ -410,13 +410,15 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
     //
     // `reversivel` diz se o "Desfazer" da tela pode existir: colar o
     // rastreio criou um fulfillment na Shopify, e isso não se desfaz daqui.
-    "conferencia:decidir": ({ pedido, decisao, texto, conta, motivo, ate }) => tentar(async () => {
+    "conferencia:decidir": ({ pedido, decisao, texto, conta, motivo, ate, aceitarRepetido }) => tentar(async () => {
       if (!pedido) throw new Error("sem número de pedido");
       switch (decisao) {
         case "colar": {
           // O olho humano já aconteceu: `manual:conferir` mostrou o lado da
           // Shopify e a pessoa clicou em escrever.
-          const r = await resolverManual(pedido, texto, { confirmado: true });
+          const r = await resolverManual(pedido, texto, { confirmado: true, aceitarRepetido: Boolean(aceitarRepetido) });
+          // Não é erro: nada foi escrito, e a tela pergunta se é isso mesmo.
+          if (!r.ok && r.repetidos) return { precisaConfirmar: true, repetidos: r.repetidos };
           if (!r.ok) throw new Error(r.erro ?? "não deu para escrever");
           return { reversivel: false, volta: false, escrito: r.escrito };
         }
@@ -634,6 +636,7 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
           { escrever: false, aoLog }));
       return {
         resumo, pulados,
+        naConferencia: escritosNaConferencia(),
         itens: planejado.map((p) => ({
           pedido: p.l.p.pedido, conta: (p.contas ?? [p.l.conta]).join(" + "),
           // pedidos iguais do mesmo cliente: o rastreio de cada um saiu da
@@ -670,8 +673,8 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
 
     // ── escrita manual ────────────────────────────────────────────────
     "manual:conferir": ({ pedido, texto }) => tentar(() => prepararManual(pedido, texto)),
-    "manual:escrever": ({ pedido, texto, notificar }) =>
-      tentar(() => resolverManual(pedido, texto, { confirmado: true, notificar })),
+    "manual:escrever": ({ pedido, texto, notificar, aceitarRepetido }) =>
+      tentar(() => resolverManual(pedido, texto, { confirmado: true, notificar, aceitarRepetido: Boolean(aceitarRepetido) })),
 
     // ── histórico ─────────────────────────────────────────────────────
     "historico:listar": async ({ limite = 60 } = {}) => historico(limite),

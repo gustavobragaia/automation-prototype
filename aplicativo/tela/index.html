@@ -1167,6 +1167,15 @@ details.cred summary:hover{color:var(--tinta)}
       Não precisa aprovar um por um.</p>
   </div>
 
+  <div class="bloco" id="blConf4" hidden>
+    <div class="rotulo"><h2>Já escritos na conferência · hoje</h2><span class="dir" id="ctConf4"></span></div>
+    <div class="rolo"><table>
+      <thead><tr><th>Pedido</th><th>Rastreio</th><th>Hora</th><th></th></tr></thead>
+      <tbody id="tbConf4"></tbody></table></div>
+    <p class="nota">O "Usar este" e o "Colei o rastreio" escrevem na Shopify <b>na hora do clique</b>.
+      Por isso estes não estão na lista acima: já foram.</p>
+  </div>
+
   <div class="bloco" id="blReenvios4" hidden>
     <div class="rotulo"><h2>Reenvios · rastreio novo</h2>
       <span class="dir"><button class="btn peq" id="bCopiarRe">Copiar todos</button></span></div>
@@ -2103,6 +2112,12 @@ function resolver(it,rotulo,ordem){
   travar(it,true);
   return Promise.resolve(GANCHOS.decidir(pedido,ordem||{decisao:"encerrar"}))
     .then(function(r){
+      // O rastreio já foi para outro pedido: nada foi escrito. Pergunta.
+      if(r&&r.precisaConfirmar){
+        travar(it,false); confirmarRepetido(it,rotulo,ordem,r.repetidos||[]);
+        return "confirmar";
+      }
+      var velho=it.querySelector(".repetido"); if(velho) velho.remove();
       TRATADOS.unshift({titulo:pedido, decisao:rotulo, hora:agora(),
         html:it.outerHTML, reversivel:!r||r.reversivel!==false});
       it.classList.add("sumindo");
@@ -2114,6 +2129,23 @@ function resolver(it,rotulo,ordem){
       erroNoItem(it,e&&e.message?e.message:"não deu para gravar essa decisão");
       return false;
     });
+}
+function confirmarRepetido(it,rotulo,ordem,repetidos){
+  var cx=it.querySelector(".repetido");
+  if(!cx){ cx=document.createElement("div"); cx.className="repetido esperando"; cx.style.marginTop="11px"; it.appendChild(cx); }
+  cx.innerHTML='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>'+
+    '<span class="texto"><b>Esse rastreio já foi escrito em outro pedido:</b> '+
+    repetidos.map(function(x){return '<span class="mono">'+esc(x.codigo)+'</span> no <b>'+esc(x.pedido)+'</b>';}).join("; ")+
+    '. Nada foi escrito ainda. Só está certo se for uma compra só na Shopee para os dois pedidos.</span>'+
+    '<button class="btn" data-repetido-nao>Cancelar</button>'+
+    '<button class="btn pri" data-repetido-sim>Escrever mesmo assim</button>';
+  cx.querySelector("[data-repetido-nao]").onclick=function(ev){ ev.stopPropagation(); cx.remove(); };
+  cx.querySelector("[data-repetido-sim]").onclick=function(ev){
+    ev.stopPropagation();
+    var o={}; for(var k in ordem) o[k]=ordem[k]; o.aceitarRepetido=true;
+    resolver(it,rotulo+" (mesmo rastreio de "+repetidos.map(function(x){return x.pedido;}).join(", ")+")",o);
+  };
+  aproximar(cx);
 }
 function travar(it,sim){
   Array.prototype.forEach.call(it.querySelectorAll("button"),function(b){
@@ -2222,8 +2254,12 @@ $("cxPrecisa").addEventListener("click",function(e){
         '<div class="par"><dt>Rastreio</dt><dd class="mono">'+esc(cods.join(" · "))+'</dd></div>'+
         (r.transportadora?'<div class="par"><dt>Transportadora</dt><dd>'+esc(r.transportadora)+'</dd></div>':'')+
         '</dl>'+
+        ((r.repetidos||[]).length?'<p class="erro repetido-aviso" style="margin-top:9px"><b>Atenção:</b> '+
+          r.repetidos.map(function(x){return 'o rastreio <span class="mono">'+esc(x.codigo)+'</span> já foi escrito no <b>'+esc(x.pedido)+'</b>';}).join("; ")+
+          '. Só escreva se for uma compra só na Shopee para os dois pedidos.</p>':'')+
         '<div class="l" style="margin-top:11px"><button class="btn" data-cancelar>Cancelar</button>'+
-        '<button class="btn pri" data-escrever="'+esc(cods.join(","))+'">Escrever na Shopify</button></div>'+
+        '<button class="btn pri" data-escrever="'+esc(cods.join(","))+'"'+((r.repetidos||[]).length?' data-aceitar="1"':'')+'>'+
+        ((r.repetidos||[]).length?'Escrever mesmo assim':'Escrever na Shopify')+'</button></div>'+
         '<p class="nota" style="margin-top:9px">O nome acima veio da Shopify agora. Aqui não há '+
         'lado Shopee para comparar: <b>quem confere que é a pessoa certa é você.</b></p>';
       p.appendChild(cx); aproximar(cx);
@@ -2237,7 +2273,8 @@ $("cxPrecisa").addEventListener("click",function(e){
 
   var escB=e.target.closest("[data-escrever]");
   if(escB) return resolver(it,"rastreio "+escB.dataset.escrever.split(",").join(" · ")+
-    " escrito na mão", {decisao:"colar", texto:escB.dataset.escrever.split(",").join(" ")});
+    " escrito na mão", {decisao:"colar", texto:escB.dataset.escrever.split(",").join(" "),
+    aceitarRepetido:escB.dataset.aceitar==="1"});
 
   var mov=e.target.closest("[data-mover]");
   if(mov){
@@ -2268,10 +2305,12 @@ $("cxPrecisa").addEventListener("click",function(e){
     resolver(it,"escolhido o rastreio "+usarCod.dataset.usarCodigo,
       {decisao:"colar", texto:usarCod.dataset.usarCodigo}).then(function(deu){
       if(!sobra) return;
+      // Parou para perguntar do rastreio repetido: o outro espera a resposta.
+      if(deu==="confirmar") return travar(sobra.irmao,false);
       // O outro pedido só é escrito DEPOIS de o primeiro dar certo: se a
       // Shopify recusou o primeiro, a escolha pode estar errada, e escrever
       // o segundo mesmo assim espalharia o erro para outro pedido.
-      if(deu) return resolver(sobra.irmao,"ficou com o rastreio que sobrou: "+sobra.codigo,
+      if(deu===true) return resolver(sobra.irmao,"ficou com o rastreio que sobrou: "+sobra.codigo,
         {decisao:"colar", texto:sobra.codigo});
       travar(sobra.irmao,false);
       erroNoItem(sobra.irmao,"Não escrevi este porque o "+it.dataset.pedido+" deu erro. Escolha de novo.");
@@ -3123,6 +3162,15 @@ window.TELA = {
     prontos=A_ESCREVER.length;
     coletou=true;
     pintaEscrita(); pintaTrilha();
+    var conf=(dados&&dados.naConferencia)||[];
+    $("blConf4").hidden=!conf.length;
+    $("ctConf4").textContent=conf.length?conf.length+(conf.length>1?" pedidos":" pedido"):"";
+    $("tbConf4").innerHTML=conf.map(function(x){
+      var h=new Date(x.em);
+      return '<tr><td class="mono forte">'+esc(x.pedido)+'</td><td class="mono">'+esc((x.codigos||[]).join(" · "))+'</td>'+
+        '<td class="ter">'+("0"+h.getHours()).slice(-2)+":"+("0"+h.getMinutes()).slice(-2)+'</td>'+
+        '<td>'+((x.repetidoEm||[]).length?'<span class="erro" style="font-size:12px">mesmo rastreio do '+esc(x.repetidoEm.join(", "))+'</span>':'')+'</td></tr>';
+    }).join("");
   },
 
   // ── a conferência de verdade ──
