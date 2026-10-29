@@ -165,3 +165,13 @@ export async function lerPendentes(caminho, { aba, desde, dias } = {}) {
 
   return { contas, pendentes, ignorados, total, aba: ws.name, corte, semCabecalho };
 }
+
+/** Os nomes das abas, na ordem do arquivo. A leitura usa a 1ª se ninguém escolher. */
+export async function abasDaPlanilha(caminho) {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(caminho);
+  return wb.worksheets.map((w) => w.name);
+}
+
+/** A aba que parece ser a de reenvios ("REENVIOS + CANCELADOS"), se houver. */
+export const abaDeReenvio = (abas = []) => abas.find((a) => /reenvi/i.test(a)) ?? null;

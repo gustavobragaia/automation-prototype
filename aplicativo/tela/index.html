@@ -887,6 +887,23 @@ details.cred summary:hover{color:var(--tinta)}
       <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
   </div>
 
+  <!-- Reenvios (src/reenvios.mjs): só coleta. Ficam fora da escrita, da
+       conferência e da carteira; o resultado sai na etapa 4 para copiar. -->
+  <div class="bloco" id="blReenvio" data-n="0">
+    <div class="rotulo"><h2>Reenvios</h2><span class="dir">opcional · só busca o rastreio</span></div>
+    <div id="reSugere" hidden style="margin-bottom:12px"></div>
+    <div id="reEscolha" hidden style="margin-bottom:12px">
+      <span class="nota" style="margin:0 8px 0 0" id="reEscolhaTxt">Qual aba tem os reenvios?</span>
+      <select id="reAba"></select>
+      <button class="btn peq" id="bReAba">Usar esta aba</button>
+    </div>
+    <div id="reArq"></div>
+    <button class="btn" id="bReenvio">Escolher planilha de reenvios</button>
+    <p class="nota">Pedido reenviado em outra conta da Shopee. O robô abre essas contas junto com as do dia
+      e só busca o rastreio novo: <b>não escreve nada na Shopify</b> e não mexe no pedido original.
+      O resultado aparece na etapa 4, para você copiar e colar na sua aba de reenvios.</p>
+  </div>
+
   <div class="bloco">
     <div class="rotulo"><h2>Vindos de dias anteriores</h2>
       <span class="dir"><button class="btn peq" id="bVerAtras" aria-expanded="false">Ver quais</button></span></div>
@@ -1148,6 +1165,16 @@ details.cred summary:hover{color:var(--tinta)}
       <tbody id="tbEscrita"></tbody></table></div>
     <p class="nota">Uma conferida na lista e um clique libera o lote inteiro.
       Não precisa aprovar um por um.</p>
+  </div>
+
+  <div class="bloco" id="blReenvios4" hidden>
+    <div class="rotulo"><h2>Reenvios · rastreio novo</h2>
+      <span class="dir"><button class="btn peq" id="bCopiarRe">Copiar todos</button></span></div>
+    <div class="rolo"><table>
+      <thead><tr><th>Linha</th><th>Pedido</th><th>Cliente</th><th>Conta</th><th>Rastreio</th><th></th></tr></thead>
+      <tbody id="tbReenvios"></tbody></table></div>
+    <p class="nota" id="reNota">Estes <b>não vão para a Shopify</b>. Copie o código e cole na linha da sua aba
+      de reenvios; na próxima vez que a aba for lida, a linha sai daqui.</p>
   </div>
 
   <div class="bloco">
@@ -1643,7 +1670,7 @@ function pintaArquivos(){
   $("leSemBloco").hidden=!sem.length; $("leSem").textContent=sem.length;
   $("leSemRot").firstChild.textContent=sem.length===1?"linha sem conta":"linhas sem conta";
   $("leSemOnde").textContent=sem.slice(0,3).join(", ")+(sem.length>3?" e mais "+(sem.length-3):"");
-  $("bRodar").disabled=rodando||!arquivos.length;
+  $("bRodar").disabled=rodando||!(arquivos.length||Number($("blReenvio").dataset.n||0));
   $("rLidos").textContent=TOTAL?("de "+TOTAL+" rastreios lidos"):"rastreios lidos";
   pintaCtrl(); if(!rodando&&!coletou) pintaColeta();
   pintaFechada(); pintaTrilha();
@@ -2973,6 +3000,8 @@ window.TELA = {
     shopEstado=estado; if(dados) shopDados=dados; pintaShopify();
   },
   planilha: somar,
+  // a etapa 1 recalcula o "Iniciar coleta" quando os reenvios mudam
+  repintarArquivos: function(){ pintaArquivos(); },
   avisar: avisar,
   escritaProgresso: function(p){ if(escrevendo) progressoEscrita(p); },
   alertas: function(lista){ alertas=lista||[]; pintaAlertas(); },

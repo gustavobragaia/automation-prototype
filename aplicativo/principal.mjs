@@ -6,7 +6,7 @@
 //   · nada de carregar URL externa: a tela é arquivo local
 //   · a atualização nunca instala no meio de uma rodada
 
-import { app, BrowserWindow, ipcMain, shell, dialog, Notification } from "electron";
+import { app, BrowserWindow, ipcMain, shell, dialog, Notification, clipboard } from "electron";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { mkdirSync } from "node:fs";
@@ -182,6 +182,9 @@ app.whenReady().then(async () => {
     // a janela ter sido fechada.
     aoEvento: (e) => janela?.webContents.send("evento", e),
     abrirNoNavegador: (url) => shell.openExternal(url),
+    // "Copiar" dos reenvios: pela área de transferência do sistema, que no
+    // Windows funciona mesmo quando a janela não está em foco.
+    copiar: (texto) => clipboard.writeText(texto),
     porta: PORTA_EM_USO,
   });
 

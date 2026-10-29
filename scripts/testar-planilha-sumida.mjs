@@ -124,7 +124,7 @@ sec("5. O caso de 26/10: o original some no meio — conferência e escrita segu
   await planilha(p, [453, 454]);
   await des(ponte["planilha:ler"]({ caminho: p }));
   rmSync(p);
-  globalThis.fetch = (async (orig) => async (url, opcoes) => String(url).includes("myshopify")
+  globalThis.fetch = ((orig) => async (url, opcoes) => String(url).includes("myshopify")
     ? new Response(JSON.stringify({ data: { orders: { pageInfo: { hasNextPage: false }, nodes: [] } } }), { status: 200 })
     : orig(url, opcoes))(globalThis.fetch);
   const conf = await erroDe(ponte["conferencia:listar"]({}));

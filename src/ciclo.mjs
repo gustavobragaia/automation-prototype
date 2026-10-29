@@ -27,7 +27,7 @@ export { historico };
  */
 export async function descobrirContas(args = [], {
   aoLog = () => {}, planilha: planilhaPedida, ignorarRecorte = false,
-  aba: abaPedida, desde: desdePedido, dias: diasPedidos,
+  mapear = true, aba: abaPedida, desde: desdePedido, dias: diasPedidos,
 } = {}) {
   if (args.length) return args.map((a) => ({ serial: Number(a), conta: Number(a) }));
 
@@ -76,7 +76,9 @@ export async function descobrirContas(args = [], {
 
     // O mapeamento pedido→conta nasce aqui. Guardá-lo é o que permite, lá na
     // frente, o banco cobrir o que hoje só a planilha sabe.
-    for (const p of r.pendentes) if (p.pedido) anotarMapeamento(p.pedido, p.conta, "planilha");
+    // Reenvio (src/reenvios.mjs) não anota: o número é o do pedido original,
+    // e a conta do reenvio tomaria o lugar da conta onde ele foi comprado.
+    if (mapear) for (const p of r.pendentes) if (p.pedido) anotarMapeamento(p.pedido, p.conta, "planilha");
 
     // A planilha dá o número da conta; a fila precisa do user_id do perfil.
     const { resolvidas, ambiguas } = await resolverContas(
@@ -165,7 +167,7 @@ export function alertarFalhas(falhas, total) {
 }
 
 export async function rodarCiclo({ contas, escrever = true, simular = false,
-                                  planilhas: planilhasPedidas, aba: abaPedida,
+                                  planilhas: planilhasPedidas, aba: abaPedida, soReenvios = false,
                                   aoLog = () => {} } = {}) {
   const inicio = new Date();
   const t0 = Date.now();
@@ -215,6 +217,9 @@ export async function rodarCiclo({ contas, escrever = true, simular = false,
     // de um: o cliente sobe outra planilha no mesmo dia, e as duas valem.
     const arquivos = planilhasPedidas?.length ? planilhasPedidas : [process.env.PLANILHA];
     const escolhidos = Boolean(planilhasPedidas?.length);
+    // Rodada só de reenvios (o app manda a lista vazia): não há planilha do
+    // dia para cruzar, e cair no PLANILHA do .env seria ler outro arquivo.
+    if (soReenvios) throw Object.assign(new Error("só reenvios"), { soReenvios: true });
     const daPlanilha = [];
     for (const arq of arquivos) {
       const lido = await lerPendentes(arq,
@@ -264,13 +269,16 @@ export async function rodarCiclo({ contas, escrever = true, simular = false,
                                  grupo: p.motivo.grupo, em: new Date().toISOString() };
     }
   } catch (e) {
-    aoLog(`escrita não realizada: ${e.message}`);
-    falhasEscrita++;
-    // Ia só para o log, e ninguém via: a rodada de 26/10 12:48 se perdeu assim.
-    alertar({ id: "rodada-sem-cruzar", nivel: "erro",
-      titulo: "A rodada coletou, mas não conseguiu cruzar com a planilha",
-      texto: `O que foi lido na Shopee está guardado. O cruzamento com a planilha falhou: ${e.message}`,
-      acao: "Escolha a planilha de novo na etapa 1 e abra a etapa 3: a conferência e a escrita usam o que já foi coletado, sem abrir as contas de novo." });
+    if (e.soReenvios) aoLog("rodada só de reenvios: nada a escrever na Shopify");
+    else {
+      aoLog(`escrita não realizada: ${e.message}`);
+      falhasEscrita++;
+      // Ia só para o log, e ninguém via: a rodada de 26/10 12:48 se perdeu assim.
+      alertar({ id: "rodada-sem-cruzar", nivel: "erro",
+        titulo: "A rodada coletou, mas não conseguiu cruzar com a planilha",
+        texto: `O que foi lido na Shopee está guardado. O cruzamento com a planilha falhou: ${e.message}`,
+        acao: "Escolha a planilha de novo na etapa 1 e abra a etapa 3: a conferência e a escrita usam o que já foi coletado, sem abrir as contas de novo." });
+    }
   }
 
   salvar(estado);

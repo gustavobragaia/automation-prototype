@@ -932,3 +932,36 @@ contas" fez a rodada começar com os 200 perfis — o teste ganhou um tempo
 máximo para falhar em vez de travar. `ensaio-planilha-sumida.mjs`: escolher,
 apagar de Downloads, "Iniciar coleta": a tabela mostra 3 contas.
 `npm test`: 885; ensaios: 147.
+
+## 28/10/2026 — v0.1.15: reenvios, só coleta
+
+O Matheus guarda os reenvios (troca, pedido cancelado e mandado de novo) na
+aba "REENVIOS + CANCELADOS", 2ª aba do arquivo do Google Sheets: mesmo
+número de pedido, outra compra, quase sempre em outra conta. Testando, o robô
+"não puxou nenhum". Duas causas: a leitura usa só a 1ª aba do arquivo; e,
+mesmo lida, a etapa 4 conta o pedido como "já feito" (na Shopify ele está
+atendido com o rastreio do envio original) e o código colhido sumia.
+
+Ele não quer escrita: quer o código para colar na aba dele.
+
+- **Lista própria, fora de `planilhas`** (`reenvios` na ponte). Tudo que lê
+  `planilhas` escreve na Shopify, anota o mapeamento pedido→conta, alimenta a
+  carteira ou grava motivo. O reenvio não passa por nada disso e não chama a
+  Shopify. `descobrirContas(..., { mapear: false })`: o número é o do pedido
+  original, e anotar trocaria a conta dele.
+- **Mesma fila da rodada do dia**, nunca uma rodada à parte: a rodada apaga a
+  coleta das contas que abre (início de `rodarCiclo`); uma rodada só de
+  reenvio entre a coleta e a etapa 4 trocaria a coleta do dia dessas contas, e
+  gastaria logins do freio. Só reenvios também roda (`soReenvios`: sem
+  cruzamento, sem o alerta "não conseguiu cruzar").
+- **Cópia própria por arquivo**: o mesmo arquivo entra nas duas listas, com
+  abas diferentes, e trocar um não troca o outro.
+- **Nunca devolver o rastreio original** (`src/reenvios.mjs`): compra cujo
+  código já foi escrito na Shopify (em qualquer pedido) é descartada; só
+  vale compra feita no dia da linha ou depois. Duas compras que sobram →
+  "dúvida", mostrando as duas. A mesma compra servindo a dois reenvios →
+  os dois em dúvida.
+- **O achado fica guardado** (`trabalho/reenvios.json`, 60 dias): coleta nova
+  da conta ou app fechado não apagam o código. Sai quando ele cola na aba (a
+  linha deixa de ser pendente).
+- Linha sem conta aparece ("falta a conta"), em vez de sumir.

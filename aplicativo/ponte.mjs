@@ -11,7 +11,8 @@ import { lerMaquina, custoGB, TETO } from "../src/maquina.mjs";
 import { diagnosticar, apiAbertaSemChave } from "../src/adspower.mjs";
 import { conexaoAtiva, ESCOPOS, normalizarLoja, salvarConexao, provarCredenciais, esquecerToken } from "../src/shopify-conexao.mjs";
 import { identidadeDaLoja, escoposConcedidos } from "../src/shopify.mjs";
-import { lerPendentes } from "../src/planilha.mjs";
+import { lerPendentes, abasDaPlanilha, abaDeReenvio } from "../src/planilha.mjs";
+import { apurarReenvios, guardarEcompletar, lerGuardados, textoParaColar } from "../src/reenvios.mjs";
 import { escreverRastreios } from "../src/escrita.mjs";
 import { tirarJaAtendidos } from "../src/carteira-shopify.mjs";
 import { copiarPlanilha, travaDaRodada } from "../src/planilha-copia.mjs";
@@ -73,7 +74,7 @@ export function explicarRecusa(msg = "") {
   return msg;
 }
 
-export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, abrirNoNavegador } = {}) {
+export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, abrirNoNavegador, copiar } = {}) {
   // Os eventos do robô viram eventos da janela. Inscreve uma vez, no
   // arranque: o coletor sobe antes da rodada e emite por conta própria.
   if (enviar) aoEvento(enviar);
@@ -87,6 +88,10 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
   // as contas que a montagem da rodada tirou das planilhas: a rodada só abre
   // essas (trava contra abrir o AdsPower inteiro, como em 27/10)
   let contasDaPlanilha = new Set();
+  // As abas de reenvio (src/reenvios.mjs): { original, copia, aba }. Ficam
+  // FORA de `planilhas` de propósito — tudo que lê `planilhas` escreve na
+  // Shopify, anota mapeamento ou mexe na carteira, e reenvio é só leitura.
+  let reenvios = [];
   let escritaEmCurso = false;
   let diagnosticoEmCurso = null;
   const diagnosticarDeVerdade = (cfg) => tentar(async () => {
@@ -183,7 +188,7 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
   // e "deixar para amanhã" viraria "deixar para hoje".
   const amanha = () => { const d = new Date(); d.setDate(d.getDate() + 1); return diaLocal(d); };
 
-  return {
+  const ponteLocal = {
     // ── ajustes que o cliente escolhe uma vez ─────────────────────────
     // A leitura geral leva só "guardada" no lugar de cada segredo; o valor,
     // para preencher o campo, vem por "ajustes:verSegredo".
@@ -262,7 +267,10 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
       copiaDe.set(caminho, copia);
       abas.set(copia, r.aba);
       aoLog(`planilha escolhida: ${caminho} · ${r.total} linha(s), ${r.contas.length} conta(s) · cópia em ${copia}`);
+      const todas = await abasDaPlanilha(copia);
+      const sugerida = abaDeReenvio(todas.filter((a) => a !== r.aba));
       return {
+        abas: todas, abaReenvio: sugerida,
         aba: r.aba, total: r.total, pendentes: r.pendentes.length,
         contas: r.contas.map((c) => ({ conta: c.conta, pedidos: c.pedidos.length })),
         ignorados: r.ignorados.length,
@@ -483,13 +491,62 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
       // a tela conhece o arquivo original; a lista guarda a cópia
       const alvo = caminho ? (copiaDe.get(caminho) ?? caminho) : null;
       planilhas = alvo ? planilhas.filter((p) => p !== alvo) : [];
-      if (caminho) copiaDe.delete(caminho); else copiaDe.clear();
+      if (caminho) copiaDe.delete(caminho); else { copiaDe.clear(); reenvios = []; }
       return planilhas.length;
     },
 
+    // ── reenvios: só coleta, nada na Shopify (src/reenvios.mjs) ────────
+    "planilha:abas": ({ caminho }) => tentar(async () => {
+      const abas = await abasDaPlanilha(caminho);
+      return { abas, sugerida: abaDeReenvio(abas) };
+    }),
+    // A mesma planilha pode estar aqui E na lista do dia, com outra aba: a
+    // cópia é própria do reenvio, e trocar uma não troca a outra.
+    "reenvios:escolher": ({ caminho, aba }) => tentar(async () => {
+      const copia = copiarPlanilha(caminho);
+      const r = await lerPendentes(copia, { aba });
+      reenvios = reenvios.filter((x) => x.original !== caminho);
+      reenvios.push({ original: caminho, copia, aba: r.aba });
+      aoLog(`reenvios: ${caminho} · aba "${r.aba}" · ${r.pendentes.length} sem rastreio em ${r.contas.length} conta(s) · cópia em ${copia}`);
+      return {
+        aba: r.aba, pendentes: r.pendentes.length,
+        contas: r.contas.map((c) => c.conta), semConta: r.ignorados.length,
+      };
+    }),
+    "reenvios:esquecer": async ({ caminho } = {}) => {
+      reenvios = caminho ? reenvios.filter((x) => x.original !== caminho) : [];
+      return reenvios.length;
+    },
+    "reenvios:listar": () => tentar(async () => {
+      // Sem aba escolhida nesta sessão (o app fechou): o que ficou guardado.
+      if (!reenvios.length) {
+        const g = Object.values(lerGuardados());
+        return { daSessao: false, itens: g.map((x) => ({ ...x, estado: "achado", deAntes: x.em })) };
+      }
+      const coletas = lerColetas(), registro = lerRegistro();
+      const itens = [];
+      for (const r of reenvios) {
+        const lido = await lerPendentes(r.copia, { aba: r.aba });
+        itens.push(...apurarReenvios({ pendentes: lido.pendentes, semConta: lido.ignorados, coletas, registro })
+          .map((i) => ({ ...i, aba: r.aba })));
+      }
+      return { daSessao: true, itens: guardarEcompletar(itens) };
+    }),
+    "reenvios:copiar": ({ texto, todos } = {}) => tentar(async () => {
+      const t = todos ? textoParaColar((await (async () => {
+        const r = await ponteLocal["reenvios:listar"]();
+        if (!r.ok) throw new Error(r.erro);
+        return r.dado.itens;
+      })())) : String(texto ?? "");
+      if (!t) throw new Error("nenhum rastreio para copiar");
+      if (!copiar) throw new Error("copiar não está disponível aqui");
+      copiar(t);
+      return { linhas: t.split("\n").length };
+    }),
+
     "rodada:contas": (args) => tentar(async () => {
       if (Array.isArray(args) && args.length) return descobrirContas(args, { aoLog });
-      if (!planilhas.length) throw new Error("nenhuma planilha escolhida ainda");
+      if (!planilhas.length && !reenvios.length) throw new Error("nenhuma planilha escolhida ainda");
 
       // O cliente pode subir mais de uma planilha no mesmo dia. Uma conta que
       // aparece em duas é uma conta só: abrir o mesmo perfil duas vezes na
@@ -498,6 +555,13 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
       for (const planilha of planilhas)
         for (const c of await descobrirContas([],
                { aoLog, planilha, ignorarRecorte: true, aba: abaDe(planilha) }))
+          if (!porConta.has(c.conta)) porConta.set(c.conta, c);
+      // As contas dos reenvios entram na MESMA fila: cada conta é aberta uma
+      // vez só. Uma rodada à parte apagaria a coleta do dia dessas contas
+      // (ciclo.mjs, início da rodada) e gastaria logins do freio.
+      for (const r of reenvios)
+        for (const c of await descobrirContas([],
+               { aoLog, planilha: r.copia, ignorarRecorte: true, aba: r.aba, mapear: false }))
           if (!porConta.has(c.conta)) porConta.set(c.conta, c);
       // A aba Contas mostra o perfil de cada conta; o mapa custa uma
       // varredura de 972 perfis, então guarda o que esta rodada resolveu.
@@ -542,10 +606,11 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
       if (concorrencia) process.env.CONCORRENCIA = String(concorrencia);
       // As travas de 26 e 27/10 (src/planilha-copia.mjs): planilha
       // acessível, e nenhuma conta de fora dela.
-      const trava = travaDaRodada({ planilhas, contas: contas ?? [], daPlanilha: contasDaPlanilha });
+      const trava = travaDaRodada({ planilhas: [...planilhas, ...reenvios.map((r) => r.copia)],
+                                    contas: contas ?? [], daPlanilha: contasDaPlanilha });
       if (trava) throw new Error(trava);
       // relê o PLANILHA do ambiente, que no app é o .env do projeto.
-      rodadaEmCurso = rodarCiclo({ contas, escrever, planilhas, aoLog })
+      rodadaEmCurso = rodarCiclo({ contas, escrever, planilhas, aoLog, soReenvios: !planilhas.length })
         .finally(() => { rodadaEmCurso = null; });
       try {
         return await rodadaEmCurso;
@@ -611,4 +676,5 @@ export function construir({ aoLog = () => {}, aoEvento: enviar, porta = 3000, ab
     // ── histórico ─────────────────────────────────────────────────────
     "historico:listar": async ({ limite = 60 } = {}) => historico(limite),
   };
+  return ponteLocal;
 }

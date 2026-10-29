@@ -245,10 +245,115 @@ async function ler(caminho){
       lista: r.contas.map(function(c){ return c.conta; }),
       semConta: r.semConta || [],
     });
+    // A planilha inteira do Google Sheets traz a aba de reenvios junto, e a
+    // leitura do dia usa só a 1ª aba: oferece a outra com um clique.
+    if (r.abaReenvio) sugerirReenvio(caminho, nome, r.abaReenvio);
   } catch (e) {
     console.error("[esteira] planilha " + nome + ":", e.message);
     TELA.avisar("Não consegui ler " + nome, e.message);
   }
+}
+
+/* ── Reenvios: só coleta (src/reenvios.mjs) ── */
+var reLista = [];
+function pintaReenvios(){
+  var bl = document.getElementById("blReenvio");
+  bl.dataset.n = String(reLista.length);
+  document.getElementById("reArq").innerHTML = reLista.map(function(a, i){
+    return '<div class="arq"><div><div class="nm">' + esc(a.nome) + ' · aba "' + esc(a.aba) + '"</div><div class="meta">' +
+      a.pendentes + ' reenvio(s) para buscar · ' + a.contas.length + ' conta(s)' +
+      (a.semConta ? ' · ' + a.semConta + ' sem conta' : '') + '</div></div>' +
+      '<button data-tirar-re="' + i + '" aria-label="Remover"><svg viewBox="0 0 24 24">' +
+      '<path d="M18 6L6 18M6 6l12 12"/></svg></button></div>';
+  }).join("");
+  document.getElementById("bReenvio").textContent = reLista.length ? "Escolher outra planilha de reenvios" : "Escolher planilha de reenvios";
+  if (TELA.repintarArquivos) TELA.repintarArquivos();
+}
+async function usarReenvio(caminho, aba){
+  var nome = caminho.split(/[\\/]/).pop();
+  try {
+    var r = await pedir("reenvios:escolher", { caminho: caminho, aba: aba });
+    reLista = reLista.filter(function(x){ return x.caminho !== caminho; });
+    reLista.push({ caminho: caminho, nome: nome, aba: r.aba, pendentes: r.pendentes,
+                   contas: r.contas || [], semConta: r.semConta || 0 });
+    document.getElementById("reSugere").hidden = true;
+    document.getElementById("reEscolha").hidden = true;
+    pintaReenvios();
+  } catch (e) { TELA.avisar("Não consegui ler os reenvios de " + nome, e.message); }
+}
+function sugerirReenvio(caminho, nome, aba){
+  if (reLista.some(function(x){ return x.caminho === caminho; })) return;
+  var el = document.getElementById("reSugere");
+  el.innerHTML = '<span class="nota" style="margin:0 8px 0 0">A planilha <b>' + esc(nome) + '</b> tem a aba <b>"' +
+    esc(aba) + '"</b>.</span><button class="btn peq" id="bReSug">Usar como reenvios</button>';
+  el.hidden = false;
+  document.getElementById("bReSug").onclick = function(){ usarReenvio(caminho, aba); };
+}
+async function escolherReenvio(caminho){
+  var r = await pedir("planilha:abas", { caminho: caminho });
+  if (r.abas.length === 1) return usarReenvio(caminho, r.abas[0]);
+  if (r.sugerida) return usarReenvio(caminho, r.sugerida);
+  // várias abas e nenhuma com "reenvio" no nome: a pessoa escolhe
+  var sel = document.getElementById("reAba");
+  sel.innerHTML = r.abas.map(function(a){ return '<option>' + esc(a) + '</option>'; }).join("");
+  document.getElementById("reEscolha").hidden = false;
+  document.getElementById("bReAba").onclick = function(){ usarReenvio(caminho, sel.value); };
+}
+function rotuloReenvio(i){
+  if (i.estado === "achado") return '<span class="mono">' + esc(i.codigos.join(" · ")) + '</span>' +
+    (i.deAntes ? ' <span class="ter" style="font-size:12px">lido em ' + esc(i.deAntes.slice(8, 10) + "/" + i.deAntes.slice(5, 7)) + '</span>' : '');
+  if (i.estado === "sem-rastreio-ainda") return '<span class="ter">a compra está na conta, mas a Shopee ainda não despachou</span>';
+  if (i.estado === "nao-achado") return '<span class="ter">nenhuma compra deste cliente na conta, desde a data da linha</span>';
+  if (i.estado === "conta-nao-lida") return '<span class="ter">a conta não foi lida nesta rodada</span>';
+  if (i.estado === "falta-conta") return '<span class="ter">falta a conta na coluna "onde foi feito o pedido"</span>';
+  if (i.estado === "duvida") return '<span class="ter">' + i.candidatos.length + ' compras deste cliente na conta: </span><span class="mono">' +
+    esc(i.candidatos.map(function(c){ return (c.codigos || []).join(" + ") || "sem rastreio"; }).join(" ou ")) + '</span>';
+  return esc(i.estado);
+}
+async function carregarReenvios(){
+  try {
+    var r = await pedir("reenvios:listar", {});
+    var bl = document.getElementById("blReenvios4");
+    bl.hidden = !r.itens.length;
+    var achados = r.itens.filter(function(i){ return i.estado === "achado"; });
+    document.getElementById("bCopiarRe").hidden = !achados.length;
+    document.getElementById("tbReenvios").innerHTML = r.itens.map(function(i){
+      return '<tr><td class="num">' + esc(i.linha || "") + '</td><td class="mono">' + esc(i.pedido) + '</td><td>' + esc(i.nome) +
+        '</td><td>' + (i.conta != null ? "Shopee " + esc(i.conta) : "—") + '</td><td>' + rotuloReenvio(i) + '</td><td class="dir">' +
+        (i.estado === "achado" ? '<button class="btn peq" data-copiar-re="' + esc(i.codigos.join(" - ")) + '">Copiar</button>' : '') + '</td></tr>';
+    }).join("");
+    document.getElementById("reNota").innerHTML = r.daSessao
+      ? 'Estes <b>não vão para a Shopify</b>. Copie o código e cole na linha da sua aba de reenvios; na próxima vez que a aba for lida, a linha sai daqui.'
+      : 'Os reenvios achados nas últimas rodadas. Escolha a aba de reenvios na etapa 1 para conferir de novo.';
+  } catch (e) { console.error("[esteira] reenvios:", e.message); }
+}
+function copiado(botao, texto){
+  var antes = botao.textContent; botao.textContent = texto || "Copiado";
+  setTimeout(function(){ botao.textContent = antes; }, 1600);
+}
+function reenvios(){
+  document.getElementById("bReenvio").onclick = async function(){
+    var caminhos = await window.esteira.escolherPlanilha();
+    if (caminhos.length) try { await escolherReenvio(caminhos[0]); }
+      catch (e) { TELA.avisar("Não consegui abrir a planilha de reenvios", e.message); }
+  };
+  document.getElementById("reArq").addEventListener("click", function(e){
+    var b = e.target.closest("[data-tirar-re]"); if (!b) return;
+    var fora = reLista.splice(Number(b.dataset.tirarRe), 1)[0];
+    pintaReenvios();
+    if (fora) pedir("reenvios:esquecer", { caminho: fora.caminho }).catch(function(){});
+  });
+  document.getElementById("tbReenvios").addEventListener("click", async function(e){
+    var b = e.target.closest("[data-copiar-re]"); if (!b) return;
+    try { await pedir("reenvios:copiar", { texto: b.dataset.copiarRe }); copiado(b); }
+    catch (er) { TELA.avisar("Não consegui copiar", er.message); }
+  });
+  document.getElementById("bCopiarRe").onclick = async function(){
+    var b = this;
+    try { var r = await pedir("reenvios:copiar", { todos: true }); copiado(b, r.linhas + " copiado(s)"); }
+    catch (er) { TELA.avisar("Não consegui copiar", er.message); }
+  };
+  carregarReenvios();
 }
 
 /* ── A rodada de verdade ── */
@@ -269,6 +374,7 @@ function rodada(){
       TELA.rodada.terminar(e);
       // A conciliação já rodou junto com a coleta; agora a lista é real.
       if (!e.erro) { carregarConferencia(); carregarEscrita(); }
+      carregarReenvios();
       recarregar();
       return;
     }
@@ -510,6 +616,7 @@ GANCHOS.proximaRodada = async function(){
   // As planilhas de ontem saem da lista do robô — senão a próxima rodada
   // abriria as contas delas de novo — e a etapa 1 recarrega da carteira.
   try { await pedir("planilha:esquecer", {}); } catch (e) {}
+  reLista = []; pintaReenvios();   // a ponte esqueceu os reenvios junto
   recarregar();
 };
 // Ao abrir a aba Histórico, ela é lida de novo: o que foi escrito por
@@ -616,7 +723,7 @@ function avisos(){
   var partes = [
     // só ligam botões: instantâneos, rodam todos no mesmo instante, antes
     // que qualquer clique ou arrastar consiga acontecer
-    ["AdsPower",adspower],["arquivos",arquivos],["planilha",planilha],["rodada",rodada],
+    ["AdsPower",adspower],["arquivos",arquivos],["planilha",planilha],["reenvios",reenvios],["rodada",rodada],
     ["conferência",conferencia],["escrita",escrita],["avisos",avisos],["atualização",atualizacao],
     // carregam: vão à ponte e esperam
     ["arranque",arranque],["ajustes",ajustes],["máquina",maquina],["Shopify",shopify],["alertas",alertas]];
